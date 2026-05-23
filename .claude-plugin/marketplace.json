@@ -1,0 +1,20 @@
+{
+  "$schema": "https://anthropic.com/claude-code/marketplace.schema.json",
+  "name": "jd-claude-skill",
+  "description": "jamehd's personal Claude Code marketplace — skills, commands, and workflows.",
+  "owner": {
+    "name": "jamehd"
+  },
+  "plugins": [
+    {
+      "name": "jd",
+      "description": "Personal skill library by jamehd — UI self-review and other engineering workflows.",
+      "author": {
+        "name": "jamehd"
+      },
+      "category": "development",
+      "source": "./plugins/jd",
+      "homepage": "https://github.com/jamehd/jd-claude-skill"
+    }
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "name": "jd",
+  "description": "Personal skill library by jamehd — UI self-review and other engineering workflows.",
+  "version": "0.1.0",
+  "author": {
+    "name": "jamehd"
+  },
+  "homepage": "https://github.com/jamehd/jd-claude-skill",
+  "repository": "https://github.com/jamehd/jd-claude-skill",
+  "license": "MIT",
+  "keywords": [
+    "skills",
+    "ui-review",
+    "design-system",
+    "frontend"
+  ]
+}
