@@ -1,0 +1,9 @@
+{
+  "name": "nodejs-nestjs-broken",
+  "version": "0.0.1",
+  "dependencies": {
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/common": "^10.0.0",
+    "@sentry/node": "^7.0.0"
+  }
+}

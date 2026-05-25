@@ -1,0 +1,46 @@
+# error-audit.config.yaml
+# Place at project root. Skill detects this file and skips the interactive confirmation gate.
+
+# Override auto-detected critical paths (boost severity +1 for findings inside).
+critical_paths:
+  - src/payment/**
+  - src/auth/**
+  - src/checkout/**
+
+# Add or replace the default critical_path_keywords list (see references/critical-path-keywords.md).
+critical_path_keywords:
+  add:
+    - vault
+  # remove: [subscription]   # uncomment to remove defaults
+  # replace: true            # set true to use only `critical_paths` above, ignoring keywords
+
+# Override the default sensitive-data patterns (see references/sensitive-data-patterns.md).
+sensitive_patterns:
+  add:
+    - internal_id
+  exempt_files:
+    - src/legacy/**
+
+# Project uses a custom logger; tell the skill to recognize these as log call sites.
+log_function_names:
+  - logger
+  - log
+  - myLogger
+  # default: [console, logger, log]
+
+# Skip patterns by ID (use sparingly — document why).
+skip_patterns:
+  - nodejs/03-error-class-taxonomy  # we accept generic Error in this codebase intentionally
+
+# Glob patterns to exclude from all scans.
+exclude_paths:
+  - '**/*.test.*'
+  - '**/*.spec.*'
+  - '**/__tests__/**'
+  - '**/dist/**'
+  - '**/build/**'
+  - '**/node_modules/**'
+  - '**/vendor/**'
+
+# Output directory for reports.
+output_dir: ./error-audit-report

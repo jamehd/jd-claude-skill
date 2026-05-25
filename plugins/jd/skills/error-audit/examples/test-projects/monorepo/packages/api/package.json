@@ -1,0 +1,4 @@
+{
+  "name": "@example/api",
+  "dependencies": { "@nestjs/core": "^10.0.0" }
+}
