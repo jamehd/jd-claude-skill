@@ -11,10 +11,14 @@ A growing library of personal engineering skills. After install, every skill is 
 | Skill | Description |
 |-------|-------------|
 | `jd:self-review-ui` | UI audit against `DESIGN_SYSTEM.md` / `design-theme-*.html` or a built-in default checklist. Reports severity-grouped, file+line-anchored findings. |
+| `jd:error-audit` | Error-handling audit across code patterns, logging, notification routing, and user messages. Supports Node.js/TypeScript, Go, and Frontend (React/Vue/Next.js). Outputs severity-classified report + per-finding fix files. Read-only. |
+| `jd:postgres-audit` | PostgreSQL audit covering performance, security, schema, configuration, and operations. Requires a read-only DB connection. Outputs severity-classified report + reviewable SQL fix scripts (never executed). |
 
 | Command | Description |
 |---------|-------------|
 | `/jd:self-review-ui [scope]` | Run the UI self-review. Optional `scope` argument restricts to a path. |
+| `/jd:error-audit [scope\|stack\|dry-run]` | Run the error-handling audit. Optional argument: scope path, stack filter (`nodejs`/`go`/`frontend`), or `dry-run` to list checks. |
+| `/jd:postgres-audit [url\|category\|dry-run\|--anonymize]` | Run the PostgreSQL audit. Optional argument: connection URL, category filter (`performance`/`security`/`schema`/`configuration`/`operations`), `dry-run`, or `--anonymize`. |
 
 ## Install
 
