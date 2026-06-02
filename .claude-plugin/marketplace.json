@@ -8,7 +8,7 @@
   "plugins": [
     {
       "name": "jd",
-      "description": "Personal skill library by jamehd — UI self-review and other engineering workflows.",
+      "description": "Personal skill library by jamehd — design/scaffold (architect) and audit skills for UI, error handling, and databases, plus engineering workflows.",
       "author": {
         "name": "jamehd"
       },

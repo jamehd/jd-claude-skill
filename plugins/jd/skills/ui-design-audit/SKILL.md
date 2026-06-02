@@ -1,9 +1,9 @@
 ---
-name: self-review-ui
-description: Use this skill whenever the user asks for a UI review, design audit, theme compliance check, or wants to verify that the frontend implementation matches the project's design system. Trigger on phrases like "review UI", "kiểm tra UI", "check design", "rà soát giao diện", "audit theme", "self-review UI", "check Tailwind", or whenever the user has finished a UI change and wants quality assurance. The skill scans the source code, compares it against the project's DESIGN_SYSTEM.md / design-theme-v2.html (or a default UI-quality checklist if those files are absent), and reports concrete, file-and-line-anchored violations grouped by severity.
+name: ui-design-audit
+description: Use this skill whenever the user asks for a UI review, design audit, theme compliance check, or wants to verify that the frontend implementation matches the project's design system. Trigger on phrases like "review UI", "ui audit", "design audit", "kiểm tra UI", "check design", "rà soát giao diện", "audit theme", "check Tailwind", or whenever the user has finished a UI change and wants quality assurance. The skill scans the source code, compares it against the project's DESIGN_SYSTEM.md / design-theme-v2.html (or a default UI-quality checklist if those files are absent), and reports concrete, file-and-line-anchored violations grouped by severity.
 ---
 
-# Self-Review UI
+# UI Design Audit
 
 A systematic UI audit skill. Treat the codebase as something to inspect, not modify — produce a precise report of what diverges from the design system (or from universal UI quality rules) so the human can decide what to fix.
 

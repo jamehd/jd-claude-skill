@@ -69,7 +69,7 @@ In review step 2, decide from the diff which domain audits to run. Run an audit 
 
 | Audit | Run when the diff touches | Notes |
 |-------|---------------------------|-------|
-| `jd:self-review-ui` | Frontend/UI: components, pages, styles, theme/design-system files | Scope it to the changed UI paths. |
+| `jd:ui-design-audit` | Frontend/UI: components, pages, styles, theme/design-system files | Scope it to the changed UI paths. |
 | `jd:db-audit` | DB schema (Prisma), migrations, or query-heavy data-access code | The static (prisma) layer needs only the schema file and always runs when a schema is present. The runtime (postgres) layer needs a read-only DB connection (`DATABASE_AUDIT_URL` or a passed URL); if none is configured, run the static layer only and record the runtime layer as skipped — do NOT stop to ask. |
 | `jd:error-audit` | New or changed error handling, logging, or critical paths (payment/auth/upload) | Scope it to the changed paths. If `error-standard.yaml` exists, conformance mode runs automatically and checks the diff against the project's error contract. |
 
