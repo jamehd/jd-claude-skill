@@ -19,9 +19,10 @@ Audit error handling across four dimensions and produce a classified Markdown re
 ## What this skill does
 1. Detects project stacks (Node/Go/Frontend) and critical paths (payment/auth/...)
 2. Runs pattern checks across 4 dimensions: Code (A), Logging (B), Routing (C), User Messaging (E)
-3. Classifies findings Critical/High/Medium/Low (boosted in critical paths)
-4. Outputs `AUDIT-REPORT.md` + `EXECUTIVE-SUMMARY.md` + per-finding fix files + raw scan output
-5. Read-only — does NOT modify code, does NOT call external APIs
+3. Conformance mode (when `error-standard.yaml` is present): also checks the code against the project's adopted error contract — see `references/conformance-mode.md`
+4. Classifies findings Critical/High/Medium/Low (boosted in critical paths)
+5. Outputs `AUDIT-REPORT.md` + `EXECUTIVE-SUMMARY.md` + per-finding fix files + raw scan output
+6. Read-only — does NOT modify code, does NOT call external APIs, does NOT edit the contract
 
 ## Workflow
 
@@ -29,6 +30,7 @@ Audit error handling across four dimensions and produce a classified Markdown re
 - Verify `ripgrep` available: `rg --version`. If missing, abort with install instructions.
 - Verify target project: there must be at least one of `package.json`, `go.mod`, or a `src/` directory.
 - Look for `error-audit.config.yaml` at project root.
+- Look for `error-standard.yaml` at project root. If present, enable conformance mode (load the contract per `references/conformance-mode.md`). If the invocation is `conformance`, run conformance checks only; if no contract is found in that case, stop and point the user at `jd:architect-error-system-design`.
 
 ### Step 2 — Stack Detection
 - Follow rules in `detectors/stack-detection.md`.
@@ -46,6 +48,7 @@ Audit error handling across four dimensions and produce a classified Markdown re
 ### Step 5 — Pattern Execution
 - Always run `patterns/_common/*`.
 - Run `patterns/<stack>/*` for each detected stack (per mapping in `detectors/stack-detection.md`).
+- In conformance mode, also run `patterns/_conformance/*` with the loaded `error-standard.yaml` registry as input. If the invocation was `conformance`, run ONLY `patterns/_conformance/*`.
 - Fail-safe: a single pattern's failure logs an error in `raw/skipped-patterns.json` and DOES NOT abort the audit.
 - For each pattern: read the `Ripgrep command(s):` block, execute, collect output. Apply false-positive guards described in the pattern file.
 
@@ -95,6 +98,7 @@ Report: ./error-audit-report/2026-05-25-14-30-00/AUDIT-REPORT.md
 - Does NOT execute project code
 
 ## References
+- Conformance mode: `references/conformance-mode.md`
 - Severity rubric: `references/severity-classification.md`
 - Error taxonomy: `references/error-taxonomy.md`
 - Routing matrix: `references/notification-routing-guide.md`
