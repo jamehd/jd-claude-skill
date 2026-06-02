@@ -70,7 +70,7 @@ In review step 2, decide from the diff which domain audits to run. Run an audit 
 | Audit | Run when the diff touches | Notes |
 |-------|---------------------------|-------|
 | `jd:self-review-ui` | Frontend/UI: components, pages, styles, theme/design-system files | Scope it to the changed UI paths. |
-| `jd:postgres-audit` | DB schema, migrations, or query-heavy data-access code | Needs a read-only DB connection (`DATABASE_AUDIT_URL` or a passed URL). If none is configured, skip and record it as a skipped audit in the report — do NOT stop to ask. |
+| `jd:db-audit` | DB schema (Prisma), migrations, or query-heavy data-access code | The static (prisma) layer needs only the schema file and always runs when a schema is present. The runtime (postgres) layer needs a read-only DB connection (`DATABASE_AUDIT_URL` or a passed URL); if none is configured, run the static layer only and record the runtime layer as skipped — do NOT stop to ask. |
 | `jd:error-audit` | New or changed error handling, logging, or critical paths (payment/auth/upload) | Scope it to the changed paths. |
 
 If the diff touches none of these (e.g. docs or config only), skip all three and say so. Multiple may apply at once — run each relevant one. These audits are read-only; treat their findings as input to the general review, not a reason to halt unless a finding hits the STOP list.

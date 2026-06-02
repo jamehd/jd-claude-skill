@@ -1,0 +1,22 @@
+{
+  "$comment": "Place a copy named db-audit.config.json at the target repo root to pin which layers run. Omit the file to let the skill auto-detect. This example matches a Prisma + PostgreSQL project (such as CrewOS).",
+  "layers": {
+    "schemaStatic": {
+      "enabled": true,
+      "adapter": "prisma",
+      "schemaPath": "prisma/schema.prisma",
+      "scanCallSites": false,
+      "callSiteGlobs": ["apps/web/src/**/*.ts"]
+    },
+    "runtime": {
+      "enabled": true,
+      "engine": "postgres",
+      "connectionEnv": "DATABASE_AUDIT_URL",
+      "categories": ["performance", "security", "schema", "configuration", "operations"]
+    }
+  },
+  "output": {
+    "dir": "audit-reports",
+    "gitignore": true
+  }
+}

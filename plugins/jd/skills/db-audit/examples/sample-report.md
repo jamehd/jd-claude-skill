@@ -3,7 +3,7 @@
 **Database:** `production_db` @ `db-prod-01.example.com:5432`
 **PostgreSQL Version:** 15.4
 **Audit Date:** 2026-05-25 14:30:22 UTC
-**Audited By:** Claude Code (postgres-audit skill v1.0)
+**Audited By:** Claude Code (db-audit skill, runtime/postgres layer)
 **DB Size:** 247 GB
 **Tables:** 142
 **Connection User:** `audit_readonly`
