@@ -21,22 +21,15 @@ Keep moving. When a decision has a reasonable default, pick it, record it as an 
 
 ## The chain — run in order, do not stop between phases
 
-1. **Brainstorm** — Load superpowers:brainstorming. Explore intent, requirements, and edge cases yourself. Resolve open questions with sensible defaults instead of asking. Record every assumption.
-2. **Spec** — Write a short spec: scope, the decisions you made, and an explicit **Assumptions** list. This is the audit trail the user reviews later.
-3. **Plan** — Load superpowers:writing-plans. Break into independent, testable tasks. Assign model per task (Sonnet for routine, Opus 4.8 for complex).
+1. **Brainstorm** — Load superpowers:brainstorming and run it as self-Q&A: surface the questions it would ask, answer each with a sensible default drawn from the request, codebase, CLAUDE.md, or memory, and record every answer as an assumption. Do not pause for user input — the only exceptions are STOP-list items.
+2. **Spec** — Write a short spec: scope, the decisions you made, and an explicit **Assumptions** list. Write the spec, the Assumptions list, and the plan under `.jd/auto/<YYYY-MM-DD-HHMMSS>/` (shared output convention: `../../shared/output-convention.md`). The PR and branch are the deliverable; these files are the audit trail the user reviews later.
+3. **Plan** — Load superpowers:writing-plans. Break into independent, testable tasks. Assign model per task (Sonnet for routine, Opus for complex).
 4. **Worktree** — Load superpowers:using-git-worktrees. Isolate work in a fresh worktree/branch off the base branch. Never work on the base branch directly.
-5. **Implement (subagent-driven)** — Load superpowers:subagent-driven-development + superpowers:test-driven-development. One task at a time. Dispatch each task to a subagent on the model matched to its size (see **Subagent model selection**). Run the project's tests after each task; do not defer the suite to the end.
-6. **Review** — three layers, in order:
-   1. **General review** — Load superpowers:requesting-code-review and collect findings.
-   2. **Domain audits** — Run only the audits relevant to what the diff touched (see **Domain review routing**) and collect findings.
-   3. **Fix** — Apply fixes per the **Fix policy** below, through a subagent with TDD, then re-run the affected tests.
-   4. **Verify** — Load superpowers:verification-before-completion. Run the commands and confirm output before claiming done.
-
-### Fix policy
-
-- **Severity:** Auto-fix **Critical and High** findings. Record **Medium and Low** in the end-of-run report for the user to decide later — do not fix them.
-- **Scope:** Only fix findings inside **this change's diff**. Findings the audits surface in pre-existing code outside the diff go to the report as "out of scope, not fixed" — do not expand the PR to fix them.
-- **After fixing:** re-run the affected tests and re-verify. If a Critical/High fix would itself require a STOP-list decision (schema change, destructive migration), stop and ask instead of forcing it.
+5. **Implement (subagent-driven)** — Load superpowers:subagent-driven-development + superpowers:test-driven-development. One task at a time. Dispatch each task to a subagent on the model matched to its size (see **Subagent model selection**). Run the project's tests after each task; do not defer the suite to the end. Debug failures with superpowers:systematic-debugging, not guesswork, and honor the **Escalation** rule below.
+6. **Review** — in order:
+   a. **General review** — Load superpowers:requesting-code-review; collect findings.
+   b. **Domain audits** — Run only the audits the diff triggers (see **Domain review routing**); collect findings.
+   c. **Fix and verify** — Apply fixes per the **Fix policy** (below) through a subagent with TDD, re-run the affected tests, then Load superpowers:verification-before-completion and confirm output before claiming done.
 7. **Pull request** — Load superpowers:finishing-a-development-branch. Commit, push the branch, open the PR, report the link.
 
 ## STOP and ask — ONLY these
@@ -49,6 +42,16 @@ Pause for input only when a decision is one of:
 - **Genuine fork:** two or more reasonable options diverge materially AND a wrong pick wastes significant work AND nothing in the request, codebase, CLAUDE.md, or memory points to one.
 
 If none apply, do NOT stop. Pick the default, log the assumption, continue.
+
+## Escalation — stop and report when you CANNOT proceed
+
+Distinct from the STOP list (decisions the user must own), these are dead-ends where you cannot move forward:
+
+- A task's tests still fail after 3 focused attempts using superpowers:systematic-debugging.
+- The same fix re-breaks a test you just made pass (thrashing).
+- A required tool, credential, or service is missing and there is no offline path.
+
+On any of these: stop the chain, leave the work in the worktree, and report the failing task plus exactly what you tried. Never mark a failing task done, never skip it silently, never delete the work to "start clean".
 
 ## Do NOT stop for
 
@@ -63,9 +66,13 @@ If none apply, do NOT stop. Pick the default, log the assumption, continue.
 - "I'll just proceed" on something in the STOP list. Stop and ask.
 - "The request is a bit vague so I'll keep asking." Make defaults, record assumptions, deliver.
 
+## One-time scope checkpoint (not per-step)
+
+If the plan exceeds ~8 tasks or spans multiple subsystems, post the spec + plan + assumptions ONCE for a go/no-go before implementing. This is a single gate, not a return to per-step approval; after the go, run the rest of the chain uninterrupted.
+
 ## Domain review routing
 
-In review step 2, decide from the diff which domain audits to run. Run an audit only when its trigger is in the change; skip the rest and note what you skipped.
+In review step 6b, decide from the diff which domain audits to run. Run an audit only when its trigger is in the change; skip the rest and note what you skipped.
 
 | Audit | Run when the diff touches | Notes |
 |-------|---------------------------|-------|
@@ -73,7 +80,13 @@ In review step 2, decide from the diff which domain audits to run. Run an audit 
 | `jd:db-audit` | DB schema (Prisma), migrations, or query-heavy data-access code | The static (prisma) layer needs only the schema file and always runs when a schema is present. The runtime (postgres) layer needs a read-only DB connection (`DATABASE_AUDIT_URL` or a passed URL); if none is configured, run the static layer only and record the runtime layer as skipped — do NOT stop to ask. |
 | `jd:error-audit` | New or changed error handling, logging, or critical paths (payment/auth/upload) | Scope it to the changed paths. If `error-standard.yaml` exists, conformance mode runs automatically and checks the diff against the project's error contract. |
 
-If the diff touches none of these (e.g. docs or config only), skip all three and say so. Multiple may apply at once — run each relevant one. These audits are read-only; treat their findings as input to the general review, not a reason to halt unless a finding hits the STOP list.
+If the diff touches none of these (e.g. docs or config only), skip all three and say so. Multiple may apply at once — run each relevant one. If the diff touches auth, PII, or upload paths, also run a security pass (the built-in security-review) and fold its findings into the general review. These audits are read-only; treat their findings as input to the general review, not a reason to halt unless a finding hits the STOP list.
+
+## Fix policy
+
+- **Severity:** Auto-fix **Critical and High** findings. Record **Medium and Low** in the end-of-run report for the user to decide later — do not fix them.
+- **Scope:** Only fix findings inside **this change's diff**. Findings the audits surface in pre-existing code outside the diff go to the report as "out of scope, not fixed" — do not expand the PR to fix them.
+- **After fixing:** re-run the affected tests and re-verify. If a Critical/High fix would itself require a STOP-list decision (schema change, destructive migration), stop and ask instead of forcing it.
 
 ## Subagent model selection
 
@@ -89,12 +102,14 @@ When a task sits on the line, size up: more files, more unknowns, or higher blas
 - English for code and docs; no redundant comments; no icons or symbols.
 - Web PWA follows Hyundai Premium v3 tokens; never hardcode hex.
 - Commit footer: Co-Authored-By line. PR body footer: Generated with Claude Code.
-- Tests must actually pass. Evidence before "done".
+- Tests: capture the baseline once before implementing (run the suite, record failures). A task is done only when it adds NO failures beyond that baseline. Pre-existing failures outside this change's diff are recorded as out-of-scope, never "fixed" to force green. Evidence (the actual run) before claiming done.
 
 ## End of run — report
 
 - PR link
 - One-line summary per task
 - The full **Assumptions** list, surfaced prominently so the user can correct anything you decided
+- Any **Escalation** or **out-of-scope** items left unresolved
+- Write this same report to `.jd/auto/<YYYY-MM-DD-HHMMSS>/REPORT.md` in addition to printing it
 
 This assumptions log is the contract: in auto mode the user trades per-step approval for a clear record of every decision made on their behalf.

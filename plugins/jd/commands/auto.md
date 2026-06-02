@@ -16,4 +16,4 @@ Steps:
 4. Pause ONLY for architectural, hard-to-reverse, or destructive decisions (see the skill's STOP list). Otherwise pick sensible defaults and record them as assumptions.
 5. End by reporting the PR link, a per-task summary, and the full assumptions list.
 
-Per-task model: Sonnet for routine tasks, Opus 4.8 for complex ones. Work in an isolated worktree/branch, never the base branch.
+Per-task model: Sonnet for routine tasks, Opus for complex ones. Work in an isolated worktree/branch, never the base branch.
