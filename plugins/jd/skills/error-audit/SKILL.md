@@ -58,7 +58,7 @@ Audit error handling across four dimensions and produce a classified Markdown re
 - Cross-check with `references/severity-classification.md` rubric for any composite checks.
 
 ### Step 7 — Generate Output
-Create `<project_root>/<output_dir>/<YYYY-MM-DD-HH-MM-SS>/` (default `output_dir`: `error-audit-report`) with:
+Create `<project_root>/<output_dir>/<YYYY-MM-DD-HH-MM-SS>/` (default `output_dir`: `.jd/error-audit`, per the shared output convention `../../shared/output-convention.md`) with:
 - `AUDIT-REPORT.md` (filled-in `templates/report-template.md`)
 - `EXECUTIVE-SUMMARY.md` (filled-in `templates/executive-summary-template.md`)
 - `fixes-critical/`, `fixes-high/`, `fixes-medium/`, `fixes-low/` — one `.md` per finding (filled-in `templates/fix-template.md`)
@@ -71,7 +71,7 @@ Audit complete. Findings:
   High: 12
   Medium: 28
   Low: 41
-Report: ./error-audit-report/2026-05-25-14-30-00/AUDIT-REPORT.md
+Report: ./.jd/error-audit/2026-05-25-14-30-00/AUDIT-REPORT.md
 ```
 
 ## Edge cases
@@ -87,7 +87,7 @@ Report: ./error-audit-report/2026-05-25-14-30-00/AUDIT-REPORT.md
 10. Test files → skipped by default
 
 ## Output safety
-- Output dir is git-ignored by default (skill prompts to add `error-audit-report/` to `.gitignore` if not present).
+- Output dir is git-ignored by default (skill ensures `.jd/` is in `.gitignore` if not present).
 - Snippets in fix files use the smallest necessary context — no full file dumps.
 - Stack traces are NOT included in the report.
 

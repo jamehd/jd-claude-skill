@@ -7,6 +7,8 @@ description: Use this skill whenever the user asks for a UI review, design audit
 
 A systematic UI audit skill. Treat the codebase as something to inspect, not modify — produce a precise report of what diverges from the design system (or from universal UI quality rules) so the human can decide what to fix.
 
+This skill reports inline by default and writes no files. If the user asks for the report as files, write them under `.jd/ui-design-audit/<YYYY-MM-DD-HHMMSS>/` per the shared output convention (`../../shared/output-convention.md`) and ensure `.jd/` is in `.gitignore`.
+
 ## Mental model
 
 The user runs this skill repeatedly during UI development. Three things matter:

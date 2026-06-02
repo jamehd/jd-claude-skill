@@ -20,7 +20,7 @@ Copy `db-audit.config.example.json` to `db-audit.config.json` at the repo root a
 - `layers.runtime.engine` — `postgres` today.
 - `layers.runtime.connectionEnv` — env var holding the read-only connection string. Never put a connection string in this file.
 - `layers.runtime.categories` — subset of `performance`, `security`, `schema`, `configuration`, `operations`.
-- `output.dir` / `output.gitignore` — where reports go and whether to add that folder to `.gitignore`.
+- `output.dir` / `output.gitignore` — where reports go (default `.jd/db-audit`, per the shared output convention) and whether to add `.jd/` to `.gitignore`.
 
 ## Examples
 

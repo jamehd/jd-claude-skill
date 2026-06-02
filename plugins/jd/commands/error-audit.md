@@ -18,7 +18,7 @@ Steps:
 4. If `$ARGUMENTS` matches `nodejs`, `go`, or `frontend`, restrict pattern execution to that stack's `patterns/<stack>/*` (plus `_common/*`).
 5. If `$ARGUMENTS` is `dry-run`, list the patterns that would run + estimated scan size; do NOT execute.
 5a. If `error-standard.yaml` exists at the project root, enable conformance mode (load it, also run `patterns/_conformance/*` — see `references/conformance-mode.md`). If `$ARGUMENTS` is `conformance`, run ONLY the conformance checks; if no contract is found, stop and point the user at `jd:architect-error-system-design`.
-6. After scanning, generate the timestamped report folder (`error-audit-report/<YYYY-MM-DD-HH-MM-SS>/`) with `AUDIT-REPORT.md`, `EXECUTIVE-SUMMARY.md`, per-severity `fixes-*/` folders, and `raw/`.
+6. After scanning, generate the timestamped report folder (`.jd/error-audit/<YYYY-MM-DD-HH-MM-SS>/`, per the shared output convention) with `AUDIT-REPORT.md`, `EXECUTIVE-SUMMARY.md`, per-severity `fixes-*/` folders, and `raw/`.
 7. Print the severity counts + path to the report at the end.
 
 Read-only. Do not modify source code. Do not call external APIs. If `ripgrep` is missing, abort with install instructions.

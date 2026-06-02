@@ -19,9 +19,9 @@ Steps:
    - `prisma` or `runtime` -> run only that layer.
    - category keyword -> restrict the runtime layer to that audit file.
    - `dry-run` -> list enabled layers and their checks; do NOT connect.
-   - `compare with last report` -> diff against the most recent report under `audit-reports/`.
+   - `compare with last report` -> diff against the most recent report under `.jd/db-audit/`.
 5. Run the enabled layers, classify, and cross-reference static against runtime where both ran.
-6. Generate `audit-reports/<YYYY-MM-DD-HHMMSS>/` with `AUDIT-REPORT.md`, `EXECUTIVE-SUMMARY.md`, `fixes-schema.prisma.md` (static), `fixes-runtime-{critical,high,medium,low}.sql` (runtime), and `raw/`.
+6. Generate `.jd/db-audit/<YYYY-MM-DD-HHMMSS>/` with `AUDIT-REPORT.md`, `EXECUTIVE-SUMMARY.md`, `fixes-schema.prisma.md` (static), `fixes-runtime-{critical,high,medium,low}.sql` (runtime), and `raw/`.
 7. Print the resolved scope, severity counts, the top 5 findings (note which were cross-confirmed), and the report path.
 
 Static findings are fixed in the schema; runtime findings as reviewable SQL. Nothing is applied automatically — schema patches and fix scripts are generated for review, destructive statements commented out.

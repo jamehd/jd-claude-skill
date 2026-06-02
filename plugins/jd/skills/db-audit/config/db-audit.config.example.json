@@ -16,7 +16,7 @@
     }
   },
   "output": {
-    "dir": "audit-reports",
+    "dir": ".jd/db-audit",
     "gitignore": true
   }
 }

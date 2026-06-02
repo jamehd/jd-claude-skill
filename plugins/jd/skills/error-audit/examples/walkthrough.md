@@ -20,7 +20,7 @@ Your options:
 
 ## 4. Reading the output
 After ~30 seconds (depending on codebase size):
-- Open `error-audit-report/<timestamp>/EXECUTIVE-SUMMARY.md` first (1 page)
+- Open `.jd/error-audit/<timestamp>/EXECUTIVE-SUMMARY.md` first (1 page)
 - Then `AUDIT-REPORT.md` for full findings
 - For each Critical, open the matching file in `fixes-critical/`
 

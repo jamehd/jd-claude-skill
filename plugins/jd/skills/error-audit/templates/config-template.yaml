@@ -42,5 +42,5 @@ exclude_paths:
   - '**/node_modules/**'
   - '**/vendor/**'
 
-# Output directory for reports.
-output_dir: ./error-audit-report
+# Output directory for reports (shared jd convention: .jd/<skill>).
+output_dir: ./.jd/error-audit

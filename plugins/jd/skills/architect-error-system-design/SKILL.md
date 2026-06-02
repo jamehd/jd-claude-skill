@@ -74,8 +74,8 @@ For each selected adapter, follow its `adapters/<lang>/GUIDE.md` to generate idi
 
 ### Step 5: Emit the contract and a migration plan
 
-- Write `error-standard.yaml` at the repo root from `templates/error-standard.example.yaml`, filled from the Step 3 decisions. This is the bridge file `jd:error-audit` conformance mode reads.
-- Write a migration plan: an ordered list to move existing ad-hoc errors onto the new system, critical paths first. Keep it incremental so each step can be tested before the next.
+- Write `error-standard.yaml` at the repo root from `templates/error-standard.example.yaml`, filled from the Step 3 decisions. This is a committed contract, the source of truth, and lives at the root (not under the reports folder). It is the bridge file `jd:error-audit` conformance mode reads.
+- Write a migration plan and the Step 2 discovery notes under `.jd/architect-error-system-design/<YYYY-MM-DD-HHMMSS>/` (shared output convention: `../../shared/output-convention.md`). The plan is an ordered list to move existing ad-hoc errors onto the new system, critical paths first. Keep it incremental so each step can be tested before the next.
 
 Do not auto-migrate the whole codebase in one sweep. Scaffold the system and the first critical-path conversions; leave the rest as a reviewed plan unless the user asks to proceed.
 

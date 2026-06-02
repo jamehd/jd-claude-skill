@@ -57,7 +57,7 @@ Apply the order above. Print the resolved layers and adapters. If a requested la
 - **runtime / postgres** — create the output directory, then run each audit SQL into `raw/`, exactly as before:
   ```bash
   TIMESTAMP=$(date -u +"%Y-%m-%d-%H%M%S")
-  OUTDIR="audit-reports/${TIMESTAMP}"
+  OUTDIR=".jd/db-audit/${TIMESTAMP}"
   mkdir -p "${OUTDIR}/raw"
   for audit in layers/runtime-postgres/audits/0*.sql; do
       name=$(basename "$audit" .sql)
@@ -76,7 +76,7 @@ Apply the order above. Print the resolved layers and adapters. If a requested la
 
 ### Step 5: Generate output
 
-Into `audit-reports/{YYYY-MM-DD-HHMMSS}/`:
+Into `.jd/db-audit/{YYYY-MM-DD-HHMMSS}/` (shared output convention: `../../shared/output-convention.md`):
 
 - **AUDIT-REPORT.md** from `templates/report-template.md` — findings grouped by severity, each labeled with its source layer(s) and any cross-reference note.
 - **EXECUTIVE-SUMMARY.md** from `templates/executive-summary-template.md`.
@@ -92,7 +92,7 @@ Print: resolved scope; counts by severity; the top 5 findings as one-liners (not
 ## Safety Rules
 
 - **schema-static** never connects to a database and never writes to the project. Schema fixes are emitted as a reviewable patch file, not applied.
-- **runtime** is read-only at the database level, with the same three layers of safety as before: connection-level (read-only role and session timeouts), query-level (SELECT only, no resets, no locks, bloat skipped on very large tables unless allowed), and output-level (fix scripts generated but never executed, destructive statements commented out, the report folder added to `.gitignore`).
+- **runtime** is read-only at the database level, with the same three layers of safety as before: connection-level (read-only role and session timeouts), query-level (SELECT only, no resets, no locks, bloat skipped on very large tables unless allowed), and output-level (fix scripts generated but never executed, destructive statements commented out, the `.jd/` reports root added to `.gitignore`).
 
 ## Invocation Patterns
 
@@ -103,7 +103,7 @@ Print: resolved scope; counts by severity; the top 5 findings as one-liners (not
 | "review db performance" | Runtime performance audit; if Prisma present, also run its index and type checks |
 | "audit postgres at postgres://audit@host/db" | Runtime only against that URL, password masked in all output |
 | "db-audit dry-run" | List enabled layers and their checks; do NOT connect |
-| "db-audit, compare with last report" | Run, then diff against the most recent report under `audit-reports/` |
+| "db-audit, compare with last report" | Run, then diff against the most recent report under `.jd/db-audit/` |
 
 ## Layers and References
 

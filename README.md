@@ -22,6 +22,14 @@ A growing library of personal engineering skills. After install, every skill is 
 | `/jd:db-audit [layer\|category\|url\|dry-run]` | Run the layered database audit. Optional argument: layer (`prisma`/`runtime`), category filter (`performance`/`security`/`schema`/`configuration`/`operations`), connection URL, or `dry-run`. |
 | `/jd:architect-error-system-design [language\|path]` | Design and scaffold the unified error system. Optional argument: a language (`typescript`/`go`) to restrict the adapter, or a path to scope discovery. |
 
+## Output convention
+
+All skills follow one rule so a project stays tidy (full spec: `plugins/jd/shared/output-convention.md`):
+
+- Transient reports, fix files, raw scans, and plans go under a single namespaced, git-ignored root: `.jd/<skill-name>/<timestamp>/`.
+- Contracts and config that are the source of truth stay at the repo root and are committed: `error-standard.yaml`, `db-audit.config.json`, `error-audit.config.yaml`.
+- Scaffolded source code goes where the project's code lives, never under `.jd/`.
+
 ## Install
 
 In Claude Code, register this repo as a marketplace once, then install the plugin.
