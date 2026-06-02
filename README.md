@@ -13,12 +13,14 @@ A growing library of personal engineering skills. After install, every skill is 
 | `jd:self-review-ui` | UI audit against `DESIGN_SYSTEM.md` / `design-theme-*.html` or a built-in default checklist. Reports severity-grouped, file+line-anchored findings. |
 | `jd:error-audit` | Error-handling audit across code patterns, logging, notification routing, and user messages. Supports Node.js/TypeScript, Go, and Frontend (React/Vue/Next.js). Outputs severity-classified report + per-finding fix files. Read-only. |
 | `jd:db-audit` | Layered database audit. A static layer over the Prisma schema (missing FK indexes, timezone-naive timestamps, cascade and type review) and a runtime layer over the live PostgreSQL database (performance, security, schema, configuration, operations). Per-project scope, auto-detected or from `db-audit.config.json`. The runtime layer needs a read-only DB connection. Outputs a unified severity-classified report plus reviewable schema and SQL fixes (never executed). |
+| `jd:architect-error-system-design` | Design and scaffold a unified, project-wide error system. Produces a language-agnostic error contract (`error-standard.yaml`: codes, HTTP mapping, localized messages, log/alert policy) plus idiomatic code per language. Adapters: TypeScript (Node/Next.js App Router) and Go; pluggable for more. Writes code behind human-gated decisions. The architect counterpart to `jd:error-audit`, which enforces the contract. |
 
 | Command | Description |
 |---------|-------------|
 | `/jd:self-review-ui [scope]` | Run the UI self-review. Optional `scope` argument restricts to a path. |
 | `/jd:error-audit [scope\|stack\|dry-run]` | Run the error-handling audit. Optional argument: scope path, stack filter (`nodejs`/`go`/`frontend`), or `dry-run` to list checks. |
 | `/jd:db-audit [layer\|category\|url\|dry-run]` | Run the layered database audit. Optional argument: layer (`prisma`/`runtime`), category filter (`performance`/`security`/`schema`/`configuration`/`operations`), connection URL, or `dry-run`. |
+| `/jd:architect-error-system-design [language\|path]` | Design and scaffold the unified error system. Optional argument: a language (`typescript`/`go`) to restrict the adapter, or a path to scope discovery. |
 
 ## Install
 
