@@ -1,0 +1,64 @@
+import Fastify, { type FastifyInstance } from 'fastify'
+import cookie from '@fastify/cookie'
+import websocket from '@fastify/websocket'
+import fastifyStatic from '@fastify/static'
+import { existsSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import type { Config } from './config.js'
+import type { BoardStore } from './store.js'
+import type { WsHub } from './ws.js'
+import type { JobRunner, GitOps } from './jobs/runner.js'
+import { registerRoutes } from './api/routes.js'
+
+export interface ServerDeps {
+  config: Config
+  store: BoardStore
+  hub: WsHub
+  runner: JobRunner
+  git: GitOps
+}
+
+export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
+  const app = Fastify({ logger: true })
+  const sessions = new Set<string>()
+
+  await app.register(cookie)
+  await app.register(websocket)
+
+  const uiDist = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ui/dist')
+  if (existsSync(uiDist)) {
+    await app.register(fastifyStatic, { root: uiDist })
+  }
+
+  app.post<{ Body: { password?: string } }>('/api/login', (req, reply) => {
+    if (req.body?.password !== deps.config.password) {
+      return reply.code(401).send({ error: 'wrong password' })
+    }
+    const sid = randomUUID()
+    sessions.add(sid)
+    reply.setCookie('board_session', sid, { path: '/', httpOnly: true, sameSite: 'lax' })
+    return { ok: true }
+  })
+
+  app.addHook('onRequest', (req, reply, done) => {
+    const path = req.url.split('?')[0]
+    const open = path === '/api/login' || !path.startsWith('/api')
+    if (open || sessions.has(req.cookies.board_session ?? '')) return done()
+    reply.code(401).send({ error: 'unauthorized' })
+  })
+
+  // /ws is not under /api so the hook passes it through;
+  // auth is enforced here at upgrade time to prevent unauthenticated streaming
+  app.get('/ws', { websocket: true }, (socket, req) => {
+    if (!sessions.has(req.cookies.board_session ?? '')) {
+      socket.close(4401, 'unauthorized')
+      return
+    }
+    deps.hub.add(socket)
+  })
+
+  registerRoutes(app, deps)
+  return app
+}

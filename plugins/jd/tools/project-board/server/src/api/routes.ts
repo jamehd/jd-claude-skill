@@ -1,0 +1,184 @@
+import type { FastifyInstance } from 'fastify'
+import path from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import type { ServerDeps } from '../server.js'
+import type { ItemStatus, ItemType, Priority } from '../../../ui/src/types.js'
+import { STATUSES, PRIORITIES } from '../markdown.js'
+import { SAFE_ID } from '../jobs/git.js'
+import { RESCAN_ID } from '../jobs/runner.js'
+
+interface CreateBody { type?: ItemType; title?: string; component?: string; priority?: Priority; body?: string }
+interface PatchBody { title?: string; status?: ItemStatus; priority?: Priority; component?: string; body?: string }
+
+// Patchable user-supplied fields; id/created/type are immutable after creation.
+const PATCH_WHITELIST = ['title', 'status', 'priority', 'component', 'body'] as const
+
+// Statuses settable by users; ai_running is system-only.
+const USER_STATUSES = STATUSES.filter((s) => s !== 'ai_running')
+
+export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
+  const { store, hub } = deps
+
+  app.get('/api/board', () => ({
+    ...store.scan(),
+    components: store.componentStatuses(),
+    jobs: deps.runner?.listJobs() ?? [],
+  }))
+
+  app.post<{ Body: CreateBody }>('/api/tasks', (req, reply) => {
+    const { type, title, component, priority, body } = req.body ?? {}
+    if (!type || !['task', 'bug'].includes(type) || !title?.trim() || !component?.trim()) {
+      return reply.code(400).send({ error: 'type, title and component are required' })
+    }
+    if (priority !== undefined && !PRIORITIES.includes(priority)) {
+      return reply.code(400).send({ error: `invalid priority: ${priority}` })
+    }
+    const item = store.createItem({ type, title: title.trim(), component: component.trim(), priority, body })
+    hub.broadcast({ type: 'board_update' })
+    return reply.code(201).send(item)
+  })
+
+  app.patch<{ Params: { id: string }; Body: PatchBody }>('/api/tasks/:id', (req, reply) => {
+    if (req.body?.status === 'ai_running') {
+      return reply.code(400).send({ error: 'ai_running is system-managed; use dispatch' })
+    }
+    if (!store.getItem(req.params.id)) return reply.code(404).send({ error: 'not found' })
+
+    const raw = req.body ?? {}
+    const patch: Partial<Record<(typeof PATCH_WHITELIST)[number], unknown>> = {}
+    for (const key of PATCH_WHITELIST) {
+      if (key in raw) patch[key] = (raw as Record<string, unknown>)[key]
+    }
+
+    if (Object.keys(patch).length === 0) {
+      return reply.code(400).send({ error: 'no updatable fields' })
+    }
+
+    if (patch.status !== undefined && !USER_STATUSES.includes(patch.status as (typeof USER_STATUSES)[number])) {
+      return reply.code(400).send({ error: `invalid status: ${patch.status}` })
+    }
+    if (patch.priority !== undefined && !PRIORITIES.includes(patch.priority as Priority)) {
+      return reply.code(400).send({ error: `invalid priority: ${patch.priority}` })
+    }
+
+    const item = store.updateItem(req.params.id, patch as Parameters<typeof store.updateItem>[1])
+    hub.broadcast({ type: 'board_update' })
+    return item
+  })
+
+  app.post<{ Params: { id: string } }>('/api/tasks/:id/dispatch', (req, reply) => {
+    const item = store.getItem(req.params.id)
+    if (!item) return reply.code(404).send({ error: 'not found' })
+    if (item.status !== 'ready') {
+      return reply.code(409).send({ error: `task is ${item.status}; only ready tasks can be dispatched` })
+    }
+    try {
+      return reply.code(202).send(deps.runner.dispatchTask(item.id))
+    } catch (err) {
+      return reply.code(409).send({ error: err instanceof Error ? err.message : String(err) })
+    }
+  })
+
+  app.post('/api/rescan', (_req, reply) => {
+    try {
+      return reply.code(202).send(deps.runner.dispatchRescan())
+    } catch (err) {
+      return reply.code(409).send({ error: err instanceof Error ? err.message : String(err) })
+    }
+  })
+
+  app.post<{ Params: { id: string } }>('/api/jobs/:id/cancel', (req, reply) => {
+    if (!SAFE_ID.test(req.params.id)) return reply.code(404).send({ error: 'not found' })
+    if (!deps.runner.getJob(req.params.id)) return reply.code(404).send({ error: 'not found' })
+    deps.runner.cancel(req.params.id)
+    return { ok: true }
+  })
+
+  app.get<{ Params: { id: string } }>('/api/jobs/:id/log', (req, reply) => {
+    if (!SAFE_ID.test(req.params.id)) return reply.code(404).send({ error: 'not found' })
+    const file = path.join(store.jobsDir, `${req.params.id}.log`)
+    if (!existsSync(file)) return reply.code(404).send({ error: 'no log' })
+    return reply.type('text/plain').send(readFileSync(file, 'utf8'))
+  })
+
+  function requireReview(id: string, reply: { code: (n: number) => { send: (b: unknown) => unknown } }) {
+    const item = store.getItem(id)
+    if (!item) { reply.code(404).send({ error: 'not found' }); return undefined }
+    if (item.status !== 'review') { reply.code(409).send({ error: `task is ${item.status}, not review` }); return undefined }
+    return item
+  }
+
+  app.get<{ Params: { id: string } }>('/api/tasks/:id/diff', (req, reply) => {
+    const item = requireReview(req.params.id, reply)
+    if (!item) return reply
+    return reply.type('text/plain').send(deps.git.branchDiff(item.id))
+  })
+
+  app.post<{ Params: { id: string } }>('/api/tasks/:id/merge', (req, reply) => {
+    const item = requireReview(req.params.id, reply)
+    if (!item) return reply
+    try {
+      deps.git.mergeBranch(item.id, `board: ${item.id} ${item.title}`)
+    } catch (err) {
+      return reply.code(409).send({ error: err instanceof Error ? err.message : String(err) })
+    }
+    const updated = store.updateItem(item.id, { status: 'done' })
+    hub.broadcast({ type: 'board_update' })
+    return updated
+  })
+
+  app.post<{ Params: { id: string } }>('/api/tasks/:id/pr', (req, reply) => {
+    const item = requireReview(req.params.id, reply)
+    if (!item) return reply
+    let url: string
+    try {
+      url = deps.git.createPr(item.id, `${item.id}: ${item.title}`, item.body)
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : String(err) })
+    }
+    store.appendToBody(item.id, `PR: ${url}`)
+    const updated = store.updateItem(item.id, { status: 'done' })
+    hub.broadcast({ type: 'board_update' })
+    return updated
+  })
+
+  app.post<{ Params: { id: string } }>('/api/tasks/:id/discard', (req, reply) => {
+    const item = requireReview(req.params.id, reply)
+    if (!item) return reply
+    deps.git.removeWorktree(item.id)
+    store.appendToBody(item.id, `Branch board/${item.id} discarded on ${new Date().toISOString().slice(0, 10)}.`)
+    const updated = store.updateItem(item.id, { status: 'ready' })
+    hub.broadcast({ type: 'board_update' })
+    return updated
+  })
+
+  function latestRescan() {
+    return deps.runner.listJobs().find((j) => j.kind === 'rescan' && j.state === 'succeeded')
+  }
+
+  app.get('/api/rescan/diff', (_req, reply) => {
+    if (!latestRescan()) return reply.code(404).send({ error: 'no succeeded rescan job' })
+    return reply.type('text/plain').send(deps.git.branchDiff(RESCAN_ID))
+  })
+
+  app.post('/api/rescan/merge', (_req, reply) => {
+    if (!latestRescan()) return reply.code(404).send({ error: 'no succeeded rescan job' })
+    try {
+      deps.git.mergeBranch(RESCAN_ID, 'board: refresh project status (rescan)')
+    } catch (err) {
+      return reply.code(409).send({ error: err instanceof Error ? err.message : String(err) })
+    }
+    hub.broadcast({ type: 'board_update' })
+    return { ok: true }
+  })
+
+  app.post('/api/rescan/discard', (_req, reply) => {
+    const active = deps.runner.listJobs().some(
+      (j) => j.kind === 'rescan' && (j.state === 'queued' || j.state === 'running'),
+    )
+    if (active) return reply.code(409).send({ error: 'rescan job is active; cancel it first' })
+    deps.git.removeWorktree(RESCAN_ID)
+    hub.broadcast({ type: 'board_update' })
+    return reply.send({ ok: true })
+  })
+}
