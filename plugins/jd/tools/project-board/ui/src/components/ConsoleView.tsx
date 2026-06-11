@@ -83,7 +83,7 @@ export function ConsoleView({ job, subscribe, onClose, showOpenTab }: {
     finally { setBusy(false) }
   }
 
-  const readOnly = job.state === 'cancelled'
+  const readOnly = job.state === 'cancelled' || job.state === 'queued'
   const continuing = job.state !== 'running' && !readOnly
   void version // re-render trigger; blocks are read from the mutable ref below
   const blocks = blocksRef.current
@@ -136,7 +136,7 @@ export function ConsoleView({ job, subscribe, onClose, showOpenTab }: {
           <textarea
             value={text} onChange={(e) => setText(e.target.value)} rows={2}
             onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); void send('queue') } }}
-            placeholder={readOnly ? 'Phiên đã đóng (job bị hủy)' : continuing ? 'Tiếp tục phiên — nhắn cho AI…' : 'Nhắn cho AI (Enter gửi, AI nhận khi xong lượt)…'}
+            placeholder={readOnly ? (job.state === 'queued' ? 'Job chưa khởi động — chờ đến lượt…' : 'Phiên đã đóng (job bị hủy)') : continuing ? 'Tiếp tục phiên — nhắn cho AI…' : 'Nhắn cho AI (Enter gửi, AI nhận khi xong lượt)…'}
             disabled={readOnly || busy}
             className="flex-1 resize-none rounded-lg border border-border bg-sunken px-3 py-2 text-[14px] text-text-primary outline-none transition-colors duration-150 focus:border-accent disabled:opacity-50"
           />
