@@ -59,5 +59,4 @@ export interface BoardSnapshot {
 
 export type WsMessage =
   | { type: 'board_update' }
-  | { type: 'job_log'; jobId: string; line: string }
   | { type: 'job_event'; jobId: string; event: ConsoleEvent }

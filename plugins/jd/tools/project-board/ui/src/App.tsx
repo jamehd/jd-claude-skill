@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Login } from './components/Login.js'
 import { KpiStrip } from './components/KpiStrip.js'
 import { ComponentsPanel } from './components/ComponentsPanel.js'
@@ -6,13 +6,22 @@ import { Kanban } from './components/Kanban.js'
 import { QuickAdd } from './components/QuickAdd.js'
 import { ActivityPanel } from './components/ActivityPanel.js'
 import { TaskDrawer } from './components/TaskDrawer.js'
+import { ConsoleView } from './components/ConsoleView.js'
 import { useBoard } from './useBoard.js'
 
 export default function App() {
   const [authed, setAuthed] = useState(true)
   const [adding, setAdding] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
-  const { snapshot, logLines, refresh } = useBoard(() => setAuthed(false))
+  const [consoleJob, setConsoleJob] = useState<string | null>(null)
+  const { snapshot, previews, subscribe, refresh } = useBoard(() => setAuthed(false))
+
+  useEffect(() => {
+    if (!consoleJob) return
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setConsoleJob(null) }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [consoleJob])
 
   if (!authed) return <Login onSuccess={() => { setAuthed(true); void refresh() }} />
   if (!snapshot) return <div className="p-8 text-text-secondary">Đang tải…</div>
@@ -33,11 +42,18 @@ export default function App() {
       <div className="flex min-h-0 flex-1 gap-3">
         <ComponentsPanel components={snapshot.components} />
         <Kanban items={snapshot.items} onSelect={setSelected} />
-        <ActivityPanel jobs={snapshot.jobs} logLines={logLines} />
+        <ActivityPanel jobs={snapshot.jobs} previews={previews} onOpenConsole={setConsoleJob} />
       </div>
       {adding && <QuickAdd components={snapshot.components} onClose={() => setAdding(false)} />}
       {selected && snapshot.items.find((i) => i.id === selected) && (
-        <TaskDrawer item={snapshot.items.find((i) => i.id === selected)!} onClose={() => setSelected(null)} />
+        <TaskDrawer item={snapshot.items.find((i) => i.id === selected)!} onClose={() => setSelected(null)}
+          onOpenConsole={setConsoleJob} />
+      )}
+      {consoleJob && snapshot.jobs.find((j) => j.id === consoleJob) && (
+        <div className="fixed inset-3 z-30 overflow-hidden rounded-xl border border-border-strong shadow-2xl">
+          <ConsoleView job={snapshot.jobs.find((j) => j.id === consoleJob)!} subscribe={subscribe}
+            onClose={() => setConsoleJob(null)} showOpenTab />
+        </div>
       )}
     </div>
   )

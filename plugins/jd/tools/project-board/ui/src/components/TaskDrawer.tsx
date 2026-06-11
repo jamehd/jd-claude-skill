@@ -11,7 +11,11 @@ const STATUS_PILL: Record<ItemStatus, string> = {
   done: 'text-ok bg-ok-bg border-ok-border',
 }
 
-export function TaskDrawer({ item, onClose }: { item: BoardItem; onClose: () => void }) {
+export function TaskDrawer({ item, onClose, onOpenConsole }: {
+  item: BoardItem
+  onClose: () => void
+  onOpenConsole?: (jobId: string) => void
+}) {
   const [diff, setDiff] = useState<string | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
@@ -63,6 +67,13 @@ export function TaskDrawer({ item, onClose }: { item: BoardItem; onClose: () => 
           <button disabled={busy} onClick={() => void act(() => api.discard(item.id))}
             className="flex-1 rounded-lg border border-border py-2 text-sm font-medium text-danger transition-colors duration-150 hover:border-border-strong hover:bg-raised disabled:opacity-50">Hủy bỏ</button>
         </div>
+      )}
+
+      {item.job && onOpenConsole && (
+        <button onClick={() => onOpenConsole(item.job!)}
+          className="rounded-lg border border-border py-2 text-sm font-medium text-text-secondary transition-colors duration-150 hover:border-border-strong hover:bg-raised">
+          Mở console
+        </button>
       )}
 
       {error && <p className="text-sm text-danger">{error}</p>}

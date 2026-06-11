@@ -132,6 +132,12 @@ must render correctly on an offline LAN.
 - **Modal (QuickAdd) / Login** — surface panel on `rgba(8,13,20,.7)` backdrop,
   inputs: sunken bg, border, focus ring `--color-accent-border` →
   `--color-accent` border.
+- **Console** — header strip on surface (mono ids, state pill); stream area on
+  base with reading-baseline assistant text; tool cards are surface `<details>`
+  with a mono summary and a sunken result well (danger fg on errors); system
+  lines mono 11px muted (danger for errors, accent for user notes); input bar on
+  surface with a sunken textarea, primary send button + danger-tinted "Ngắt &
+  chỉ đạo"; auto-scroll pinned to the bottom with a "↓ mới nhất" jump pill.
 
 ## Don'ts
 

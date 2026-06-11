@@ -12,7 +12,11 @@ const STATE_PILL: Record<string, string> = {
   interrupted: 'text-ready bg-ready-bg border-ready-border',
 }
 
-export function ActivityPanel({ jobs, logLines }: { jobs: Job[]; logLines: Record<string, string> }) {
+export function ActivityPanel({ jobs, previews, onOpenConsole }: {
+  jobs: Job[]
+  previews: Record<string, string>
+  onOpenConsole: (jobId: string) => void
+}) {
   const latestSucceededRescan = jobs.find((j) => j.kind === 'rescan' && j.state === 'succeeded')
   return (
     <aside className="flex w-72 shrink-0 flex-col gap-2 overflow-y-auto">
@@ -26,16 +30,20 @@ export function ActivityPanel({ jobs, logLines }: { jobs: Job[]; logLines: Recor
           </div>
           {job.error && <p className="mt-1 text-xs text-danger">{job.error}</p>}
           {job.state === 'running' && (
-            <>
-              <pre className="mt-2 max-h-40 overflow-y-auto whitespace-pre-wrap rounded-lg border border-border bg-sunken p-2 font-mono text-[11.5px] leading-[1.55] text-text-secondary">
-                {logLines[job.id] ?? 'Đang chờ output…'}
-              </pre>
+            <p className="mt-2 line-clamp-2 font-mono text-[11px] text-text-muted">{previews[job.id] ?? 'Đang chờ output…'}</p>
+          )}
+          <div className="mt-2 flex gap-2">
+            <button onClick={() => onOpenConsole(job.id)}
+              className="rounded-lg border border-border px-2 py-1 text-xs text-text-secondary transition-colors duration-150 hover:border-border-strong hover:bg-raised">
+              Mở console
+            </button>
+            {job.state === 'running' && (
               <button onClick={() => void api.cancelJob(job.id)}
-                className="mt-2 rounded-lg border border-border px-2 py-1 text-xs text-danger transition-colors duration-150 hover:border-border-strong hover:bg-raised">
+                className="rounded-lg border border-border px-2 py-1 text-xs text-danger transition-colors duration-150 hover:border-border-strong hover:bg-raised">
                 Hủy job
               </button>
-            </>
-          )}
+            )}
+          </div>
           {job.kind === 'rescan' && job.state === 'succeeded' && job.id === latestSucceededRescan?.id && (
             <RescanReview />
           )}
