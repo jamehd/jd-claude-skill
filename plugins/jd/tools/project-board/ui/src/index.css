@@ -37,6 +37,11 @@
   --color-diff-del: #e8754f;
   --color-diff-hunk: #7f93a8;
   --color-diff-ctx: #aebccb;
+
+  --color-task-bg: #0e1b2b;
+  --color-task-border: #1e3a52;
+  --color-bug-bg: #241318;
+  --color-bug-border: #4a2230;
 }
 
 body {

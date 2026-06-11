@@ -22,6 +22,23 @@ const STATUS_EDGE: Record<ItemStatus, string> = {
   done: 'border-l-ok',
 }
 
+const TYPE_CARD: Record<string, string> = {
+  task: 'bg-task-bg border-task-border',
+  bug: 'bg-bug-bg border-bug-border',
+}
+
+const TYPE_BADGE: Record<string, string> = {
+  task: 'text-accent', bug: 'text-danger',
+}
+
+const STATUS_PILL: Record<ItemStatus, string> = {
+  backlog: 'text-text-secondary border-border',
+  ready: 'text-ready border-ready-border',
+  ai_running: 'text-running border-running-border',
+  review: 'text-ok border-ok-border',
+  done: 'text-ok border-ok-border',
+}
+
 export function Kanban({ items, onSelect }: { items: BoardItem[]; onSelect: (id: string) => void }) {
   const [error, setError] = useState('')
 
@@ -49,13 +66,19 @@ export function Kanban({ items, onSelect }: { items: BoardItem[]; onSelect: (id:
               <div key={item.id} draggable={item.status !== 'ai_running'}
                 onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
                 onClick={() => onSelect(item.id)}
-                className={`cursor-pointer rounded-lg border-y border-r border-l-2 border-border ${STATUS_EDGE[item.status]} bg-surface p-2 text-sm transition-colors duration-150 hover:border-y-border-strong hover:border-r-border-strong hover:bg-raised`}>
-                <div className="flex justify-between font-mono text-xs">
-                  <span className="text-text-muted">{item.id}</span>
-                  <span className={PRIORITY_COLOR[item.priority]}>{item.priority}</span>
+                className={`cursor-pointer rounded-lg border border-l-2 p-2 text-sm transition-colors duration-150 hover:border-y-border-strong hover:border-r-border-strong ${TYPE_CARD[item.type]} ${STATUS_EDGE[item.status]}`}>
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-mono text-text-muted">{item.id}</span>
+                  <span className={`font-mono ${PRIORITY_COLOR[item.priority]}`}>{item.priority}</span>
                 </div>
-                <div className={item.type === 'bug' ? 'text-danger' : 'text-text-primary'}>{item.title}</div>
-                <div className="text-xs text-text-muted">{item.component}</div>
+                <div className={`mt-0.5 ${item.type === 'bug' ? 'text-danger' : 'text-text-primary'}`}>{item.title}</div>
+                <div className="mt-1 flex items-center justify-between">
+                  <span className="text-xs text-text-muted">{item.component}</span>
+                  <span className="flex gap-1">
+                    <span className={`rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase ${TYPE_BADGE[item.type]} border-current`}>{item.type}</span>
+                    <span className={`rounded-full border px-1.5 py-0.5 font-mono text-[9px] ${STATUS_PILL[item.status]}`}>{col.label}</span>
+                  </span>
+                </div>
               </div>
             ))}
           </div>
