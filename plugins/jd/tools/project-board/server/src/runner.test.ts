@@ -38,6 +38,7 @@ function setup() {
     createPr: vi.fn(() => ''),
     hasWorktree: vi.fn(() => true),
     worktreePath: vi.fn(() => path.join(dataDir, 'wt')),
+    porcelain: vi.fn(() => [] as string[]),
   }
   const runner = new JobRunner({
     store, hub: new WsHub(), git, spawnFn, repoRoot: dataDir,
@@ -92,7 +93,7 @@ describe('JobRunner', () => {
       store, hub: new WsHub(),
       git: { createWorktree: () => dataDir, removeWorktree: () => {}, changedFiles: () => [],
              branchDiff: () => '', mergeBranch: () => {}, createPr: () => '',
-             hasWorktree: () => true, worktreePath: () => dataDir },
+             hasWorktree: () => true, worktreePath: () => dataDir, porcelain: () => [] },
       spawnFn: () => { const p = new FakeProc(); procs.push(p); return p as never },
       repoRoot: dataDir,
       jobsDir: path.join(dataDir, 'jobs'), claudeBin: 'claude', timeoutMs: 50, maxConcurrent: 1,
@@ -148,6 +149,32 @@ describe('JobRunner', () => {
     expect(t.runner.getJob(job.id)?.error).toMatch(/no files under project-board\/data\/status changed/)
   })
 
+  it('rescan fails with stray-change reason when porcelain gains a new entry', async () => {
+    const t = setup()
+    // Start snapshot is clean; after the process exits the mock returns a new stray line.
+    ;(t.git.porcelain as ReturnType<typeof vi.fn>).mockReturnValue([])
+    const job = t.runner.dispatchRescan()
+    // Status file written so completedSuccessfully() returns true, reaching the stray guard.
+    writeFileSync(path.join(t.dataDir, 'status', 'infra.md'), STATUS_MD)
+    // Now simulate porcelain showing a tracked-file change introduced during rescan.
+    ;(t.git.porcelain as ReturnType<typeof vi.fn>).mockReturnValue([' M src/foo.ts'])
+    t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'))
+    expect(t.runner.getJob(job.id)?.error).toMatch(/rescan touched files outside project-board\/data\/status/)
+    expect(t.runner.getJob(job.id)?.error).toContain('src/foo.ts')
+  })
+
+  it('rescan with stray present at start is not a false positive', async () => {
+    const t = setup()
+    // The repo already had an uncommitted change before dispatch — not introduced by the rescan.
+    ;(t.git.porcelain as ReturnType<typeof vi.fn>).mockReturnValue([' M pre-existing.ts'])
+    const job = t.runner.dispatchRescan()
+    writeFileSync(path.join(t.dataDir, 'status', 'infra.md'), STATUS_MD)
+    // After the run, porcelain returns the same pre-existing entry only — rescan added nothing.
+    t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
+  })
+
   it('cancel kills and resets the task', async () => {
     const t = setup()
     const job = t.runner.dispatchTask(t.item.id)
@@ -192,6 +219,7 @@ describe('JobRunner', () => {
       createPr: vi.fn(() => ''),
       hasWorktree: vi.fn(() => true),
       worktreePath: vi.fn(() => path.join(dataDir, 'wt')),
+      porcelain: vi.fn(() => [] as string[]),
     }
     let runner!: JobRunner
     expect(() => {
@@ -223,6 +251,7 @@ describe('JobRunner', () => {
       createPr: vi.fn(() => ''),
       hasWorktree: vi.fn(() => true),
       worktreePath: vi.fn(() => path.join(dataDir, 'wt')),
+      porcelain: vi.fn(() => [] as string[]),
     }
     const runner = new JobRunner({
       store, hub: new WsHub(), git, spawnFn: vi.fn() as never, repoRoot: dataDir,
@@ -354,7 +383,7 @@ describe('JobRunner', () => {
       store, hub: new WsHub(),
       git: { createWorktree: () => dataDir, removeWorktree: () => {}, changedFiles: () => [],
              branchDiff: () => '', mergeBranch: () => {}, createPr: () => '',
-             hasWorktree: () => true, worktreePath: () => dataDir },
+             hasWorktree: () => true, worktreePath: () => dataDir, porcelain: () => [] },
       spawnFn: () => { const p = new FakeProc(); procs.push(p); return p as never },
       repoRoot: dataDir,
       jobsDir: path.join(dataDir, 'jobs'), claudeBin: 'claude', timeoutMs: 80, maxConcurrent: 1,

@@ -27,6 +27,7 @@ export function makeDeps(): ServerDeps {
     createPr: () => 'https://github.com/example/pr/1',
     hasWorktree: () => true,
     worktreePath: () => dataDir,
+    porcelain: () => [],
   }
   const runner = new JobRunner({
     store,

@@ -18,6 +18,7 @@ export interface GitOps {
   createPr(taskId: string, title: string, body: string): string
   hasWorktree(taskId: string): boolean
   worktreePath(taskId: string): string
+  porcelain(): string[]
 }
 
 export interface RunnerDeps {
@@ -31,8 +32,6 @@ export interface RunnerDeps {
   maxConcurrent: number
   spawnFn?: SpawnFn
 }
-
-export const RESCAN_ID = 'RESCAN'
 
 interface SegmentEntry {
   proc: ChildProcess
@@ -49,6 +48,7 @@ export class JobRunner {
   private timers = new Map<string, NodeJS.Timeout>()
   private cwds = new Map<string, string>()
   private statusSnapshots = new Map<string, Map<string, number>>()
+  private porcelainSnapshots = new Map<string, Set<string>>()
   private spawnFn: SpawnFn
 
   constructor(private deps?: RunnerDeps) {
@@ -132,6 +132,7 @@ export class JobRunner {
     } else {
       // Re-snapshot so a follow-up rescan segment is judged against the current disk state.
       this.statusSnapshots.set(job.id, this.snapshotStatusDir())
+      this.porcelainSnapshots.set(job.id, new Set(this.deps!.git.porcelain()))
     }
     if (!this.cwds.has(job.id)) {
       this.cwds.set(job.id, job.kind === 'task' ? this.deps!.git.worktreePath(job.taskId!) : this.deps!.repoRoot)
@@ -234,6 +235,7 @@ export class JobRunner {
       // Rescan writes status files directly to disk in the live repo; no worktree.
       cwd = this.deps!.repoRoot
       this.statusSnapshots.set(job.id, this.snapshotStatusDir())
+      this.porcelainSnapshots.set(job.id, new Set(this.deps!.git.porcelain()))
       prompt = buildRescanPrompt()
     }
     this.cwds.set(job.id, cwd)
@@ -336,8 +338,17 @@ export class JobRunner {
     }
     this.clearTimer(job.id)
     if (this.completedSuccessfully(job)) {
-      if (job.kind === 'task') this.afterSuccess(job)
-      this.finish(job, 'succeeded')
+      if (job.kind === 'task') {
+        this.afterSuccess(job)
+        this.finish(job, 'succeeded')
+      } else {
+        const strayReason = this.checkRescanStray(job)
+        if (strayReason) {
+          this.finish(job, 'failed', strayReason)
+        } else {
+          this.finish(job, 'succeeded')
+        }
+      }
     } else {
       const reason = job.kind === 'task'
         ? 'process exited 0 but no commits found on the branch'
@@ -392,6 +403,16 @@ export class JobRunner {
       }
     } catch { /* status dir missing; treat as empty */ }
     return snap
+  }
+
+  // Returns a failure reason if the rescan introduced new tracked-file changes, else undefined.
+  private checkRescanStray(job: Job): string | undefined {
+    const before = this.porcelainSnapshots.get(job.id) ?? new Set<string>()
+    const after = this.deps!.git.porcelain()
+    const stray = after.filter((line) => !before.has(line))
+    if (stray.length === 0) return undefined
+    const paths = stray.map((l) => l.slice(3).trim()).join(', ')
+    return `rescan touched files outside project-board/data/status: ${paths}`
   }
 
   private afterSuccess(job: Job): void {

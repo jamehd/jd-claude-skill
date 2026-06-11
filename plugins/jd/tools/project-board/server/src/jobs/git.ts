@@ -82,6 +82,10 @@ export class BoardGit {
     this.removeWorktree(taskId)
   }
 
+  porcelain(): string[] {
+    return this.git(['status', '--porcelain']).split('\n').filter(Boolean)
+  }
+
   // Pushes the branch and opens a GitHub PR; requires `gh` CLI and a configured remote.
   createPr(taskId: string, title: string, body: string): string {
     this.assertSafeId(taskId)
