@@ -1,7 +1,5 @@
-import { useState } from 'react'
 import { api } from '../api.js'
 import type { Job } from '../types.js'
-import { DiffView } from './DiffView.js'
 
 const STATE_PILL: Record<string, string> = {
   queued: 'text-text-muted bg-surface border-border',
@@ -17,7 +15,6 @@ export function ActivityPanel({ jobs, previews, onOpenConsole }: {
   previews: Record<string, string>
   onOpenConsole: (jobId: string) => void
 }) {
-  const latestSucceededRescan = jobs.find((j) => j.kind === 'rescan' && j.state === 'succeeded')
   return (
     <aside className="flex w-72 shrink-0 flex-col gap-2 overflow-y-auto">
       <div className="flex items-center justify-between">
@@ -48,36 +45,8 @@ export function ActivityPanel({ jobs, previews, onOpenConsole }: {
               </button>
             )}
           </div>
-          {job.kind === 'rescan' && job.state === 'succeeded' && job.id === latestSucceededRescan?.id && (
-            <RescanReview />
-          )}
         </div>
       ))}
     </aside>
-  )
-}
-
-function RescanReview() {
-  const [diff, setDiff] = useState<string | null>(null)
-  const [gone, setGone] = useState(false)
-  const [error, setError] = useState('')
-
-  if (gone) return null
-  return (
-    <div className="mt-2 space-y-2">
-      {diff === null ? (
-        <button onClick={() => api.rescanDiff().then(setDiff).catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))}
-          className="rounded-lg border border-border px-2 py-1 text-xs text-text-secondary transition-colors duration-150 hover:border-border-strong hover:bg-raised">Xem diff</button>
-      ) : (
-        <DiffView diff={diff} />
-      )}
-      <div className="flex gap-2">
-        <button onClick={() => api.rescanMerge().then(() => setGone(true)).catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))}
-          className="flex-1 rounded-lg border border-ok-border bg-ok-bg px-2 py-1 text-xs text-ok transition-colors duration-150 hover:brightness-110">Merge status</button>
-        <button onClick={() => api.rescanDiscard().then(() => setGone(true)).catch((e: unknown) => setError(e instanceof Error ? e.message : String(e)))}
-          className="flex-1 rounded-lg border border-border px-2 py-1 text-xs text-danger transition-colors duration-150 hover:border-border-strong hover:bg-raised">Hủy bỏ</button>
-      </div>
-      {error && <p className="text-xs text-danger">{error}</p>}
-    </div>
   )
 }

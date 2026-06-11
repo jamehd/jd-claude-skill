@@ -23,9 +23,6 @@ export const api = {
     request<BoardItem>(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   dispatch: (id: string) => request<Job>(`/api/tasks/${id}/dispatch`, { method: 'POST' }),
   rescan: () => request<Job>('/api/rescan', { method: 'POST' }),
-  rescanDiff: () => request<string>('/api/rescan/diff'),
-  rescanMerge: () => request<{ ok: boolean }>('/api/rescan/merge', { method: 'POST' }),
-  rescanDiscard: () => request<{ ok: boolean }>('/api/rescan/discard', { method: 'POST' }),
   cancelJob: (id: string) => request<{ ok: boolean }>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
   jobEvents: (id: string) => request<ConsoleEvent[]>(`/api/jobs/${id}/events`),
   jobMessage: (id: string, text: string, mode: 'queue' | 'steer') =>

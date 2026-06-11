@@ -1,4 +1,4 @@
-import { appendFileSync, writeFileSync, readdirSync, readFileSync, renameSync, unlinkSync } from 'node:fs'
+import { appendFileSync, writeFileSync, readdirSync, readFileSync, renameSync, unlinkSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { BoardStore } from '../store.js'
@@ -24,6 +24,7 @@ export interface RunnerDeps {
   store: BoardStore
   hub: WsHub
   git: GitOps
+  repoRoot: string
   jobsDir: string
   claudeBin: string
   timeoutMs: number
@@ -47,6 +48,7 @@ export class JobRunner {
   private messages = new Map<string, string[]>()
   private timers = new Map<string, NodeJS.Timeout>()
   private cwds = new Map<string, string>()
+  private statusSnapshots = new Map<string, Map<string, number>>()
   private spawnFn: SpawnFn
 
   constructor(private deps?: RunnerDeps) {
@@ -115,8 +117,7 @@ export class JobRunner {
 
     // succeeded | failed | interrupted -> continue-after-finish
     if (!job.sessionId) throw new Error('no session recorded for this job')
-    const wtId = job.kind === 'task' ? job.taskId! : RESCAN_ID
-    if (!this.deps!.git.hasWorktree(wtId)) {
+    if (job.kind === 'task' && !this.deps!.git.hasWorktree(job.taskId!)) {
       throw new Error('worktree no longer exists; session is read-only')
     }
     job.state = 'running'
@@ -128,9 +129,12 @@ export class JobRunner {
       if (item && item.status !== 'ai_running') {
         this.deps!.store.updateItem(item.id, { status: 'ai_running', job: job.id })
       }
+    } else {
+      // Re-snapshot so a follow-up rescan segment is judged against the current disk state.
+      this.statusSnapshots.set(job.id, this.snapshotStatusDir())
     }
     if (!this.cwds.has(job.id)) {
-      this.cwds.set(job.id, this.deps!.git.worktreePath(wtId))
+      this.cwds.set(job.id, job.kind === 'task' ? this.deps!.git.worktreePath(job.taskId!) : this.deps!.repoRoot)
     }
     this.note(job, 'user_message', text)
     this.armTimer(job)
@@ -205,33 +209,34 @@ export class JobRunner {
 
   private start(job: Job): void {
     const { store, git, hub } = this.deps!
-    const wtId = job.kind === 'task' ? job.taskId! : RESCAN_ID
-    job.branch = `board/${wtId}`
     job.startedAt = new Date().toISOString()
     job.state = 'running'
 
     let cwd: string
-    try {
-      cwd = git.createWorktree(wtId)
-    } catch (err) {
-      this.finish(job, 'failed', `worktree: ${err instanceof Error ? err.message : err}`)
-      return
-    }
-    this.cwds.set(job.id, cwd)
-
     let prompt: string
     if (job.kind === 'task') {
+      job.branch = `board/${job.taskId!}`
+      try {
+        cwd = git.createWorktree(job.taskId!)
+      } catch (err) {
+        this.finish(job, 'failed', `worktree: ${err instanceof Error ? err.message : err}`)
+        return
+      }
       const item = store.getItem(job.taskId!)
       if (!item) {
-        git.removeWorktree(wtId)
+        git.removeWorktree(job.taskId!)
         this.finish(job, 'failed', `task not found: ${job.taskId}`)
         return
       }
       store.updateItem(item.id, { status: 'ai_running', job: job.id })
       prompt = buildTaskPrompt(item)
     } else {
+      // Rescan writes status files directly to disk in the live repo; no worktree.
+      cwd = this.deps!.repoRoot
+      this.statusSnapshots.set(job.id, this.snapshotStatusDir())
       prompt = buildRescanPrompt()
     }
+    this.cwds.set(job.id, cwd)
     this.persist(job)
     hub.broadcast({ type: 'board_update' })
     this.armTimer(job)
@@ -365,11 +370,28 @@ export class JobRunner {
   }
 
   private completedSuccessfully(job: Job): boolean {
-    const { git } = this.deps!
     if (job.kind === 'task') {
-      return git.changedFiles(job.taskId!).length > 0
+      return this.deps!.git.changedFiles(job.taskId!).length > 0
     }
-    return git.changedFiles(RESCAN_ID).some((f) => f.startsWith('project-board/data/status/'))
+    // Rescan succeeds iff a status .md is new or newer than the pre-run snapshot.
+    const before = this.statusSnapshots.get(job.id) ?? new Map<string, number>()
+    const after = this.snapshotStatusDir()
+    for (const [name, mtime] of after) {
+      const prev = before.get(name)
+      if (prev === undefined || mtime > prev) return true
+    }
+    return false
+  }
+
+  private snapshotStatusDir(): Map<string, number> {
+    const snap = new Map<string, number>()
+    const dir = this.deps!.store.statusDir
+    try {
+      for (const f of readdirSync(dir).filter((f) => f.endsWith('.md'))) {
+        try { snap.set(f, statSync(path.join(dir, f)).mtimeMs) } catch { /* file vanished mid-scan */ }
+      }
+    } catch { /* status dir missing; treat as empty */ }
+    return snap
   }
 
   private afterSuccess(job: Job): void {

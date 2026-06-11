@@ -40,7 +40,7 @@ function setup() {
     worktreePath: vi.fn(() => path.join(dataDir, 'wt')),
   }
   const runner = new JobRunner({
-    store, hub: new WsHub(), git, spawnFn,
+    store, hub: new WsHub(), git, spawnFn, repoRoot: dataDir,
     jobsDir: path.join(dataDir, 'jobs'), claudeBin: 'claude', timeoutMs: 5000, maxConcurrent: 1,
   })
   const sendInit = (i = 0, session = 'sess-1') =>
@@ -94,6 +94,7 @@ describe('JobRunner', () => {
              branchDiff: () => '', mergeBranch: () => {}, createPr: () => '',
              hasWorktree: () => true, worktreePath: () => dataDir },
       spawnFn: () => { const p = new FakeProc(); procs.push(p); return p as never },
+      repoRoot: dataDir,
       jobsDir: path.join(dataDir, 'jobs'), claudeBin: 'claude', timeoutMs: 50, maxConcurrent: 1,
     })
     const job = runner.dispatchTask(item.id)
@@ -122,12 +123,29 @@ describe('JobRunner', () => {
     expect(readFileSync(path.join(t.dataDir, 'jobs', `${job.id}.log`), 'utf8')).toContain('working...')
   })
 
-  it('rescan succeeds when status files changed', async () => {
+  const STATUS_MD = '---\ncomponent: infra\ncompletion: 50\nlast_scanned: 2026-06-11\n---\nSummary.\n\n## Gaps\n- [ ] thing\n'
+
+  it('rescan runs in repoRoot (no worktree) and succeeds when a status file is written to disk', async () => {
     const t = setup()
-    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['project-board/data/status/infra.md'])
     const job = t.runner.dispatchRescan()
+    // No worktree must be created for a rescan.
+    expect(t.git.createWorktree).not.toHaveBeenCalledWith('RESCAN')
+    expect(t.git.createWorktree).not.toHaveBeenCalled()
+    // Rescan spawns in the repo root, not a worktree path.
+    expect((t.spawnFn as ReturnType<typeof vi.fn>).mock.calls[0][2]).toEqual({ cwd: t.dataDir })
+    // Simulate the AI writing a status file AFTER dispatch so its mtime beats the snapshot.
+    writeFileSync(path.join(t.dataDir, 'status', 'infra.md'), STATUS_MD)
+    t.procs[0].stdout.emit('data', Buffer.from(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-1' }) + '\n'))
     t.procs[0].emit('exit', 0)
     await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
+  })
+
+  it('rescan fails with the no-change reason when exit 0 but no status file changed', async () => {
+    const t = setup()
+    const job = t.runner.dispatchRescan()
+    t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'))
+    expect(t.runner.getJob(job.id)?.error).toMatch(/no files under project-board\/data\/status changed/)
   })
 
   it('cancel kills and resets the task', async () => {
@@ -178,7 +196,7 @@ describe('JobRunner', () => {
     let runner!: JobRunner
     expect(() => {
       runner = new JobRunner({
-        store, hub: new WsHub(), git, spawnFn: vi.fn() as never,
+        store, hub: new WsHub(), git, spawnFn: vi.fn() as never, repoRoot: dataDir,
         jobsDir, claudeBin: 'claude', timeoutMs: 50, maxConcurrent: 1,
       })
     }).not.toThrow()
@@ -207,7 +225,7 @@ describe('JobRunner', () => {
       worktreePath: vi.fn(() => path.join(dataDir, 'wt')),
     }
     const runner = new JobRunner({
-      store, hub: new WsHub(), git, spawnFn: vi.fn() as never,
+      store, hub: new WsHub(), git, spawnFn: vi.fn() as never, repoRoot: dataDir,
       jobsDir, claudeBin: 'claude', timeoutMs: 50, maxConcurrent: 1,
     })
     expect(runner.getJob('job-002')?.state).toBe('interrupted')
@@ -338,6 +356,7 @@ describe('JobRunner', () => {
              branchDiff: () => '', mergeBranch: () => {}, createPr: () => '',
              hasWorktree: () => true, worktreePath: () => dataDir },
       spawnFn: () => { const p = new FakeProc(); procs.push(p); return p as never },
+      repoRoot: dataDir,
       jobsDir: path.join(dataDir, 'jobs'), claudeBin: 'claude', timeoutMs: 80, maxConcurrent: 1,
     })
     const job = runner.dispatchTask(item.id)

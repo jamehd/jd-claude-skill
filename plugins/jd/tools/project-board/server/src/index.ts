@@ -15,6 +15,7 @@ const hub = new WsHub()
 const git = new BoardGit(config.repoRoot)
 const runner = new JobRunner({
   store, hub, git,
+  repoRoot: config.repoRoot,
   jobsDir: path.join(config.dataDir, 'jobs'),
   claudeBin: config.claudeBin,
   timeoutMs: config.jobTimeoutMs,

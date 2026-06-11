@@ -32,6 +32,7 @@ export function makeDeps(): ServerDeps {
     store,
     hub,
     git,
+    repoRoot: dataDir,
     jobsDir: store.jobsDir,
     claudeBin: 'claude',
     timeoutMs: 60_000,

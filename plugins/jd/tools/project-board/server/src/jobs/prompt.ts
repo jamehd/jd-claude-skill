@@ -21,12 +21,12 @@ export function buildTaskPrompt(item: BoardItem): string {
 
 export function buildRescanPrompt(): string {
   return [
-    'You are working in a dedicated git worktree of the GameSync repo.',
+    'You are working in the GameSync repository root.',
     'Survey the whole repository and refresh the project status files under project-board/data/status/.',
     'For each component (idc-backend, admin-web, cafe-service, launcher-downloader, launcher-user, launcher-packer, infra):',
     '- assess implementation completeness (features done / partial / missing, test coverage, TODO markers)',
     '- rewrite project-board/data/status/<component>.md keeping the frontmatter schema:',
     '  component, completion (integer percent), last_scanned (today, YYYY-MM-DD), then a summary paragraph and a "## Gaps" checklist.',
-    'Only modify files under project-board/data/status/. Commit the result to the current branch.',
+    'Write the files directly under project-board/data/status/. Do NOT run git and do NOT commit — the dashboard reads them from disk.',
   ].join('\n')
 }

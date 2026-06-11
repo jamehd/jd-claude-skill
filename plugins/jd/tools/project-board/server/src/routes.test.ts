@@ -185,21 +185,6 @@ describe('review routes', () => {
   })
 })
 
-describe('rescan review routes', () => {
-  it('404s when no rescan job has succeeded', async () => {
-    const res = await app.inject({ method: 'GET', url: '/api/rescan/diff', cookies: cookie })
-    expect(res.statusCode).toBe(404)
-  })
-
-  it('refuses to discard while a rescan job is active', async () => {
-    const started = await app.inject({ method: 'POST', url: '/api/rescan', cookies: cookie })
-    expect(started.json().state).toBe('running')
-    const res = await app.inject({ method: 'POST', url: '/api/rescan/discard', cookies: cookie })
-    expect(res.statusCode).toBe(409)
-    expect(res.json().error).toMatch(/active|cancel/i)
-  })
-})
-
 describe('console routes', () => {
   async function dispatched(): Promise<{ jobId: string }> {
     await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,

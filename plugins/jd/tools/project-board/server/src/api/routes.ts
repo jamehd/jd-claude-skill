@@ -5,7 +5,6 @@ import type { ServerDeps } from '../server.js'
 import type { ItemStatus, ItemType, Priority } from '../../../ui/src/types.js'
 import { STATUSES, PRIORITIES } from '../markdown.js'
 import { SAFE_ID } from '../jobs/git.js'
-import { RESCAN_ID } from '../jobs/runner.js'
 import { normalizeLine } from '../jobs/events.js'
 
 interface CreateBody { type?: ItemType; title?: string; component?: string; priority?: Priority; body?: string }
@@ -195,35 +194,5 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     const updated = store.updateItem(item.id, { status: 'ready' })
     hub.broadcast({ type: 'board_update' })
     return updated
-  })
-
-  function latestRescan() {
-    return deps.runner.listJobs().find((j) => j.kind === 'rescan' && j.state === 'succeeded')
-  }
-
-  app.get('/api/rescan/diff', (_req, reply) => {
-    if (!latestRescan()) return reply.code(404).send({ error: 'no succeeded rescan job' })
-    return reply.type('text/plain').send(deps.git.branchDiff(RESCAN_ID))
-  })
-
-  app.post('/api/rescan/merge', (_req, reply) => {
-    if (!latestRescan()) return reply.code(404).send({ error: 'no succeeded rescan job' })
-    try {
-      deps.git.mergeBranch(RESCAN_ID, 'board: refresh project status (rescan)')
-    } catch (err) {
-      return reply.code(409).send({ error: err instanceof Error ? err.message : String(err) })
-    }
-    hub.broadcast({ type: 'board_update' })
-    return { ok: true }
-  })
-
-  app.post('/api/rescan/discard', (_req, reply) => {
-    const active = deps.runner.listJobs().some(
-      (j) => j.kind === 'rescan' && (j.state === 'queued' || j.state === 'running'),
-    )
-    if (active) return reply.code(409).send({ error: 'rescan job is active; cancel it first' })
-    deps.git.removeWorktree(RESCAN_ID)
-    hub.broadcast({ type: 'board_update' })
-    return reply.send({ ok: true })
   })
 }
