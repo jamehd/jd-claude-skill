@@ -11,32 +11,42 @@ type Block =
   | { type: 'tool'; toolId: string; tool: string; inputPreview: string; output?: string; isError?: boolean }
   | { type: 'system'; text: string; tone: 'muted' | 'danger' | 'user' }
 
+type ToolBlock = Extract<Block, { type: 'tool' }>
+
+// Folds a single event into `blocks`, MUTATING it. `toolIndex` maps toolId →
+// its tool block for O(1) tool_result attachment (replaces the O(n) reverse-find).
+function foldEvent(blocks: Block[], toolIndex: Map<string, ToolBlock>, e: ConsoleEvent): void {
+  if (e.kind === 'text_delta') {
+    const last = blocks[blocks.length - 1]
+    if (last?.type === 'text') last.text += e.text
+    else blocks.push({ type: 'text', text: e.text })
+  } else if (e.kind === 'tool_start') {
+    const card: ToolBlock = { type: 'tool', toolId: e.toolId, tool: e.tool, inputPreview: e.inputPreview }
+    blocks.push(card)
+    toolIndex.set(e.toolId, card)
+  } else if (e.kind === 'tool_result') {
+    const card = toolIndex.get(e.toolId)
+    if (card) { card.output = e.output; card.isError = e.isError }
+  } else if (e.kind === 'note') {
+    blocks.push({ type: 'system', text: `${NOTE_LABEL[e.noteType]}: ${e.text}`,
+      tone: e.noteType === 'error' ? 'danger' : e.noteType === 'user_message' ? 'user' : 'muted' })
+  } else if (e.kind === 'init') {
+    blocks.push({ type: 'system', text: `Phiên ${e.sessionId.slice(0, 8)} · ${e.model}`, tone: 'muted' })
+  } else if (e.kind === 'turn_result') {
+    const cost = e.costUsd != null ? ` · $${e.costUsd.toFixed(4)}` : ''
+    const dur = e.durationMs != null ? ` · ${(e.durationMs / 1000).toFixed(1)}s` : ''
+    blocks.push({ type: 'system', text: `Kết thúc lượt (${e.ok ? 'ok' : 'lỗi'})${dur}${cost}`, tone: e.ok ? 'muted' : 'danger' })
+  } else if (e.kind === 'raw') {
+    blocks.push({ type: 'system', text: e.text, tone: 'muted' })
+  }
+}
+
+// Thin wrapper: folds a whole event list into a fresh array. Used for seeding
+// from history so the folding logic lives in exactly one place (foldEvent).
 function reduceEvents(events: ConsoleEvent[]): Block[] {
   const blocks: Block[] = []
-  for (const e of events) {
-    if (e.kind === 'text_delta') {
-      const last = blocks[blocks.length - 1]
-      if (last?.type === 'text') last.text += e.text
-      else blocks.push({ type: 'text', text: e.text })
-    } else if (e.kind === 'tool_start') {
-      blocks.push({ type: 'tool', toolId: e.toolId, tool: e.tool, inputPreview: e.inputPreview })
-    } else if (e.kind === 'tool_result') {
-      const card = [...blocks].reverse().find((b) => b.type === 'tool' && b.toolId === e.toolId) as
-        Extract<Block, { type: 'tool' }> | undefined
-      if (card) { card.output = e.output; card.isError = e.isError }
-    } else if (e.kind === 'note') {
-      blocks.push({ type: 'system', text: `${NOTE_LABEL[e.noteType]}: ${e.text}`,
-        tone: e.noteType === 'error' ? 'danger' : e.noteType === 'user_message' ? 'user' : 'muted' })
-    } else if (e.kind === 'init') {
-      blocks.push({ type: 'system', text: `Phiên ${e.sessionId.slice(0, 8)} · ${e.model}`, tone: 'muted' })
-    } else if (e.kind === 'turn_result') {
-      const cost = e.costUsd != null ? ` · $${e.costUsd.toFixed(4)}` : ''
-      const dur = e.durationMs != null ? ` · ${(e.durationMs / 1000).toFixed(1)}s` : ''
-      blocks.push({ type: 'system', text: `Kết thúc lượt (${e.ok ? 'ok' : 'lỗi'})${dur}${cost}`, tone: e.ok ? 'muted' : 'danger' })
-    } else if (e.kind === 'raw') {
-      blocks.push({ type: 'system', text: e.text, tone: 'muted' })
-    }
-  }
+  const toolIndex = new Map<string, ToolBlock>()
+  for (const e of events) foldEvent(blocks, toolIndex, e)
   return blocks
 }
 
@@ -46,23 +56,65 @@ export function ConsoleView({ job, subscribe, onClose, showOpenTab }: {
   onClose?: () => void
   showOpenTab?: boolean
 }) {
-  const [events, setEvents] = useState<ConsoleEvent[]>([])
+  const [version, setVersion] = useState(0)
   const [text, setText] = useState('')
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [pinned, setPinned] = useState(true)
   const streamRef = useRef<HTMLDivElement>(null)
 
+  const blocksRef = useRef<Block[]>([])
+  const toolIndexRef = useRef<Map<string, ToolBlock>>(new Map())
+  const pendingRef = useRef<ConsoleEvent[]>([])
+  const flushScheduledRef = useRef(false)
+
   useEffect(() => {
     let cancelled = false
-    api.jobEvents(job.id).then((history) => { if (!cancelled) setEvents(history) }).catch(() => {})
-    const unsub = subscribe(job.id, (e) => setEvents((prev) => [...prev, e]))
-    return () => { cancelled = true; unsub() }
+    let seeded = false
+    let rafId = 0
+    blocksRef.current = []
+    toolIndexRef.current = new Map()
+    pendingRef.current = []
+    flushScheduledRef.current = false
+
+    const flush = () => {
+      flushScheduledRef.current = false
+      // Hold live events in the queue until history has seeded blocksRef, so a
+      // pre-seed flush can't fold into blocks the seed is about to overwrite.
+      if (cancelled || !seeded || pendingRef.current.length === 0) return
+      const queued = pendingRef.current
+      pendingRef.current = []
+      for (const e of queued) foldEvent(blocksRef.current, toolIndexRef.current, e)
+      setVersion((v) => v + 1)
+    }
+    const scheduleFlush = () => {
+      if (flushScheduledRef.current) return
+      flushScheduledRef.current = true
+      rafId = requestAnimationFrame(flush)
+    }
+
+    api.jobEvents(job.id).then((history) => {
+      if (cancelled) return
+      // Seed from history (rebuilds blocks + tool index in one place).
+      blocksRef.current = reduceEvents(history)
+      toolIndexRef.current = new Map()
+      for (const b of blocksRef.current) if (b.type === 'tool') toolIndexRef.current.set(b.toolId, b)
+      seeded = true
+      // Fold any live events that arrived during the fetch AFTER the seed so
+      // they are not lost (mild duplication with the history tail is acceptable).
+      const queued = pendingRef.current
+      pendingRef.current = []
+      for (const e of queued) foldEvent(blocksRef.current, toolIndexRef.current, e)
+      setVersion((v) => v + 1)
+    }).catch(() => {})
+
+    const unsub = subscribe(job.id, (e) => { pendingRef.current.push(e); scheduleFlush() })
+    return () => { cancelled = true; if (rafId) cancelAnimationFrame(rafId); unsub() }
   }, [job.id, subscribe])
 
   useEffect(() => {
     if (pinned) streamRef.current?.scrollTo({ top: streamRef.current.scrollHeight })
-  }, [events, pinned])
+  }, [version, pinned])
 
   const onScroll = useCallback(() => {
     const el = streamRef.current
@@ -80,7 +132,8 @@ export function ConsoleView({ job, subscribe, onClose, showOpenTab }: {
 
   const readOnly = job.state === 'cancelled'
   const continuing = job.state !== 'running' && !readOnly
-  const blocks = reduceEvents(events)
+  void version // re-render trigger; blocks are read from the mutable ref below
+  const blocks = blocksRef.current
 
   return (
     <div className="flex h-full flex-col bg-base">

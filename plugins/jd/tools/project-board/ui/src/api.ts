@@ -27,7 +27,6 @@ export const api = {
   rescanMerge: () => request<{ ok: boolean }>('/api/rescan/merge', { method: 'POST' }),
   rescanDiscard: () => request<{ ok: boolean }>('/api/rescan/discard', { method: 'POST' }),
   cancelJob: (id: string) => request<{ ok: boolean }>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
-  jobLog: (id: string) => request<string>(`/api/jobs/${id}/log`),
   jobEvents: (id: string) => request<ConsoleEvent[]>(`/api/jobs/${id}/events`),
   jobMessage: (id: string, text: string, mode: 'queue' | 'steer') =>
     request<{ ok: boolean }>(`/api/jobs/${id}/message`, { method: 'POST', body: JSON.stringify({ text, mode }) }),
