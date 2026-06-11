@@ -1,4 +1,4 @@
-import type { BoardItem, BoardSnapshot, ConsoleEvent, Job } from './types.js'
+import type { BoardItem, BoardSnapshot, Candidate, ConsoleEvent, Job } from './types.js'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -33,4 +33,7 @@ export const api = {
   discard: (id: string) => request<BoardItem>(`/api/tasks/${id}/discard`, { method: 'POST' }),
   deleteTask: (id: string) => request<{ ok: boolean }>(`/api/tasks/${id}`, { method: 'DELETE' }),
   clearFinishedJobs: () => request<{ cleared: number }>('/api/jobs/clear-finished', { method: 'POST' }),
+  scanCandidates: () => request<{ candidates: Candidate[] }>('/api/scan-candidates'),
+  bulkCreate: (items: { type: string; title: string; component: string; priority: string; body: string }[]) =>
+    request<{ created: string[]; rejected: { index: number; error: string }[] }>('/api/tasks/bulk', { method: 'POST', body: JSON.stringify({ items }) }),
 }
