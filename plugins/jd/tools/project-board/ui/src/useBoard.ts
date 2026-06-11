@@ -15,13 +15,16 @@ export function useBoard(onUnauthorized: () => void) {
     return () => { set!.delete(cb) }
   }, [])
 
+  const onUnauthRef = useRef(onUnauthorized)
+  useEffect(() => { onUnauthRef.current = onUnauthorized })
+
   const refresh = useCallback(async () => {
     try {
       setSnapshot(await api.board())
     } catch (err) {
-      if (err instanceof UnauthorizedError) onUnauthorized()
+      if (err instanceof UnauthorizedError) onUnauthRef.current()
     }
-  }, [onUnauthorized])
+  }, [])
 
   useEffect(() => {
     void refresh()
