@@ -49,7 +49,7 @@ export function Kanban({ items, onSelect }: { items: BoardItem[]; onSelect: (id:
               <div key={item.id} draggable={item.status !== 'ai_running'}
                 onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
                 onClick={() => onSelect(item.id)}
-                className={`cursor-pointer rounded-lg border-y border-r border-l-2 border-border ${STATUS_EDGE[item.status]} bg-surface p-2 text-sm transition-colors duration-150 hover:border-border-strong hover:bg-raised`}>
+                className={`cursor-pointer rounded-lg border-y border-r border-l-2 border-border ${STATUS_EDGE[item.status]} bg-surface p-2 text-sm transition-colors duration-150 hover:border-y-border-strong hover:border-r-border-strong hover:bg-raised`}>
                 <div className="flex justify-between font-mono text-xs">
                   <span className="text-text-muted">{item.id}</span>
                   <span className={PRIORITY_COLOR[item.priority]}>{item.priority}</span>
