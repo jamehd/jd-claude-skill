@@ -240,6 +240,13 @@ describe('console routes', () => {
     expect(res.statusCode).toBe(409)
   })
 
+  it('returns [] for a known job with no log yet', async () => {
+    const { jobId } = await dispatched()
+    const res = await app.inject({ method: 'GET', url: `/api/jobs/${jobId}/events`, cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual([])
+  })
+
   it('guards job-id params and 404s unknown event logs', async () => {
     const trav = await app.inject({ method: 'GET', url: '/api/jobs/..%2Fx/events', cookies: cookie })
     expect(trav.statusCode).toBe(404)

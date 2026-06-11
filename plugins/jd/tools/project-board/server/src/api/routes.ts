@@ -106,7 +106,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     if (!SAFE_ID.test(req.params.id)) return reply.code(404).send({ error: 'not found' })
     if (!deps.runner.getJob(req.params.id)) return reply.code(404).send({ error: 'not found' })
     const file = path.join(store.jobsDir, `${req.params.id}.log`)
-    if (!existsSync(file)) return reply.code(404).send({ error: 'no events' })
+    if (!existsSync(file)) return []
     const events = readFileSync(file, 'utf8').split('\n').filter((l) => l.trim())
       .flatMap((l) => normalizeLine(l))
     return events

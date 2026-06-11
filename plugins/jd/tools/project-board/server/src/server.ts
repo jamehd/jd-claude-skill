@@ -67,7 +67,7 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       if (req.method === 'GET' && !req.url.startsWith('/api')) {
         return reply.type('text/html').send(readFileSync(uiIndex, 'utf8'))
       }
-      reply.code(404).send({ error: 'Not Found' })
+      reply.code(404).send({ error: 'not found' })
     })
   }
 
