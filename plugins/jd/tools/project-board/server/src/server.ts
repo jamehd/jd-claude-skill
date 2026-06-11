@@ -29,7 +29,17 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
 
   const uiDist = deps.config.uiDistDir ?? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ui/dist')
   if (existsSync(uiDist)) {
-    await app.register(fastifyStatic, { root: uiDist })
+    await app.register(fastifyStatic, {
+      root: uiDist,
+      cacheControl: false,
+      setHeaders: (res, filePath) => {
+        if (filePath.endsWith('.html')) {
+          res.setHeader('cache-control', 'no-cache')
+        } else if (filePath.includes('/assets/')) {
+          res.setHeader('cache-control', 'public, max-age=31536000, immutable')
+        }
+      },
+    })
   }
 
   app.post<{ Body: { password?: string } }>('/api/login', (req, reply) => {
@@ -65,7 +75,7 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
   if (existsSync(uiIndex)) {
     app.setNotFoundHandler((req, reply) => {
       if (req.method === 'GET' && !req.url.startsWith('/api')) {
-        return reply.type('text/html').send(readFileSync(uiIndex, 'utf8'))
+        return reply.header('cache-control', 'no-cache').type('text/html').send(readFileSync(uiIndex, 'utf8'))
       }
       reply.code(404).send({ error: 'not found' })
     })

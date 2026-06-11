@@ -260,3 +260,16 @@ describe('console routes', () => {
     expect(res.body).toContain('<div id="root">')
   })
 })
+
+describe('cache headers', () => {
+  it('serves html with no-cache and hashed assets as immutable', async () => {
+    const root = await app.inject({ method: 'GET', url: '/' })
+    expect(root.statusCode).toBe(200)
+    expect(root.headers['cache-control']).toBe('no-cache')
+    const spa = await app.inject({ method: 'GET', url: '/console/job-001' })
+    expect(spa.headers['cache-control']).toBe('no-cache')
+    const asset = await app.inject({ method: 'GET', url: '/assets/app-test.js' })
+    expect(asset.statusCode).toBe(200)
+    expect(asset.headers['cache-control']).toContain('immutable')
+  })
+})

@@ -14,6 +14,8 @@ export function makeDeps(): ServerDeps {
   const uiDistDir = path.join(dataDir, 'uidist')
   mkdirSync(uiDistDir, { recursive: true })
   writeFileSync(path.join(uiDistDir, 'index.html'), '<!doctype html><html><body><div id="root"></div></body></html>')
+  mkdirSync(path.join(uiDistDir, 'assets'), { recursive: true })
+  writeFileSync(path.join(uiDistDir, 'assets', 'app-test.js'), '/* hashed bundle */')
   const store = new BoardStore(dataDir)
   const hub = new WsHub()
   const git: GitOps = {
