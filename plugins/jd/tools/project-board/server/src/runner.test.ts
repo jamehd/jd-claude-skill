@@ -301,6 +301,20 @@ describe('JobRunner', () => {
     expect(() => t.runner.message(job.id, 'more', 'queue')).toThrow(/worktree no longer exists/)
   })
 
+  it('steer arriving after natural exit degrades to continue-after-finish', async () => {
+    const t = setup()
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    const job = t.runner.dispatchTask(t.item.id)
+    t.sendInit()
+    t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
+    t.runner.message(job.id, 'late steer', 'steer')
+    expect(t.runner.getJob(job.id)?.state).toBe('running')
+    await vi.waitFor(() => expect(t.spawnCalls).toHaveLength(2))
+    expect(t.spawnCalls[1]).toEqual(expect.arrayContaining(['-p', 'late steer', '--resume', 'sess-1']))
+    expect(t.procs[0].killed).toBe(false)
+  })
+
   it('messaging a cancelled job throws', async () => {
     const t = setup()
     const job = t.runner.dispatchTask(t.item.id)
