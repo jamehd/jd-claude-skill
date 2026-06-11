@@ -397,6 +397,25 @@ describe('JobRunner', () => {
     expect(runner.getJob(job.id)?.error).toMatch(/timeout/)
   })
 
+  it('reconcileOrphanedTasks resets an ai_running task with no live job', () => {
+    const t = setup()
+    // No job dispatched; force the orphaned state directly.
+    t.store.updateItem(t.item.id, { status: 'ai_running' })
+    const resets = t.runner.reconcileOrphanedTasks()
+    expect(resets).toBe(1)
+    expect(t.store.getItem(t.item.id)?.status).toBe('ready')
+    expect(t.store.getItem(t.item.id)?.body).toContain('orphaned')
+  })
+
+  it('reconcileOrphanedTasks does NOT reset a task with a live running job', () => {
+    const t = setup()
+    t.runner.dispatchTask(t.item.id)  // -> ai_running with a live running job
+    expect(t.store.getItem(t.item.id)?.status).toBe('ai_running')
+    const resets = t.runner.reconcileOrphanedTasks()
+    expect(resets).toBe(0)
+    expect(t.store.getItem(t.item.id)?.status).toBe('ai_running')
+  })
+
   it('clearFinished removes finished jobs + files, keeps active ones', async () => {
     const t = setup()
     // job 1: succeeds
