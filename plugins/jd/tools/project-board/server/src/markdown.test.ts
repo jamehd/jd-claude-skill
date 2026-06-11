@@ -70,10 +70,11 @@ describe('unknown frontmatter keys', () => {
 })
 
 describe('parseComponentStatus', () => {
-  it('parses completion and body', () => {
+  it('parses built, tested and body', () => {
     const cs = parseComponentStatus(`---
 component: cafe-service
-completion: 90
+built: 90
+tested: 75
 last_scanned: 2026-06-11
 ---
 
@@ -83,7 +84,20 @@ Summary.
 - [ ] GetTheme RPC
 `)
     expect(cs.component).toBe('cafe-service')
-    expect(cs.completion).toBe(90)
+    expect(cs.built).toBe(90)
+    expect(cs.tested).toBe(75)
     expect(cs.body).toContain('## Gaps')
+  })
+
+  it('defaults built and tested to 0 when absent', () => {
+    const cs = parseComponentStatus(`---
+component: cafe-service
+last_scanned: 2026-06-11
+---
+
+Summary.
+`)
+    expect(cs.built).toBe(0)
+    expect(cs.tested).toBe(0)
   })
 })

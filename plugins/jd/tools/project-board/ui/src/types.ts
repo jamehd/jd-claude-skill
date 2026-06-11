@@ -18,7 +18,8 @@ export interface BoardItem {
 
 export interface ComponentStatus {
   component: string
-  completion: number
+  built: number
+  tested: number
   last_scanned: string
   body: string
 }

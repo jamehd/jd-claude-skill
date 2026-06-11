@@ -39,7 +39,11 @@ describe('buildRescanPrompt (requirements-aware)', () => {
   })
   it('directs writing the per-id status table format', () => {
     expect(p).toMatch(/\| ?Req ?\| ?State ?\| ?Tested/i)
-    expect(p).toContain('completion')
+  })
+  it('directs the two status axes (built and tested) in frontmatter', () => {
+    expect(p).toContain('built')
+    expect(p).toContain('tested')
+    expect(p).not.toContain('completion')
   })
   it('directs reporting drift', () => {
     expect(p.toLowerCase()).toContain('drift')

@@ -47,7 +47,8 @@ export function parseComponentStatus(raw: string): ComponentStatus {
   const { data, content } = matter(raw)
   return {
     component: req(data, 'component'),
-    completion: Number(req(data, 'completion')),
+    built: data.built === undefined || data.built === null || data.built === '' ? 0 : Number(data.built),
+    tested: data.tested === undefined || data.tested === null || data.tested === '' ? 0 : Number(data.tested),
     last_scanned: req(data, 'last_scanned'),
     body: content.trim() + '\n',
   }
