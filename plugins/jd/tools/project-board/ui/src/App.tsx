@@ -46,8 +46,8 @@ export default function App() {
       </div>
       {adding && <QuickAdd components={snapshot.components} onClose={() => setAdding(false)} />}
       {selected && snapshot.items.find((i) => i.id === selected) && (
-        <TaskDrawer item={snapshot.items.find((i) => i.id === selected)!} onClose={() => setSelected(null)}
-          onOpenConsole={setConsoleJob} />
+        <TaskDrawer item={snapshot.items.find((i) => i.id === selected)!} components={snapshot.components}
+          onClose={() => setSelected(null)} onOpenConsole={setConsoleJob} />
       )}
       {consoleJob && snapshot.jobs.find((j) => j.id === consoleJob) && (
         <div className="fixed inset-3 z-30 overflow-hidden rounded-xl border border-border-strong shadow-2xl">

@@ -20,7 +20,11 @@ export function ActivityPanel({ jobs, previews, onOpenConsole }: {
   const latestSucceededRescan = jobs.find((j) => j.kind === 'rescan' && j.state === 'succeeded')
   return (
     <aside className="flex w-72 shrink-0 flex-col gap-2 overflow-y-auto">
-      <h2 className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Hoạt động AI</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Hoạt động AI</h2>
+        <button onClick={() => void api.clearFinishedJobs()}
+          className="rounded bg-raised px-2 py-1 text-xs text-text-secondary transition-colors duration-150 hover:brightness-110">Dọn xong</button>
+      </div>
       {jobs.length === 0 && <p className="py-8 text-center text-sm text-text-muted">Chưa có job nào.</p>}
       {jobs.map((job) => (
         <div key={job.id} className={`rounded-[10px] border bg-surface p-3 text-sm ${job.state === 'running' ? 'border-running-border shadow-[0_0_18px_rgba(67,217,232,.18)]' : 'border-border'}`}>

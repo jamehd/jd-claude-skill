@@ -65,6 +65,19 @@ recipe) — never the fg color on raw `--color-surface`.
 
 Priority text colors: P0 `#e87a7a` · P1 `#e8b54f` · P2 `#8fa3b8` · P3 `#5d7290`.
 
+### Item type (task vs bug)
+
+Type tints the card surface; status owns the left edge + pill (the two signals coexist).
+
+| Token | Value | Use |
+|---|---|---|
+| `--color-task-bg` | `#0e1b2b` | Task card surface |
+| `--color-task-border` | `#1e3a52` | Task card border |
+| `--color-bug-bg` | `#241318` | Bug card surface |
+| `--color-bug-border` | `#4a2230` | Bug card border |
+
+Type badge text: task → `--color-accent`, bug → `--color-danger`.
+
 ### Diff & log
 
 | Token | Value | Use |
@@ -106,10 +119,12 @@ must render correctly on an offline LAN.
 
 - **KPI cell** — surface card, mono number 24px (accent on "overall %"), muted
   uppercase label beneath.
-- **Kanban card** — surface bg, 1px border, **2px left edge in the item's
-  status fg color**; row 1: mono ID (muted) + priority (priority color); row 2:
-  title in `text-primary` (bug titles in failed-fg); row 3: component muted.
-  Hover: raised recipe.
+- **Kanban card** — **Type** → tinted surface (`bg-task-bg`/`bg-bug-bg`) + a mono
+  TASK/BUG badge (accent/danger). **Status** → a 2px left edge in the status fg
+  color + a status pill. Both signals coexist. Row 1: mono ID (muted) + priority
+  (priority color); row 2: title in `text-primary` (bug titles in failed-fg); row
+  3: component muted + the type/status badges. Hover: raised recipe, but keep the
+  status left edge (`hover:border-y/-r-border-strong`, not all sides).
 - **Kanban column** — `--color-sunken` at 10px radius, uppercase label with
   count; `ai_running` column header carries an accent `◉`.
 - **Status pill** — mono 10px, fg/bg/border triple, radius 999px, padding
@@ -118,9 +133,20 @@ must render correctly on an offline LAN.
   text `#e6fbff`, radius 8px, `--glow-accent`; hover brightens 8%.
 - **Secondary button** — transparent bg, `--color-border` border,
   `text-secondary`; hover: raised recipe. Destructive: failed-fg text.
-- **Drawer** — `--color-surface`, left border, title row = ID pill + status
-  pill + Inter 600 title; body prose at the reading baseline; diff/log in
-  sunken wells.
+- **Drawer** — `--color-surface` panel on a full-screen `rgba(8,13,20,.7)`
+  backdrop, anchored right with a left border; closes on outside-click and ESC
+  (panel calls `stopPropagation`). It is an **editable form**: title input,
+  description textarea, priority + component selects (sunken bg, accent focus
+  border). A secondary Save button is enabled only when **dirty AND** both
+  required fields (title + description) are non-blank; saving keeps the panel
+  open. Below a hairline, an **action row**: Execute (⚡ primary, for
+  backlog/ready/failed) / Mở console (when a job exists) / review actions
+  (Merge ok-tint / Tạo PR neutral / Hủy bỏ danger-tint). Diff/log render in
+  sunken wells. A **Delete** affordance pins to the bottom with an inline
+  danger confirm.
+- **Confirm (inline)** — prefer an in-place confirm over a separate modal: a
+  short danger-tinted prompt + a danger confirm button (`danger` fg/bg/border)
+  beside a neutral cancel, shown where the trigger was.
 - **Activity entry** — surface card; running entry gets accent border +
   `--glow-accent`; log tail in a sunken well, timestamps muted.
 - **Diff rendering** — line-based coloring per the diff tokens (classifier:
