@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { readdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
 import chokidar, { type FSWatcher } from 'chokidar'
 import { parseItem, serializeItem, parseComponentStatus } from './markdown.js'
@@ -100,6 +100,12 @@ export class BoardStore {
     const item = { ...parseItem(readFileSync(file, 'utf8')), ...patch, updated: today() }
     writeFileSync(file, serializeItem(item))
     return item
+  }
+
+  deleteItem(id: string): void {
+    const file = this.fileFor(id)
+    if (!file) throw new Error(`item not found: ${id}`)
+    unlinkSync(file)
   }
 
   appendToBody(id: string, text: string): BoardItem {

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest'
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
@@ -347,5 +347,26 @@ describe('JobRunner', () => {
     await vi.waitFor(() => expect(runner.getJob(job.id)?.state).toBe('failed'), { timeout: 2000 })
     expect(procs[1].killed).toBe(true)
     expect(runner.getJob(job.id)?.error).toMatch(/timeout/)
+  })
+
+  it('clearFinished removes finished jobs + files, keeps active ones', async () => {
+    const t = setup()
+    // job 1: succeeds
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    const done = t.runner.dispatchTask(t.item.id)
+    t.sendInit()
+    t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(done.id)?.state).toBe('succeeded'))
+    // job 2: a second task, still running
+    const other = t.store.createItem({ type: 'task', title: 'Running', component: 'infra' })
+    t.store.updateItem(other.id, { status: 'ready' })
+    const live = t.runner.dispatchTask(other.id)
+    expect(t.runner.getJob(live.id)?.state).toBe('running')
+
+    const cleared = t.runner.clearFinished()
+    expect(cleared).toBe(1)
+    expect(t.runner.getJob(done.id)).toBeUndefined()
+    expect(t.runner.getJob(live.id)).toBeDefined()
+    expect(existsSync(path.join(t.dataDir, 'jobs', `${done.id}.json`))).toBe(false)
   })
 })

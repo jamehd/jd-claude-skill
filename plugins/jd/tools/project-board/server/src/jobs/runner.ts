@@ -1,4 +1,4 @@
-import { appendFileSync, writeFileSync, readdirSync, readFileSync, renameSync } from 'node:fs'
+import { appendFileSync, writeFileSync, readdirSync, readFileSync, renameSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { BoardStore } from '../store.js'
@@ -60,6 +60,22 @@ export class JobRunner {
 
   getJob(id: string): Job | undefined {
     return this.jobs.get(id)
+  }
+
+  clearFinished(): number {
+    const finished: Job['state'][] = ['succeeded', 'failed', 'cancelled', 'interrupted']
+    let cleared = 0
+    for (const [id, job] of this.jobs) {
+      if (!finished.includes(job.state)) continue
+      this.jobs.delete(id)
+      if (this.deps) {
+        for (const ext of ['.json', '.log']) {
+          try { unlinkSync(path.join(this.deps.jobsDir, `${id}${ext}`)) } catch { /* file may not exist */ }
+        }
+      }
+      cleared++
+    }
+    return cleared
   }
 
   dispatchTask(taskId: string): Job {

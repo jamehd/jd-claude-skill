@@ -93,4 +93,16 @@ describe('BoardStore', () => {
     // And reading back confirms the change persisted
     expect(store.getItem('TASK-009')?.status).toBe('ready')
   })
+
+  it('deletes an item file', () => {
+    const a = store.createItem({ type: 'task', title: 'Doomed', component: 'infra' })
+    expect(store.getItem(a.id)).toBeDefined()
+    store.deleteItem(a.id)
+    expect(store.getItem(a.id)).toBeUndefined()
+    expect(store.scan().items).toHaveLength(0)
+  })
+
+  it('throws when deleting an unknown item', () => {
+    expect(() => store.deleteItem('TASK-999')).toThrow(/not found/)
+  })
 })
