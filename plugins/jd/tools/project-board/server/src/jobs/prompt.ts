@@ -1,8 +1,9 @@
 import { serializeItem } from '../markdown.js'
 import type { BoardItem } from '../../../ui/src/types.js'
+import { extractReqIds, type Requirement } from './requirements.js'
 
-export function buildTaskPrompt(item: BoardItem): string {
-  return [
+export function buildTaskPrompt(item: BoardItem, requirements?: Map<string, Requirement>): string {
+  const lines = [
     `You are working in a dedicated git worktree on branch board/${item.id} of the GameSync repo.`,
     'Implement the following item. Follow the conventions in CLAUDE.md (English code/docs, error standard, tests).',
     '',
@@ -16,7 +17,24 @@ export function buildTaskPrompt(item: BoardItem): string {
     '3. End your final output with a short summary of what you did and the test results.',
     '4. Do NOT modify anything under project-board/data/ — task state is managed by the dashboard.',
     '5. Do not push, do not merge, do not touch branches other than the current one.',
-  ].join('\n')
+  ]
+
+  const ids = extractReqIds(item.body)
+  if (requirements && ids.length > 0) {
+    lines.push('', '--- REQUIREMENTS YOU MUST SATISFY ---')
+    for (const id of ids) {
+      const r = requirements.get(id)
+      if (r) {
+        lines.push(`${r.id} — ${r.title}: ${r.statement}`)
+        for (const ac of r.acceptance) lines.push(`  AC: ${ac}`)
+      } else {
+        lines.push(`${id}: not found in docs/requirements (proceed from the task description)`)
+      }
+    }
+    lines.push('--- END REQUIREMENTS ---')
+  }
+
+  return lines.join('\n')
 }
 
 export function buildRescanPrompt(): string {

@@ -5,6 +5,7 @@ import type { BoardStore } from '../store.js'
 import type { WsHub } from '../ws.js'
 import type { ConsoleEvent, Job, JobKind, NoteType } from '../../../ui/src/types.js'
 import { buildTaskPrompt, buildRescanPrompt } from './prompt.js'
+import { parseRequirementsDir } from './requirements.js'
 import { normalizeLine } from './events.js'
 
 export type SpawnFn = (bin: string, args: string[], opts: { cwd: string }) => ChildProcess
@@ -230,7 +231,7 @@ export class JobRunner {
         return
       }
       store.updateItem(item.id, { status: 'ai_running', job: job.id })
-      prompt = buildTaskPrompt(item)
+      prompt = buildTaskPrompt(item, parseRequirementsDir(this.deps!.repoRoot))
     } else {
       // Rescan writes status files directly to disk in the live repo; no worktree.
       cwd = this.deps!.repoRoot
