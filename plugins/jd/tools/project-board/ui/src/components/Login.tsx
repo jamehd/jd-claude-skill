@@ -16,16 +16,16 @@ export function Login({ onSuccess }: { onSuccess: () => void }) {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <form onSubmit={submit} className="w-80 space-y-4 rounded-xl border border-zinc-800 bg-zinc-900 p-6">
-        <h1 className="text-lg font-semibold">GameSync Project Board</h1>
+    <div className="flex min-h-screen items-center justify-center bg-[rgba(8,13,20,.7)]">
+      <form onSubmit={submit} className="w-80 space-y-4 rounded-[10px] border border-border bg-surface p-6">
+        <h1 className="text-lg font-semibold text-text-primary">GameSync Project Board</h1>
         <input
           type="password" value={password} onChange={(e) => setPassword(e.target.value)}
           placeholder="Mật khẩu" autoFocus
-          className="w-full rounded-md border border-zinc-700 bg-zinc-950 px-3 py-2 outline-none focus:border-cyan-500"
+          className="w-full rounded-lg border border-border bg-sunken px-3 py-2 text-text-primary outline-none transition-colors duration-150 focus:border-accent"
         />
-        {error && <p className="text-sm text-red-400">{error}</p>}
-        <button className="w-full rounded-md bg-cyan-600 py-2 font-medium hover:bg-cyan-500">Đăng nhập</button>
+        {error && <p className="text-sm text-danger">{error}</p>}
+        <button className="w-full rounded-lg bg-gradient-to-r from-accent-strong to-accent-deep py-2 font-medium text-[#e6fbff] shadow-[0_0_18px_rgba(67,217,232,.18)] transition-colors duration-150 hover:brightness-110">Đăng nhập</button>
       </form>
     </div>
   )

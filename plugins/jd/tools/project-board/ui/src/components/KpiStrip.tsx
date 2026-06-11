@@ -7,18 +7,18 @@ export function KpiStrip({ snapshot }: { snapshot: BoardSnapshot }) {
   const avg = snapshot.components.length
     ? Math.round(snapshot.components.reduce((s, c) => s + c.completion, 0) / snapshot.components.length)
     : 0
-  const cells: [string, string | number][] = [
-    ['Hoàn thiện tổng thể', `${avg}%`],
-    ['Task đang mở', open.length - bugs.length],
-    ['Bug đang mở', bugs.length],
-    ['AI đang chạy', running.length],
+  const cells: [string, string | number, boolean][] = [
+    ['Hoàn thiện tổng thể', `${avg}%`, true],
+    ['Task đang mở', open.length - bugs.length, false],
+    ['Bug đang mở', bugs.length, false],
+    ['AI đang chạy', running.length, false],
   ]
   return (
     <div className="grid flex-1 grid-cols-4 gap-3">
-      {cells.map(([label, value]) => (
-        <div key={label} className="rounded-xl border border-zinc-800 bg-zinc-900 p-4 text-center">
-          <div className="text-2xl font-semibold text-cyan-400">{value}</div>
-          <div className="text-xs text-zinc-500">{label}</div>
+      {cells.map(([label, value, accent]) => (
+        <div key={label} className="rounded-[10px] border border-border bg-surface p-4 text-center">
+          <div className={`font-mono text-2xl font-semibold ${accent ? 'text-accent' : 'text-text-primary'}`}>{value}</div>
+          <div className="mt-1 text-[10px] uppercase tracking-wider text-text-muted">{label}</div>
         </div>
       ))}
     </div>

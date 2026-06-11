@@ -15,17 +15,17 @@ export default function App() {
   const { snapshot, logLines, refresh } = useBoard(() => setAuthed(false))
 
   if (!authed) return <Login onSuccess={() => { setAuthed(true); void refresh() }} />
-  if (!snapshot) return <div className="p-8 text-zinc-400">Đang tải…</div>
+  if (!snapshot) return <div className="p-8 text-text-secondary">Đang tải…</div>
 
   return (
     <div className="flex h-screen flex-col gap-3 p-3">
       <div className="flex items-start gap-3">
         <KpiStrip snapshot={snapshot} />
         <button onClick={() => setAdding(true)}
-          className="rounded-xl bg-cyan-600 px-4 py-3 font-medium hover:bg-cyan-500">⊕ Thêm task / bug</button>
+          className="rounded-lg bg-gradient-to-r from-accent-strong to-accent-deep px-4 py-3 font-medium text-[#e6fbff] shadow-[0_0_18px_rgba(67,217,232,.18)] transition-colors duration-150 hover:brightness-110">⊕ Thêm task / bug</button>
       </div>
       {snapshot.invalid.length > 0 && (
-        <div className="rounded-lg border border-orange-900 bg-orange-950/40 p-2 text-xs text-orange-300">
+        <div className="rounded-lg border border-danger-border bg-danger-bg p-2 text-xs text-danger">
           <span className="font-semibold">File lỗi không đọc được: </span>
           {snapshot.invalid.map((f) => `${f.file} (${f.error})`).join(' · ')}
         </div>

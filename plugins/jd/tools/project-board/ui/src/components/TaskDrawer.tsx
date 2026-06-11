@@ -1,6 +1,15 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
-import type { BoardItem } from '../types.js'
+import type { BoardItem, ItemStatus } from '../types.js'
+import { DiffView } from './DiffView.js'
+
+const STATUS_PILL: Record<ItemStatus, string> = {
+  backlog: 'text-text-secondary bg-surface border-border',
+  ready: 'text-ready bg-ready-bg border-ready-border',
+  ai_running: 'text-running bg-running-bg border-running-border',
+  review: 'text-ok bg-ok-bg border-ok-border',
+  done: 'text-ok bg-ok-bg border-ok-border',
+}
 
 export function TaskDrawer({ item, onClose }: { item: BoardItem; onClose: () => void }) {
   const [diff, setDiff] = useState<string | null>(null)
@@ -25,18 +34,22 @@ export function TaskDrawer({ item, onClose }: { item: BoardItem; onClose: () => 
   }
 
   return (
-    <div className="fixed inset-y-0 right-0 z-10 flex w-[32rem] flex-col gap-3 overflow-y-auto border-l border-zinc-800 bg-zinc-900 p-5 shadow-2xl">
+    <div className="fixed inset-y-0 right-0 z-10 flex w-[32rem] flex-col gap-3 overflow-y-auto border-l border-border bg-surface p-5 shadow-[0_2px_8px_rgba(0,0,0,.3)]">
       <div className="flex items-start justify-between">
         <div>
-          <div className="text-xs text-zinc-500">{item.id} · {item.component} · {item.priority} · {item.status}</div>
-          <h2 className="text-lg font-semibold">{item.title}</h2>
+          <div className="mb-2 flex items-center gap-2">
+            <span className="rounded-full border border-border bg-sunken px-2 py-0.5 font-mono text-[10px] text-text-muted">{item.id}</span>
+            <span className={`rounded-full border px-2 py-0.5 font-mono text-[10px] ${STATUS_PILL[item.status]}`}>{item.status}</span>
+            <span className="font-mono text-[10px] text-text-muted">{item.component} · {item.priority}</span>
+          </div>
+          <h2 className="text-[18px] font-semibold leading-[1.3] text-text-primary">{item.title}</h2>
         </div>
-        <button onClick={onClose} className="text-zinc-500 hover:text-zinc-200">✕</button>
+        <button onClick={onClose} className="text-text-muted transition-colors duration-150 hover:text-text-primary">✕</button>
       </div>
 
       {item.status === 'ready' && (
         <button disabled={busy} onClick={() => void act(() => api.dispatch(item.id))}
-          className="rounded-md bg-cyan-600 py-2 font-medium hover:bg-cyan-500 disabled:opacity-50">
+          className="rounded-lg bg-gradient-to-r from-accent-strong to-accent-deep py-2 font-medium text-[#e6fbff] shadow-[0_0_18px_rgba(67,217,232,.18)] transition-colors duration-150 hover:brightness-110 disabled:opacity-50">
           ⚡ Giao cho AI
         </button>
       )}
@@ -44,22 +57,22 @@ export function TaskDrawer({ item, onClose }: { item: BoardItem; onClose: () => 
       {item.status === 'review' && (
         <div className="flex gap-2">
           <button disabled={busy} onClick={() => void act(() => api.merge(item.id))}
-            className="flex-1 rounded-md bg-green-700 py-2 text-sm font-medium hover:bg-green-600 disabled:opacity-50">Merge</button>
+            className="flex-1 rounded-lg border border-ok-border bg-ok-bg py-2 text-sm font-medium text-ok transition-colors duration-150 hover:brightness-110 disabled:opacity-50">Merge</button>
           <button disabled={busy} onClick={() => void act(() => api.pr(item.id))}
-            className="flex-1 rounded-md bg-zinc-700 py-2 text-sm font-medium hover:bg-zinc-600 disabled:opacity-50">Tạo PR</button>
+            className="flex-1 rounded-lg border border-border py-2 text-sm font-medium text-text-secondary transition-colors duration-150 hover:border-border-strong hover:bg-raised disabled:opacity-50">Tạo PR</button>
           <button disabled={busy} onClick={() => void act(() => api.discard(item.id))}
-            className="flex-1 rounded-md bg-red-900 py-2 text-sm font-medium hover:bg-red-800 disabled:opacity-50">Hủy bỏ</button>
+            className="flex-1 rounded-lg border border-border py-2 text-sm font-medium text-danger transition-colors duration-150 hover:border-border-strong hover:bg-raised disabled:opacity-50">Hủy bỏ</button>
         </div>
       )}
 
-      {error && <p className="text-sm text-red-400">{error}</p>}
+      {error && <p className="text-sm text-danger">{error}</p>}
 
-      <pre className="whitespace-pre-wrap rounded-lg bg-zinc-950 p-3 text-sm text-zinc-300">{item.body}</pre>
+      <div className="whitespace-pre-wrap text-[14px] leading-[1.65] text-text-primary">{item.body}</div>
 
       {diff !== null && (
         <>
-          <h3 className="text-xs font-semibold uppercase text-zinc-500">Diff (main…board/{item.id})</h3>
-          <pre className="max-h-96 overflow-auto rounded-lg bg-zinc-950 p-3 text-xs text-zinc-400">{diff || '(diff trống)'}</pre>
+          <h3 className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Diff (main…board/{item.id})</h3>
+          <DiffView diff={diff} />
         </>
       )}
     </div>
