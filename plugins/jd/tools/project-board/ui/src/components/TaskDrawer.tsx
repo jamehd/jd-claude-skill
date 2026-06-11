@@ -78,7 +78,10 @@ export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
         </div>
 
         <button disabled={!canSave || busy}
-          onClick={() => void act(() => api.patchTask(item.id, { title: title.trim(), body: description.trim(), priority, component }), false)}
+          onClick={() => {
+            const t = title.trim(), d = description.trim()
+            void act(async () => { await api.patchTask(item.id, { title: t, body: d, priority, component }); setTitle(t); setDescription(d) }, false)
+          }}
           className="rounded-md border border-border py-2 text-sm font-medium text-text-secondary transition-colors duration-150 hover:bg-raised hover:border-border-strong disabled:opacity-40">
           {dirty ? 'Lưu thay đổi' : 'Đã lưu'}
         </button>
