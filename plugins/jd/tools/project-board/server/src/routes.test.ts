@@ -198,3 +198,58 @@ describe('rescan review routes', () => {
     expect(res.json().error).toMatch(/active|cancel/i)
   })
 })
+
+describe('console routes', () => {
+  async function dispatched(): Promise<{ jobId: string }> {
+    await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
+      payload: { type: 'task', title: 'Work', component: 'infra' } })
+    await app.inject({ method: 'PATCH', url: '/api/tasks/TASK-001', cookies: cookie, payload: { status: 'ready' } })
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/TASK-001/dispatch', cookies: cookie })
+    return { jobId: res.json().id }
+  }
+
+  it('replays normalized events from the log', async () => {
+    const { jobId } = await dispatched()
+    await app.inject({ method: 'POST', url: `/api/jobs/${jobId}/message`, cookies: cookie,
+      payload: { text: 'hello agent', mode: 'queue' } })
+    const res = await app.inject({ method: 'GET', url: `/api/jobs/${jobId}/events`, cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    const events = res.json() as { kind: string; text?: string }[]
+    expect(events.some((e) => e.kind === 'note' && e.text === 'hello agent')).toBe(true)
+  })
+
+  it('validates message payloads', async () => {
+    const { jobId } = await dispatched()
+    const empty = await app.inject({ method: 'POST', url: `/api/jobs/${jobId}/message`, cookies: cookie,
+      payload: { text: '   ', mode: 'queue' } })
+    expect(empty.statusCode).toBe(400)
+    const badMode = await app.inject({ method: 'POST', url: `/api/jobs/${jobId}/message`, cookies: cookie,
+      payload: { text: 'x', mode: 'shout' } })
+    expect(badMode.statusCode).toBe(400)
+    const missing = await app.inject({ method: 'POST', url: '/api/jobs/job-999/message', cookies: cookie,
+      payload: { text: 'x', mode: 'queue' } })
+    expect(missing.statusCode).toBe(404)
+  })
+
+  it('maps runner conflicts to 409', async () => {
+    const { jobId } = await dispatched()
+    const cancel = await app.inject({ method: 'POST', url: `/api/jobs/${jobId}/cancel`, cookies: cookie })
+    expect(cancel.statusCode).toBe(200)
+    const res = await app.inject({ method: 'POST', url: `/api/jobs/${jobId}/message`, cookies: cookie,
+      payload: { text: 'x', mode: 'queue' } })
+    expect(res.statusCode).toBe(409)
+  })
+
+  it('guards job-id params and 404s unknown event logs', async () => {
+    const trav = await app.inject({ method: 'GET', url: '/api/jobs/..%2Fx/events', cookies: cookie })
+    expect(trav.statusCode).toBe(404)
+    const none = await app.inject({ method: 'GET', url: '/api/jobs/job-999/events', cookies: cookie })
+    expect(none.statusCode).toBe(404)
+  })
+
+  it('serves the SPA for /console/<id> deep links', async () => {
+    const res = await app.inject({ method: 'GET', url: '/console/job-001', cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    expect(res.body).toContain('<div id="root">')
+  })
+})

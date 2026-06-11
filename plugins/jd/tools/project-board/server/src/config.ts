@@ -10,6 +10,7 @@ export interface Config {
   jobTimeoutMs: number
   maxConcurrentJobs: number
   claudeBin: string
+  uiDistDir?: string
 }
 
 function num(value: string | undefined, fallback: number): number {
@@ -30,5 +31,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
     jobTimeoutMs: num(env.BOARD_JOB_TIMEOUT_MS, 7_200_000),
     maxConcurrentJobs: num(env.BOARD_MAX_JOBS, 1),
     claudeBin: env.BOARD_CLAUDE_BIN ?? 'claude',
+    uiDistDir: env.BOARD_UI_DIST,
   }
 }

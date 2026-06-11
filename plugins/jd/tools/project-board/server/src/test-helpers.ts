@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
@@ -11,6 +11,9 @@ import { JobRunner, type GitOps } from './jobs/runner.js'
 export function makeDeps(): ServerDeps {
   const dataDir = mkdtempSync(path.join(tmpdir(), 'board-srv-'))
   for (const d of ['tasks', 'status', 'jobs']) mkdirSync(path.join(dataDir, d), { recursive: true })
+  const uiDistDir = path.join(dataDir, 'uidist')
+  mkdirSync(uiDistDir, { recursive: true })
+  writeFileSync(path.join(uiDistDir, 'index.html'), '<!doctype html><html><body><div id="root"></div></body></html>')
   const store = new BoardStore(dataDir)
   const hub = new WsHub()
   const git: GitOps = {
@@ -44,6 +47,7 @@ export function makeDeps(): ServerDeps {
     config: {
       port: 0, host: '127.0.0.1', password: 'secret', repoRoot: dataDir,
       dataDir, jobTimeoutMs: 1000, maxConcurrentJobs: 1, claudeBin: 'claude',
+      uiDistDir,
     },
     store,
     hub,

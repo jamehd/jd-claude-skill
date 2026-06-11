@@ -6,6 +6,7 @@ import type { ItemStatus, ItemType, Priority } from '../../../ui/src/types.js'
 import { STATUSES, PRIORITIES } from '../markdown.js'
 import { SAFE_ID } from '../jobs/git.js'
 import { RESCAN_ID } from '../jobs/runner.js'
+import { normalizeLine } from '../jobs/events.js'
 
 interface CreateBody { type?: ItemType; title?: string; component?: string; priority?: Priority; body?: string }
 interface PatchBody { title?: string; status?: ItemStatus; priority?: Priority; component?: string; body?: string }
@@ -99,6 +100,33 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     const file = path.join(store.jobsDir, `${req.params.id}.log`)
     if (!existsSync(file)) return reply.code(404).send({ error: 'no log' })
     return reply.type('text/plain').send(readFileSync(file, 'utf8'))
+  })
+
+  app.get<{ Params: { id: string } }>('/api/jobs/:id/events', (req, reply) => {
+    if (!SAFE_ID.test(req.params.id)) return reply.code(404).send({ error: 'not found' })
+    if (!deps.runner.getJob(req.params.id)) return reply.code(404).send({ error: 'not found' })
+    const file = path.join(store.jobsDir, `${req.params.id}.log`)
+    if (!existsSync(file)) return reply.code(404).send({ error: 'no events' })
+    const events = readFileSync(file, 'utf8').split('\n').filter((l) => l.trim())
+      .flatMap((l) => normalizeLine(l))
+    return events
+  })
+
+  app.post<{ Params: { id: string }; Body: { text?: string; mode?: string } }>('/api/jobs/:id/message', (req, reply) => {
+    if (!SAFE_ID.test(req.params.id)) return reply.code(404).send({ error: 'not found' })
+    const text = req.body?.text?.trim()
+    const mode = req.body?.mode
+    if (!text || (mode !== 'queue' && mode !== 'steer')) {
+      return reply.code(400).send({ error: 'text and mode (queue|steer) are required' })
+    }
+    if (!deps.runner.getJob(req.params.id)) return reply.code(404).send({ error: 'not found' })
+    try {
+      deps.runner.message(req.params.id, text, mode)
+    } catch (err) {
+      return reply.code(409).send({ error: err instanceof Error ? err.message : String(err) })
+    }
+    hub.broadcast({ type: 'board_update' })
+    return { ok: true }
   })
 
   function requireReview(id: string, reply: { code: (n: number) => { send: (b: unknown) => unknown } }) {
