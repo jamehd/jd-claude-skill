@@ -20,6 +20,8 @@ export function makeDeps(): ServerDeps {
     branchDiff: () => 'diff --git a/x b/x',
     mergeBranch: () => {},
     createPr: () => 'https://github.com/example/pr/1',
+    hasWorktree: () => true,
+    worktreePath: () => dataDir,
   }
   const runner = new JobRunner({
     store,

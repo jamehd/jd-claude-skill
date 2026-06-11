@@ -21,8 +21,14 @@ function setup() {
   const item = store.createItem({ type: 'task', title: 'Do work', component: 'infra' })
   store.updateItem(item.id, { status: 'ready' })
 
-  let proc: FakeProc
-  const spawnFn: SpawnFn = vi.fn(() => { proc = new FakeProc(); return proc as never })
+  const procs: FakeProc[] = []
+  const spawnCalls: string[][] = []
+  const spawnFn: SpawnFn = vi.fn((_bin, args) => {
+    spawnCalls.push(args)
+    const p = new FakeProc()
+    procs.push(p)
+    return p as never
+  })
   const git: GitOps = {
     createWorktree: vi.fn(() => path.join(dataDir, 'wt')),
     removeWorktree: vi.fn(),
@@ -30,12 +36,16 @@ function setup() {
     branchDiff: vi.fn(() => ''),
     mergeBranch: vi.fn(),
     createPr: vi.fn(() => ''),
+    hasWorktree: vi.fn(() => true),
+    worktreePath: vi.fn(() => path.join(dataDir, 'wt')),
   }
   const runner = new JobRunner({
     store, hub: new WsHub(), git, spawnFn,
-    jobsDir: path.join(dataDir, 'jobs'), claudeBin: 'claude', timeoutMs: 50, maxConcurrent: 1,
+    jobsDir: path.join(dataDir, 'jobs'), claudeBin: 'claude', timeoutMs: 5000, maxConcurrent: 1,
   })
-  return { store, runner, git, spawnFn, item, proc: () => proc!, dataDir }
+  const sendInit = (i = 0, session = 'sess-1') =>
+    procs[i].stdout.emit('data', Buffer.from(JSON.stringify({ type: 'system', subtype: 'init', session_id: session }) + '\n'))
+  return { store, runner, git, spawnFn, spawnCalls, item, procs, sendInit, dataDir }
 }
 
 describe('JobRunner', () => {
@@ -47,7 +57,7 @@ describe('JobRunner', () => {
     expect(t.git.createWorktree).toHaveBeenCalledWith(t.item.id)
     expect(t.store.getItem(t.item.id)?.status).toBe('ai_running')
 
-    t.proc().emit('exit', 0)
+    t.procs[0].emit('exit', 0)
     await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
     const item = t.store.getItem(t.item.id)!
     expect(item.status).toBe('review')
@@ -57,7 +67,7 @@ describe('JobRunner', () => {
   it('marks job failed and resets task when exit is 0 but no commits on the branch', async () => {
     const t = setup()
     const job = t.runner.dispatchTask(t.item.id)
-    t.proc().emit('exit', 0)
+    t.procs[0].emit('exit', 0)
     await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'))
     const item = t.store.getItem(t.item.id)!
     expect(item.status).toBe('ready')
@@ -67,15 +77,28 @@ describe('JobRunner', () => {
   it('fails on nonzero exit', async () => {
     const t = setup()
     const job = t.runner.dispatchTask(t.item.id)
-    t.proc().emit('exit', 1)
+    t.procs[0].emit('exit', 1)
     await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'))
   })
 
   it('kills the process on timeout', async () => {
-    const t = setup()
-    const job = t.runner.dispatchTask(t.item.id)
-    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'), { timeout: 2000 })
-    expect(t.proc().killed).toBe(true)
+    const dataDir = mkdtempSync(path.join(tmpdir(), 'board-run-'))
+    for (const d of ['tasks', 'status', 'jobs']) mkdirSync(path.join(dataDir, d), { recursive: true })
+    const store = new BoardStore(dataDir)
+    const item = store.createItem({ type: 'task', title: 'T', component: 'infra' })
+    store.updateItem(item.id, { status: 'ready' })
+    const procs: FakeProc[] = []
+    const runner = new JobRunner({
+      store, hub: new WsHub(),
+      git: { createWorktree: () => dataDir, removeWorktree: () => {}, changedFiles: () => [],
+             branchDiff: () => '', mergeBranch: () => {}, createPr: () => '',
+             hasWorktree: () => true, worktreePath: () => dataDir },
+      spawnFn: () => { const p = new FakeProc(); procs.push(p); return p as never },
+      jobsDir: path.join(dataDir, 'jobs'), claudeBin: 'claude', timeoutMs: 50, maxConcurrent: 1,
+    })
+    const job = runner.dispatchTask(item.id)
+    await vi.waitFor(() => expect(runner.getJob(job.id)?.state).toBe('failed'), { timeout: 2000 })
+    expect(procs[0].killed).toBe(true)
   })
 
   it('queues a second dispatch while one is running', () => {
@@ -90,8 +113,8 @@ describe('JobRunner', () => {
   it('writes a log file and job metadata', async () => {
     const t = setup()
     const job = t.runner.dispatchTask(t.item.id)
-    t.proc().stdout.emit('data', Buffer.from('working...\n'))
-    t.proc().emit('exit', 1)
+    t.procs[0].stdout.emit('data', Buffer.from('working...\n'))
+    t.procs[0].emit('exit', 1)
     await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'))
     const files = readdirSync(path.join(t.dataDir, 'jobs'))
     expect(files).toContain(`${job.id}.log`)
@@ -103,7 +126,7 @@ describe('JobRunner', () => {
     const t = setup()
     ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['project-board/data/status/infra.md'])
     const job = t.runner.dispatchRescan()
-    t.proc().emit('exit', 0)
+    t.procs[0].emit('exit', 0)
     await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
   })
 
@@ -120,7 +143,7 @@ describe('JobRunner', () => {
     const job = t.runner.dispatchTask(t.item.id)
     t.runner.shutdown()
     await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('interrupted'))
-    expect(t.proc().killed).toBe(true)
+    expect(t.procs[0].killed).toBe(true)
     expect(t.store.getItem(t.item.id)?.status).toBe('ready')
   })
 
@@ -149,6 +172,8 @@ describe('JobRunner', () => {
       branchDiff: vi.fn(() => ''),
       mergeBranch: vi.fn(),
       createPr: vi.fn(() => ''),
+      hasWorktree: vi.fn(() => true),
+      worktreePath: vi.fn(() => path.join(dataDir, 'wt')),
     }
     let runner!: JobRunner
     expect(() => {
@@ -178,6 +203,8 @@ describe('JobRunner', () => {
       branchDiff: vi.fn(() => ''),
       mergeBranch: vi.fn(),
       createPr: vi.fn(() => ''),
+      hasWorktree: vi.fn(() => true),
+      worktreePath: vi.fn(() => path.join(dataDir, 'wt')),
     }
     const runner = new JobRunner({
       store, hub: new WsHub(), git, spawnFn: vi.fn() as never,
@@ -185,5 +212,126 @@ describe('JobRunner', () => {
     })
     expect(runner.getJob('job-002')?.state).toBe('interrupted')
     expect(store.getItem(item.id)?.status).toBe('ready')
+  })
+
+  it('uses stream-json args and captures the session id', () => {
+    const t = setup()
+    const job = t.runner.dispatchTask(t.item.id)
+    expect(t.spawnCalls[0]).toEqual(expect.arrayContaining([
+      '-p', '--dangerously-skip-permissions', '--output-format', 'stream-json', '--verbose', '--include-partial-messages',
+    ]))
+    expect(t.spawnCalls[0]).not.toContain('--resume')
+    t.sendInit()
+    expect(t.runner.getJob(job.id)?.sessionId).toBe('sess-1')
+    expect(t.runner.getJob(job.id)?.segments).toBe(1)
+  })
+
+  it('queued message chains a resume segment instead of finishing', async () => {
+    const t = setup()
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    const job = t.runner.dispatchTask(t.item.id)
+    t.sendInit()
+    t.runner.message(job.id, 'also update the docs', 'queue')
+    t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.spawnCalls).toHaveLength(2))
+    expect(t.runner.getJob(job.id)?.state).toBe('running')
+    expect(t.spawnCalls[1]).toEqual(expect.arrayContaining(['-p', 'also update the docs', '--resume', 'sess-1']))
+    t.procs[1].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
+    expect(t.runner.getJob(job.id)?.segments).toBe(2)
+  })
+
+  it('steer kills the segment and chains immediately', async () => {
+    const t = setup()
+    const job = t.runner.dispatchTask(t.item.id)
+    t.sendInit()
+    t.runner.message(job.id, 'stop, do Y instead', 'steer')
+    await vi.waitFor(() => expect(t.spawnCalls).toHaveLength(2))
+    expect(t.procs[0].killed).toBe(true)
+    expect(t.runner.getJob(job.id)?.state).toBe('running')
+    expect(t.spawnCalls[1]).toEqual(expect.arrayContaining(['--resume', 'sess-1']))
+  })
+
+  it('steer before session id is captured degrades to queue', () => {
+    const t = setup()
+    const job = t.runner.dispatchTask(t.item.id)
+    t.runner.message(job.id, 'early steer', 'steer')
+    expect(t.procs[0].killed).toBe(false)
+    expect(t.spawnCalls).toHaveLength(1)
+    t.sendInit()
+    t.procs[0].emit('exit', 0)
+    return vi.waitFor(() => expect(t.spawnCalls).toHaveLength(2))
+  })
+
+  it('segment failure discards the queue and fails the job', async () => {
+    const t = setup()
+    const job = t.runner.dispatchTask(t.item.id)
+    t.sendInit()
+    t.runner.message(job.id, 'queued thing', 'queue')
+    t.procs[0].emit('exit', 1)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'))
+    expect(t.spawnCalls).toHaveLength(1)
+  })
+
+  it('continue-after-finish resumes a succeeded job and re-runs review', async () => {
+    const t = setup()
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    const job = t.runner.dispatchTask(t.item.id)
+    t.sendInit()
+    t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
+    expect(t.store.getItem(t.item.id)?.status).toBe('review')
+    t.runner.message(job.id, 'please also add tests', 'queue')
+    expect(t.runner.getJob(job.id)?.state).toBe('running')
+    expect(t.store.getItem(t.item.id)?.status).toBe('ai_running')
+    await vi.waitFor(() => expect(t.spawnCalls).toHaveLength(2))
+    t.procs[1].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
+    expect(t.store.getItem(t.item.id)?.status).toBe('review')
+  })
+
+  it('continue-after-finish 409s when the worktree is gone', async () => {
+    const t = setup()
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    ;(t.git.hasWorktree as ReturnType<typeof vi.fn>).mockReturnValue(false)
+    const job = t.runner.dispatchTask(t.item.id)
+    t.sendInit()
+    t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
+    expect(() => t.runner.message(job.id, 'more', 'queue')).toThrow(/worktree no longer exists/)
+  })
+
+  it('messaging a cancelled job throws', async () => {
+    const t = setup()
+    const job = t.runner.dispatchTask(t.item.id)
+    t.sendInit()
+    t.runner.cancel(job.id)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('cancelled'))
+    expect(() => t.runner.message(job.id, 'hi', 'queue')).toThrow(/cancelled/)
+  })
+
+  it('timeout budget spans segments', async () => {
+    // dedicated runner with a tiny timeout
+    const dataDir = mkdtempSync(path.join(tmpdir(), 'board-run-'))
+    for (const d of ['tasks', 'status', 'jobs']) mkdirSync(path.join(dataDir, d), { recursive: true })
+    const store = new BoardStore(dataDir)
+    const item = store.createItem({ type: 'task', title: 'T', component: 'infra' })
+    store.updateItem(item.id, { status: 'ready' })
+    const procs: FakeProc[] = []
+    const runner = new JobRunner({
+      store, hub: new WsHub(),
+      git: { createWorktree: () => dataDir, removeWorktree: () => {}, changedFiles: () => [],
+             branchDiff: () => '', mergeBranch: () => {}, createPr: () => '',
+             hasWorktree: () => true, worktreePath: () => dataDir },
+      spawnFn: () => { const p = new FakeProc(); procs.push(p); return p as never },
+      jobsDir: path.join(dataDir, 'jobs'), claudeBin: 'claude', timeoutMs: 80, maxConcurrent: 1,
+    })
+    const job = runner.dispatchTask(item.id)
+    procs[0].stdout.emit('data', Buffer.from(JSON.stringify({ type: 'system', subtype: 'init', session_id: 's' }) + '\n'))
+    runner.message(job.id, 'next', 'queue')
+    procs[0].emit('exit', 0) // chains segment 2; timer NOT re-armed
+    await vi.waitFor(() => expect(runner.getJob(job.id)?.state).toBe('failed'), { timeout: 2000 })
+    expect(procs[1].killed).toBe(true)
+    expect(runner.getJob(job.id)?.error).toMatch(/timeout/)
   })
 })

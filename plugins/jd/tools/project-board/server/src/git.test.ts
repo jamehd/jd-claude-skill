@@ -112,6 +112,14 @@ describe('BoardGit', () => {
     expect(sh(repo, 'branch', '--list', 'board/TASK-006').trim()).toBe('')
   })
 
+  it('hasWorktree reflects existence', () => {
+    expect(git.hasWorktree('TASK-010')).toBe(false)
+    git.createWorktree('TASK-010')
+    expect(git.hasWorktree('TASK-010')).toBe(true)
+    git.removeWorktree('TASK-010')
+    expect(git.hasWorktree('TASK-010')).toBe(false)
+  })
+
   // Finding 2: git stderr surfaced in thrown error
   it('surfaces git stderr when a git command fails', () => {
     // branchDiff on a non-existent branch triggers exit 128 with "fatal: ..." stderr

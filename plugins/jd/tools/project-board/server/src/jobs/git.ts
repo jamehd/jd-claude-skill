@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, existsSync } from 'node:fs'
 import path from 'node:path'
 
 export const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
@@ -37,6 +37,11 @@ export class BoardGit {
     mkdirSync(path.dirname(wt), { recursive: true })
     this.git(['worktree', 'add', '-b', this.branchName(taskId), wt, 'main'])
     return wt
+  }
+
+  hasWorktree(taskId: string): boolean {
+    this.assertSafeId(taskId)
+    return existsSync(this.worktreePath(taskId))
   }
 
   removeWorktree(taskId: string): void {

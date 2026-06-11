@@ -3,8 +3,9 @@ import path from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { BoardStore } from '../store.js'
 import type { WsHub } from '../ws.js'
-import type { Job, JobKind } from '../../../ui/src/types.js'
+import type { ConsoleEvent, Job, JobKind, NoteType } from '../../../ui/src/types.js'
 import { buildTaskPrompt, buildRescanPrompt } from './prompt.js'
+import { normalizeLine } from './events.js'
 
 export type SpawnFn = (bin: string, args: string[], opts: { cwd: string }) => ChildProcess
 
@@ -15,6 +16,8 @@ export interface GitOps {
   branchDiff(taskId: string): string
   mergeBranch(taskId: string, message: string): void
   createPr(taskId: string, title: string, body: string): string
+  hasWorktree(taskId: string): boolean
+  worktreePath(taskId: string): string
 }
 
 export interface RunnerDeps {
@@ -30,10 +33,20 @@ export interface RunnerDeps {
 
 export const RESCAN_ID = 'RESCAN'
 
+interface SegmentEntry {
+  proc: ChildProcess
+  steering: boolean
+  steerMessage?: string
+  buffer: string
+}
+
 export class JobRunner {
   private jobs = new Map<string, Job>()
-  private queue: Job[] = []
-  private running = new Map<string, { proc: ChildProcess; timer: NodeJS.Timeout }>()
+  private dispatchQueue: Job[] = []
+  private running = new Map<string, SegmentEntry>()
+  private messages = new Map<string, string[]>()
+  private timers = new Map<string, NodeJS.Timeout>()
+  private cwds = new Map<string, string>()
   private spawnFn: SpawnFn
 
   constructor(private deps?: RunnerDeps) {
@@ -63,18 +76,57 @@ export class JobRunner {
     return this.enqueue('rescan', undefined)
   }
 
-  private hasActiveJob(match: (job: Job) => boolean): boolean {
-    for (const job of this.jobs.values()) {
-      if ((job.state === 'queued' || job.state === 'running') && match(job)) return true
+  message(jobId: string, text: string, mode: 'queue' | 'steer'): void {
+    const job = this.jobs.get(jobId)
+    if (!job) throw new Error(`job not found: ${jobId}`)
+    if (job.state === 'cancelled') throw new Error('job was cancelled; session is closed')
+    if (job.state === 'queued') throw new Error('job has not started yet')
+
+    if (job.state === 'running') {
+      this.note(job, 'user_message', text)
+      const entry = this.running.get(jobId)
+      if (mode === 'steer' && entry && job.sessionId) {
+        entry.steering = true
+        entry.steerMessage = text
+        this.note(job, 'steer', 'interrupting current turn')
+        entry.proc.kill('SIGTERM')
+      } else {
+        if (mode === 'steer') this.note(job, 'queued', 'session not ready to steer; message queued')
+        this.pendingOf(jobId).push(text)
+      }
+      return
     }
-    return false
+
+    // succeeded | failed | interrupted -> continue-after-finish
+    if (!job.sessionId) throw new Error('no session recorded for this job')
+    const wtId = job.kind === 'task' ? job.taskId! : RESCAN_ID
+    if (!this.deps!.git.hasWorktree(wtId)) {
+      throw new Error('worktree no longer exists; session is read-only')
+    }
+    job.state = 'running'
+    job.error = undefined
+    job.endedAt = undefined
+    this.persist(job)
+    if (job.kind === 'task') {
+      const item = this.deps!.store.getItem(job.taskId!)
+      if (item && item.status !== 'ai_running') {
+        this.deps!.store.updateItem(item.id, { status: 'ai_running', job: job.id })
+      }
+    }
+    if (!this.cwds.has(job.id)) {
+      this.cwds.set(job.id, this.deps!.git.worktreePath(wtId))
+    }
+    this.note(job, 'user_message', text)
+    this.armTimer(job)
+    this.startSegment(job, text, job.sessionId)
+    this.deps!.hub.broadcast({ type: 'board_update' })
   }
 
   cancel(jobId: string): void {
     const job = this.jobs.get(jobId)
     if (!job) return
     if (job.state === 'queued') {
-      this.queue = this.queue.filter((j) => j.id !== jobId)
+      this.dispatchQueue = this.dispatchQueue.filter((j) => j.id !== jobId)
       this.finish(job, 'cancelled', 'cancelled while queued')
       return
     }
@@ -96,24 +148,47 @@ export class JobRunner {
     }
   }
 
+  private hasActiveJob(match: (j: Job) => boolean): boolean {
+    return [...this.jobs.values()].some((j) => (j.state === 'queued' || j.state === 'running') && match(j))
+  }
+
+  private pendingOf(jobId: string): string[] {
+    let q = this.messages.get(jobId)
+    if (!q) { q = []; this.messages.set(jobId, q) }
+    return q
+  }
+
+  private logFile(job: Job): string {
+    return path.join(this.deps!.jobsDir, `${job.id}.log`)
+  }
+
+  private emit(job: Job, event: ConsoleEvent): void {
+    this.deps!.hub.broadcast({ type: 'job_event', jobId: job.id, event })
+  }
+
+  private note(job: Job, noteType: NoteType, text: string): void {
+    appendFileSync(this.logFile(job), JSON.stringify({ _board: noteType, text }) + '\n')
+    this.emit(job, { kind: 'note', noteType, text })
+  }
+
   private enqueue(kind: JobKind, taskId?: string): Job {
     const job: Job = { id: this.nextJobId(), kind, taskId, state: 'queued' }
     this.jobs.set(job.id, job)
     this.persist(job)
-    this.queue.push(job)
+    this.dispatchQueue.push(job)
     this.pump()
     return job
   }
 
   private pump(): void {
     if (!this.deps) return
-    while (this.running.size < this.deps.maxConcurrent && this.queue.length > 0) {
-      this.start(this.queue.shift()!)
+    while (this.running.size < this.deps.maxConcurrent && this.dispatchQueue.length > 0) {
+      this.start(this.dispatchQueue.shift()!)
     }
   }
 
   private start(job: Job): void {
-    const { store, git, hub, jobsDir, claudeBin, timeoutMs } = this.deps!
+    const { store, git, hub } = this.deps!
     const wtId = job.kind === 'task' ? job.taskId! : RESCAN_ID
     job.branch = `board/${wtId}`
     job.startedAt = new Date().toISOString()
@@ -126,6 +201,7 @@ export class JobRunner {
       this.finish(job, 'failed', `worktree: ${err instanceof Error ? err.message : err}`)
       return
     }
+    this.cwds.set(job.id, cwd)
 
     let prompt: string
     if (job.kind === 'task') {
@@ -142,47 +218,134 @@ export class JobRunner {
     }
     this.persist(job)
     hub.broadcast({ type: 'board_update' })
+    this.armTimer(job)
+    this.startSegment(job, prompt, undefined)
+  }
 
-    const proc = this.spawnFn(claudeBin, ['-p', prompt, '--dangerously-skip-permissions'], { cwd })
-    const logFile = path.join(jobsDir, `${job.id}.log`)
-    const onData = (chunk: Buffer) => {
-      const line = chunk.toString()
-      appendFileSync(logFile, line)
-      hub.broadcast({ type: 'job_log', jobId: job.id, line })
+  private startSegment(job: Job, promptText: string, resume?: string): void {
+    const { claudeBin } = this.deps!
+    const cwd = this.cwds.get(job.id)
+    if (!cwd) {
+      this.finish(job, 'failed', 'worktree path lost (server restarted?); session is read-only')
+      return
     }
-    proc.stdout?.on('data', onData)
-    proc.stderr?.on('data', onData)
+    job.segments = (job.segments ?? 0) + 1
+    this.persist(job)
 
-    const timer = setTimeout(() => {
-      job.error = `timeout after ${timeoutMs}ms`
-      proc.kill('SIGTERM')
-    }, timeoutMs)
+    const args = ['-p', promptText, '--dangerously-skip-permissions',
+      '--output-format', 'stream-json', '--verbose', '--include-partial-messages']
+    if (resume) args.push('--resume', resume)
 
-    this.running.set(job.id, { proc, timer })
-    proc.on('exit', (code) => {
-      clearTimeout(timer)
-      this.running.delete(job.id)
-      if (job.state === 'cancelled' || job.state === 'interrupted') {
-        this.afterFailure(job, job.state === 'cancelled' ? 'cancelled by user' : 'server shutdown')
-        this.finishKeepState(job)
-      } else if (job.error) {
-        this.afterFailure(job, job.error)
-        this.finish(job, 'failed', job.error)
-      } else if (code !== 0) {
-        this.afterFailure(job, `claude exited with code ${code}`)
-        this.finish(job, 'failed', `exit code ${code}`)
-      } else if (this.completedSuccessfully(job)) {
-        if (job.kind === 'task') this.afterSuccess(job)
-        this.finish(job, 'succeeded')
-      } else {
-        const reason = job.kind === 'task'
-          ? 'process exited 0 but no commits found on the branch'
-          : 'process exited 0 but no files under project-board/data/status changed'
-        this.afterFailure(job, reason)
-        this.finish(job, 'failed', reason)
-      }
-      this.pump()
+    const proc = this.spawnFn(claudeBin, args, { cwd })
+    const entry: SegmentEntry = { proc, steering: false, buffer: '' }
+    this.running.set(job.id, entry)
+
+    proc.stdout?.on('data', (chunk: Buffer) => this.onStdout(job, entry, chunk))
+    proc.stderr?.on('data', (chunk: Buffer) => {
+      const text = chunk.toString()
+      appendFileSync(this.logFile(job), JSON.stringify({ _board: 'raw', text }) + '\n')
+      this.emit(job, { kind: 'raw', text })
     })
+    proc.on('exit', (code) => this.onSegmentExit(job, entry, code))
+  }
+
+  private onStdout(job: Job, entry: SegmentEntry, chunk: Buffer): void {
+    entry.buffer += chunk.toString()
+    let idx: number
+    while ((idx = entry.buffer.indexOf('\n')) >= 0) {
+      const line = entry.buffer.slice(0, idx)
+      entry.buffer = entry.buffer.slice(idx + 1)
+      this.handleLine(job, line)
+    }
+  }
+
+  private handleLine(job: Job, line: string): void {
+    if (!line.trim()) return
+    appendFileSync(this.logFile(job), line + '\n')
+    for (const event of normalizeLine(line)) {
+      if (event.kind === 'init' && !job.sessionId) {
+        job.sessionId = event.sessionId
+        this.persist(job)
+      }
+      this.emit(job, event)
+    }
+  }
+
+  private onSegmentExit(job: Job, entry: SegmentEntry, code: number | null): void {
+    if (this.running.get(job.id) !== entry) return
+    this.running.delete(job.id)
+    if (entry.buffer.trim()) {
+      this.handleLine(job, entry.buffer)
+      entry.buffer = ''
+    }
+
+    if (entry.steering) {
+      this.startSegment(job, entry.steerMessage!, job.sessionId)
+      return
+    }
+    if (job.state === 'cancelled' || job.state === 'interrupted') {
+      this.clearTimer(job.id)
+      this.messages.delete(job.id)
+      this.afterFailure(job, job.state === 'cancelled' ? 'cancelled by user' : 'server shutdown')
+      this.finishKeepState(job)
+      this.pump()
+      return
+    }
+    if (job.error) {
+      this.clearTimer(job.id)
+      this.discardQueue(job)
+      this.afterFailure(job, job.error)
+      this.finish(job, 'failed', job.error)
+      this.pump()
+      return
+    }
+    if (code !== 0) {
+      this.clearTimer(job.id)
+      this.discardQueue(job)
+      this.afterFailure(job, `claude exited with code ${code}`)
+      this.finish(job, 'failed', `exit code ${code}`)
+      this.pump()
+      return
+    }
+    const pending = this.messages.get(job.id)
+    if (pending && pending.length > 0) {
+      const next = pending.shift()!
+      this.startSegment(job, next, job.sessionId)
+      return
+    }
+    this.clearTimer(job.id)
+    if (this.completedSuccessfully(job)) {
+      if (job.kind === 'task') this.afterSuccess(job)
+      this.finish(job, 'succeeded')
+    } else {
+      const reason = job.kind === 'task'
+        ? 'process exited 0 but no commits found on the branch'
+        : 'process exited 0 but no files under project-board/data/status changed'
+      this.afterFailure(job, reason)
+      this.finish(job, 'failed', reason)
+    }
+    this.pump()
+  }
+
+  private discardQueue(job: Job): void {
+    const q = this.messages.get(job.id)
+    if (q && q.length > 0) this.note(job, 'error', `${q.length} queued message(s) discarded`)
+    this.messages.delete(job.id)
+  }
+
+  private armTimer(job: Job): void {
+    this.clearTimer(job.id)
+    const t = setTimeout(() => {
+      job.error = `timeout after ${this.deps!.timeoutMs}ms`
+      this.running.get(job.id)?.proc.kill('SIGTERM')
+    }, this.deps!.timeoutMs)
+    this.timers.set(job.id, t)
+  }
+
+  private clearTimer(jobId: string): void {
+    const t = this.timers.get(jobId)
+    if (t) clearTimeout(t)
+    this.timers.delete(jobId)
   }
 
   private completedSuccessfully(job: Job): boolean {
@@ -197,12 +360,10 @@ export class JobRunner {
     const { store, git } = this.deps!
     try {
       store.updateItem(job.taskId!, { status: 'review' })
-      store.appendToBody(
-        job.taskId!,
-        `## AI result\nJob ${job.id} succeeded on branch board/${job.taskId}.\nChanged files:\n${git.changedFiles(job.taskId!).map((f) => `- ${f}`).join('\n')}\nFull output: data/jobs/${job.id}.log`,
-      )
-    } catch {
-      job.error = 'job succeeded but the task file could not be updated to review'
+      store.appendToBody(job.taskId!,
+        `## AI result\nJob ${job.id} succeeded on branch board/${job.taskId}.\nChanged files:\n${git.changedFiles(job.taskId!).map((f) => `- ${f}`).join('\n')}\nFull output: data/jobs/${job.id}.log`)
+    } catch (err) {
+      job.error = `task file could not be updated: ${err instanceof Error ? err.message : err}`
     }
   }
 
@@ -212,7 +373,7 @@ export class JobRunner {
     try {
       store.updateItem(job.taskId!, { status: 'ready' })
       store.appendToBody(job.taskId!, `## AI result\nJob ${job.id} failed: ${reason}\nWorktree/branch kept for inspection: board/${job.taskId}`)
-    } catch { /* task file may be unparseable after a bad AI edit; job error is still recorded */ }
+    } catch { /* task file may be unparseable after a bad edit; job error is still recorded */ }
   }
 
   private finish(job: Job, state: Job['state'], error?: string): void {
@@ -229,10 +390,9 @@ export class JobRunner {
 
   private persist(job: Job): void {
     if (!this.deps) return
-    const target = path.join(this.deps.jobsDir, `${job.id}.json`)
-    const tmp = `${target}.tmp`
-    writeFileSync(tmp, JSON.stringify(job, null, 2))
-    renameSync(tmp, target)
+    const file = path.join(this.deps.jobsDir, `${job.id}.json`)
+    writeFileSync(`${file}.tmp`, JSON.stringify(job, null, 2))
+    renameSync(`${file}.tmp`, file)
   }
 
   private nextJobId(): string {
@@ -249,12 +409,11 @@ export class JobRunner {
   private recoverInterrupted(): void {
     const { jobsDir, store } = this.deps!
     for (const f of readdirSync(jobsDir).filter((f) => f.endsWith('.json'))) {
-      const full = path.join(jobsDir, f)
       let job: Job
       try {
-        job = JSON.parse(readFileSync(full, 'utf8')) as Job
+        job = JSON.parse(readFileSync(path.join(jobsDir, f), 'utf8')) as Job
       } catch {
-        try { renameSync(full, `${full}.corrupt`) } catch { /* best effort; skip regardless */ }
+        try { renameSync(path.join(jobsDir, f), path.join(jobsDir, `${f}.corrupt`)) } catch { /* best effort */ }
         continue
       }
       if (job.state === 'running' || job.state === 'queued') {
