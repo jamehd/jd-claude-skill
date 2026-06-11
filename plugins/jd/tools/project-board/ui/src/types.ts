@@ -61,3 +61,13 @@ export interface BoardSnapshot {
 export type WsMessage =
   | { type: 'board_update' }
   | { type: 'job_event'; jobId: string; event: ConsoleEvent }
+
+export interface Candidate {
+  kind: 'implement' | 'test'
+  type: ItemType
+  component: string
+  reqId: string
+  title: string
+  priority: Priority
+  body: string
+}

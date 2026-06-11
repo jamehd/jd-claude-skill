@@ -247,6 +247,51 @@ describe('console routes', () => {
   })
 })
 
+describe('bulk + candidates', () => {
+  it('returns an empty candidate list when no status files exist', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/scan-candidates', cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().candidates).toEqual([])
+  })
+
+  it('bulk-creates valid items and reports rejects', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/bulk', cookies: cookie, payload: {
+      items: [
+        { type: 'task', title: 'Implement CAFE-R10', component: 'cafe-service', priority: 'P1', body: 'do it\nReq: CAFE-R10' },
+        { type: 'task', title: 'Add tests for CAFE-R9', component: 'cafe-service', priority: 'P2', body: 'tests\nReq: CAFE-R9' },
+        { type: 'task', title: '', component: 'x', body: '' }, // invalid
+      ],
+    }})
+    expect(res.statusCode).toBe(200)
+    const j = res.json()
+    expect(j.created).toHaveLength(2)
+    expect(j.rejected).toHaveLength(1)
+    expect(j.rejected[0].index).toBe(2)
+    const board = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
+    expect(board.json().items).toHaveLength(2)
+  })
+
+  it('400s an empty bulk payload', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/bulk', cookies: cookie, payload: { items: [] } })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('rejects a bulk item with an invalid priority (P9)', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/bulk', cookies: cookie, payload: {
+      items: [
+        { type: 'task', title: 'Valid item', component: 'infra', priority: 'P1', body: 'ok' },
+        { type: 'task', title: 'Bad priority', component: 'infra', priority: 'P9', body: 'nope' },
+      ],
+    }})
+    expect(res.statusCode).toBe(200)
+    const j = res.json()
+    expect(j.created).toHaveLength(1)
+    expect(j.rejected).toHaveLength(1)
+    expect(j.rejected[0].index).toBe(1)
+    expect(j.rejected[0].error).toMatch(/invalid priority/)
+  })
+})
+
 describe('cache headers', () => {
   it('serves html with no-cache and hashed assets as immutable', async () => {
     const root = await app.inject({ method: 'GET', url: '/' })
