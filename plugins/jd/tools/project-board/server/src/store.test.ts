@@ -53,9 +53,10 @@ describe('BoardStore', () => {
 
   it('reads component status files', () => {
     writeFileSync(path.join(dataDir, 'status', 'infra.md'),
-      '---\ncomponent: infra\ncompletion: 50\nlast_scanned: 2026-06-11\n---\n\nHalf done.\n')
+      '---\ncomponent: infra\nbuilt: 50\ntested: 40\nlast_scanned: 2026-06-11\n---\n\nHalf done.\n')
     expect(store.componentStatuses()).toHaveLength(1)
-    expect(store.componentStatuses()[0].completion).toBe(50)
+    expect(store.componentStatuses()[0].built).toBe(50)
+    expect(store.componentStatuses()[0].tested).toBe(40)
   })
 
   it('resolves a hand-renamed file by frontmatter id for getItem and updateItem', () => {

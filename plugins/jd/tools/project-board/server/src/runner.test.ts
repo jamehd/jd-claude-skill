@@ -124,7 +124,7 @@ describe('JobRunner', () => {
     expect(readFileSync(path.join(t.dataDir, 'jobs', `${job.id}.log`), 'utf8')).toContain('working...')
   })
 
-  const STATUS_MD = '---\ncomponent: infra\ncompletion: 50\nlast_scanned: 2026-06-11\n---\nSummary.\n\n## Gaps\n- [ ] thing\n'
+  const STATUS_MD = '---\ncomponent: infra\nbuilt: 50\ntested: 40\nlast_scanned: 2026-06-11\n---\nSummary.\n\n## Gaps\n- [ ] thing\n'
 
   it('rescan runs in repoRoot (no worktree) and succeeds when a status file is written to disk', async () => {
     const t = setup()
