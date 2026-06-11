@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildTaskPrompt } from './jobs/prompt.js'
+import { buildTaskPrompt, buildRescanPrompt } from './jobs/prompt.js'
 import type { Requirement } from './jobs/requirements.js'
 import type { BoardItem } from '../../ui/src/types.js'
 
@@ -29,5 +29,23 @@ describe('buildTaskPrompt with requirements', () => {
     const without = buildTaskPrompt(item('just do the thing'))
     expect(withReqs).toBe(without)
     expect(withReqs).not.toContain('REQUIREMENTS YOU MUST SATISFY')
+  })
+})
+
+describe('buildRescanPrompt (requirements-aware)', () => {
+  const p = buildRescanPrompt()
+  it('directs reading the requirement docs', () => {
+    expect(p).toContain('docs/requirements/components')
+  })
+  it('directs writing the per-id status table format', () => {
+    expect(p).toMatch(/\| ?Req ?\| ?State ?\| ?Tested/i)
+    expect(p).toContain('completion')
+  })
+  it('directs reporting drift', () => {
+    expect(p.toLowerCase()).toContain('drift')
+  })
+  it('keeps the write-to-status-only, no-git constraint', () => {
+    expect(p).toContain('project-board/data/status')
+    expect(p.toLowerCase()).toMatch(/do not (run )?git|do not commit/)
   })
 })
