@@ -133,7 +133,10 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
   app.delete<{ Params: { id: string } }>('/api/tasks/:id', (req, reply) => {
     const item = store.getItem(req.params.id)
     if (!item) return reply.code(404).send({ error: 'not found' })
-    if (item.status === 'ai_running') {
+    const liveJob = deps.runner.listJobs().some(
+      (j) => (j.state === 'running' || j.state === 'queued') && j.taskId === item.id,
+    )
+    if (liveJob) {
       return reply.code(409).send({ error: 'a job is running on this task; cancel it first' })
     }
     store.deleteItem(item.id)

@@ -2,12 +2,15 @@ import { describe, it, expect, beforeEach } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { buildServer } from './server.js'
 import { makeDeps } from './test-helpers.js'
+import type { ServerDeps } from './server.js'
 
 let app: FastifyInstance
+let deps: ServerDeps
 let cookie: { board_session: string }
 
 beforeEach(async () => {
-  app = await buildServer(makeDeps())
+  deps = makeDeps()
+  app = await buildServer(deps)
   const login = await app.inject({ method: 'POST', url: '/api/login', payload: { password: 'secret' } })
   cookie = { board_session: login.cookies.find((c) => c.name === 'board_session')!.value }
 })
@@ -334,6 +337,17 @@ describe('crud + lifecycle', () => {
     await app.inject({ method: 'POST', url: `/api/tasks/${id}/dispatch`, cookies: cookie })  // -> ai_running
     const busy = await app.inject({ method: 'DELETE', url: `/api/tasks/${id}`, cookies: cookie })
     expect(busy.statusCode).toBe(409)
+  })
+
+  it('deletes a zombie ai_running task that has no live job', async () => {
+    const id = await makeTask()
+    // Force the orphaned state directly, bypassing the PATCH guard; no job dispatched.
+    deps.store.updateItem(id, { status: 'ai_running' })
+    expect(deps.runner.listJobs().some((j) => j.taskId === id)).toBe(false)
+    const res = await app.inject({ method: 'DELETE', url: `/api/tasks/${id}`, cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    const board = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
+    expect(board.json().items.find((i: { id: string }) => i.id === id)).toBeUndefined()
   })
 
   it('dispatches from backlog (not just ready)', async () => {

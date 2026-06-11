@@ -54,7 +54,29 @@ export class JobRunner {
 
   constructor(private deps?: RunnerDeps) {
     this.spawnFn = deps?.spawnFn ?? spawn
-    if (deps) this.recoverInterrupted()
+    if (deps) {
+      this.recoverInterrupted()
+      this.reconcileOrphanedTasks()
+    }
+  }
+
+  // Resets any task stuck in ai_running with no live (queued/running) job back to ready.
+  // Returns the number of tasks reset. Safe to call repeatedly.
+  reconcileOrphanedTasks(): number {
+    if (!this.deps) return 0
+    const hasLiveJob = (taskId: string) =>
+      [...this.jobs.values()].some(
+        (j) => (j.state === 'running' || j.state === 'queued') && j.taskId === taskId,
+      )
+    let resets = 0
+    for (const item of this.deps.store.scan().items) {
+      if (item.status !== 'ai_running') continue
+      if (hasLiveJob(item.id)) continue
+      this.deps.store.updateItem(item.id, { status: 'ready' })
+      this.deps.store.appendToBody(item.id, 'Reset to ready: was ai_running with no live job (orphaned).')
+      resets++
+    }
+    return resets
   }
 
   listJobs(): Job[] {
@@ -78,6 +100,8 @@ export class JobRunner {
       }
       cleared++
     }
+    // Cheap insurance: heal any task stranded in ai_running without a live job.
+    this.reconcileOrphanedTasks()
     return cleared
   }
 
