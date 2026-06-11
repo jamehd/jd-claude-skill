@@ -42,32 +42,38 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     })
   }
 
-  app.post<{ Body: { password?: string } }>('/api/login', (req, reply) => {
-    if (req.body?.password !== deps.config.password) {
-      return reply.code(401).send({ error: 'wrong password' })
-    }
-    const sid = randomUUID()
-    sessions.add(sid)
-    reply.setCookie('board_session', sid, { path: '/', httpOnly: true, sameSite: 'lax' })
-    return { ok: true }
-  })
+  if (deps.config.password) {
+    app.post<{ Body: { password?: string } }>('/api/login', (req, reply) => {
+      if (req.body?.password !== deps.config.password) {
+        return reply.code(401).send({ error: 'wrong password' })
+      }
+      const sid = randomUUID()
+      sessions.add(sid)
+      reply.setCookie('board_session', sid, { path: '/', httpOnly: true, sameSite: 'lax' })
+      return { ok: true }
+    })
 
-  app.addHook('onRequest', (req, reply, done) => {
-    const path = req.url.split('?')[0]
-    const open = path === '/api/login' || !path.startsWith('/api')
-    if (open || sessions.has(req.cookies.board_session ?? '')) return done()
-    reply.code(401).send({ error: 'unauthorized' })
-  })
+    app.addHook('onRequest', (req, reply, done) => {
+      const path = req.url.split('?')[0]
+      const open = path === '/api/login' || !path.startsWith('/api')
+      if (open || sessions.has(req.cookies.board_session ?? '')) return done()
+      reply.code(401).send({ error: 'unauthorized' })
+    })
 
-  // /ws is not under /api so the hook passes it through;
-  // auth is enforced here at upgrade time to prevent unauthenticated streaming
-  app.get('/ws', { websocket: true }, (socket, req) => {
-    if (!sessions.has(req.cookies.board_session ?? '')) {
-      socket.close(4401, 'unauthorized')
-      return
-    }
-    deps.hub.add(socket)
-  })
+    // /ws is not under /api so the hook passes it through;
+    // auth is enforced here at upgrade time to prevent unauthenticated streaming
+    app.get('/ws', { websocket: true }, (socket, req) => {
+      if (!sessions.has(req.cookies.board_session ?? '')) {
+        socket.close(4401, 'unauthorized')
+        return
+      }
+      deps.hub.add(socket)
+    })
+  } else {
+    app.get('/ws', { websocket: true }, (socket) => {
+      deps.hub.add(socket)
+    })
+  }
 
   registerRoutes(app, deps)
 

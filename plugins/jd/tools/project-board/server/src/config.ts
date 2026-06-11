@@ -4,7 +4,7 @@ import path from 'node:path'
 export interface Config {
   port: number
   host: string
-  password: string
+  password?: string
   repoRoot: string
   dataDir: string
   jobTimeoutMs: number
@@ -19,7 +19,6 @@ function num(value: string | undefined, fallback: number): number {
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
-  if (!env.BOARD_PASSWORD) throw new Error('BOARD_PASSWORD is required (set it in .env next to the tool)')
   if (!env.BOARD_REPO_ROOT) throw new Error('BOARD_REPO_ROOT is required — absolute path to the target project repository')
   const repoRoot = path.resolve(env.BOARD_REPO_ROOT)
   return {

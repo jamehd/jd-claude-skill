@@ -4,6 +4,36 @@ import { makeDeps } from './test-helpers.js'
 
 export { makeDeps }
 
+function makeOpenDeps(): ServerDeps {
+  const deps = makeDeps()
+  const { password: _pw, ...rest } = deps.config
+  deps.config = rest as ServerDeps['config']
+  return deps
+}
+
+describe('open mode (no password)', () => {
+  let deps: ServerDeps
+  beforeEach(() => { deps = makeOpenDeps() })
+
+  it('GET /api/board without any cookie returns 200', async () => {
+    const app = await buildServer(deps)
+    const res = await app.inject({ method: 'GET', url: '/api/board' })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toHaveProperty('items')
+  })
+
+  it('POST /api/tasks without a cookie returns 201', async () => {
+    const app = await buildServer(deps)
+    const res = await app.inject({
+      method: 'POST',
+      url: '/api/tasks',
+      headers: { 'content-type': 'application/json' },
+      payload: { type: 'task', title: 'open-mode task', priority: 'P2', component: 'test', body: 'detailed description' },
+    })
+    expect(res.statusCode).toBe(201)
+  })
+})
+
 describe('auth', () => {
   let deps: ServerDeps
   beforeEach(() => { deps = makeDeps() })

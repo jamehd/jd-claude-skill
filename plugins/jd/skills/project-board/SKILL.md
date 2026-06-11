@@ -29,14 +29,16 @@ Set up the Project Board dashboard (ships with this plugin) for any git reposito
    grep -qx '.board-worktrees/' <target>/.gitignore || echo '.board-worktrees/' >> <target>/.gitignore
    ```
 
-3. **Config — pass env per process, do not share a `.env` between projects.** A `.env` in the tool dir silently applies to every project; with multiple boards it points `BOARD_REPO_ROOT` at the wrong repo. Generate a real password, never a placeholder:
+3. **Config — pass env per process, do not share a `.env` between projects.** A `.env` in the tool dir silently applies to every project; with multiple boards it points `BOARD_REPO_ROOT` at the wrong repo. To require a login, generate a real password (never a placeholder):
    ```bash
    BOARD_PASSWORD=$(openssl rand -hex 8)
    ```
+   Omit `BOARD_PASSWORD` entirely for a fully-open board on a trusted LAN. The dispatch endpoint executes code on this machine, so only omit it on a network you trust.
+
    | Variable | Required | Notes |
    |---|---|---|
    | `BOARD_REPO_ROOT` | yes | Absolute path to the target repo |
-   | `BOARD_PASSWORD` | yes | Generated; report it to the user |
+   | `BOARD_PASSWORD` | no | Omit for open access (trusted LAN only); set to require a login |
    | `BOARD_PORT` | no (4400) | Pick a distinct port per project |
    | `BOARD_HOST` | no (0.0.0.0) | Keep 0.0.0.0 for LAN access |
    | `BOARD_CLAUDE_BIN` | no (claude) | Override the AI binary |
@@ -63,10 +65,15 @@ Set up the Project Board dashboard (ships with this plugin) for any git reposito
    ```
    Then start from the tool dir (or with `npm --prefix <tool-dir>`), env vars inline, in the background so the session isn't blocked:
    ```bash
+   # password-protected
    nohup env BOARD_REPO_ROOT=<abs-target> BOARD_PASSWORD=<pw> BOARD_PORT=<port> \
      node dist/server/src/index.js > /tmp/project-board-<port>.log 2>&1 &
+
+   # fully open (trusted LAN)
+   nohup env BOARD_REPO_ROOT=<abs-target> BOARD_PORT=<port> \
+     node dist/server/src/index.js > /tmp/project-board-<port>.log 2>&1 &
    ```
-   (`npm start` runs the same `node dist/server/src/index.js`.) Verify with a login curl — the endpoint is `POST /api/login` with body `{"password":"<pw>"}` (NOT `/api/auth/login`) — then report to the user: the URL `http://<lan-ip>:<port>` and the generated password. For 24/7 operation suggest a systemd unit (Linux) or scheduled task (Windows) running the same command. If you started a server only to verify setup, kill it and say so.
+   (`npm start` runs the same `node dist/server/src/index.js`.) When password-protected, verify with a login curl — the endpoint is `POST /api/login` with body `{"password":"<pw>"}` (NOT `/api/auth/login`). When open, `GET /api/board` should return 200 directly. Report to the user: the URL `http://<lan-ip>:<port>` and, if set, the generated password. For 24/7 operation suggest a systemd unit (Linux) or scheduled task (Windows) running the same command. If you started a server only to verify setup, kill it and say so.
 
 ## Scope rules
 
@@ -81,4 +88,5 @@ Set up the Project Board dashboard (ships with this plugin) for any git reposito
 | Skipping the target `.gitignore` entries | `.board-worktrees/` and job logs pollute `git status` |
 | Empty `status/` dir, no re-scan | KPI shows 0%, components panel empty |
 | Target repo dirty or not on `main` when merging | Merge button returns 409 — by design, not a bug |
+| Omitting `BOARD_PASSWORD` on an untrusted network | Dispatch endpoint executes code on this machine; anyone on the network can run jobs |
 | Weak/hardcoded password | Dispatch endpoint executes code on this machine; LAN peers exist |
