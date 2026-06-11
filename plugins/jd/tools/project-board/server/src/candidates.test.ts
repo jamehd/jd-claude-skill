@@ -77,6 +77,38 @@ describe('dedupeCandidates', () => {
     // a test candidate for a different req is still present
     expect(out.find((c) => c.reqId === 'CAFE-R9' && c.kind === 'test')).toBeDefined()
   })
+  it('CAFE-R12 live item does NOT suppress CAFE-R1 candidate (substring false-match regression)', () => {
+    const STATUS_BOTH = `---
+component: cafe-service
+last_scanned: 2026-06-11
+built: 71
+tested: 82
+---
+
+| Req | State | Tested | Note |
+|-----|-------|--------|------|
+| CAFE-R1 | missing | no | not implemented |
+| CAFE-R12 | missing | no | not implemented |
+`
+    const REQS_BOTH = new Map<string, Requirement>([
+      ['CAFE-R1', { id: 'CAFE-R1', title: 'gRPC ListGames', statement: 'Lists games.', acceptance: [] }],
+      ['CAFE-R12', { id: 'CAFE-R12', title: 'gRPC RegisterPC', statement: 'Registers PC.', acceptance: [] }],
+    ])
+    const candidates = buildCandidates(REQS_BOTH, [parseStatusDoc(STATUS_BOTH)])
+
+    // A live item covers CAFE-R12 only
+    const existing: BoardItem[] = [{
+      id: 'TASK-010', type: 'task', title: 'Implement CAFE-R12: gRPC RegisterPC', status: 'ready',
+      priority: 'P1', component: 'cafe-service', created: '2026-06-11', updated: '2026-06-11',
+      body: 'do it\nReq: CAFE-R12',
+    }]
+    const out = dedupeCandidates(candidates, existing)
+    // CAFE-R1 must survive — it shares a prefix with CAFE-R12 but is a distinct requirement
+    expect(out.find((c) => c.reqId === 'CAFE-R1' && c.kind === 'implement')).toBeDefined()
+    // CAFE-R12 is covered by the live item and must be suppressed
+    expect(out.find((c) => c.reqId === 'CAFE-R12' && c.kind === 'implement')).toBeUndefined()
+  })
+
   it('a done item does NOT suppress (gap regressed)', () => {
     const existing: BoardItem[] = [{
       id: 'TASK-001', type: 'task', title: 'Implement CAFE-R10: gRPC GetTheme', status: 'done',

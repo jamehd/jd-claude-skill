@@ -275,6 +275,21 @@ describe('bulk + candidates', () => {
     const res = await app.inject({ method: 'POST', url: '/api/tasks/bulk', cookies: cookie, payload: { items: [] } })
     expect(res.statusCode).toBe(400)
   })
+
+  it('rejects a bulk item with an invalid priority (P9)', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/bulk', cookies: cookie, payload: {
+      items: [
+        { type: 'task', title: 'Valid item', component: 'infra', priority: 'P1', body: 'ok' },
+        { type: 'task', title: 'Bad priority', component: 'infra', priority: 'P9', body: 'nope' },
+      ],
+    }})
+    expect(res.statusCode).toBe(200)
+    const j = res.json()
+    expect(j.created).toHaveLength(1)
+    expect(j.rejected).toHaveLength(1)
+    expect(j.rejected[0].index).toBe(1)
+    expect(j.rejected[0].error).toMatch(/invalid priority/)
+  })
 })
 
 describe('cache headers', () => {

@@ -218,6 +218,10 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
           rejected.push({ index, error: 'type, title, component and body are required' })
           return
         }
+        if (it.priority !== undefined && !PRIORITIES.includes(it.priority)) {
+          rejected.push({ index, error: `invalid priority: ${it.priority}` })
+          return
+        }
         created.push(store.createItem({ type: it.type, title: it.title.trim(), component: it.component.trim(), priority: it.priority, body: it.body }).id)
       })
       if (created.length > 0) hub.broadcast({ type: 'board_update' })

@@ -66,5 +66,5 @@ function itemKind(item: BoardItem): 'implement' | 'test' | null {
 export function dedupeCandidates(candidates: Candidate[], existing: BoardItem[]): Candidate[] {
   const live = existing.filter((i) => i.status !== 'done')
   return candidates.filter((c) =>
-    !live.some((i) => itemKind(i) === c.kind && i.body.includes(`Req: ${c.reqId}`)))
+    !live.some((i) => itemKind(i) === c.kind && i.body.split('\n').some((l) => l.trim() === `Req: ${c.reqId}`)))
 }
