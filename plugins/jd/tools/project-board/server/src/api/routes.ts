@@ -28,8 +28,8 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
 
   app.post<{ Body: CreateBody }>('/api/tasks', (req, reply) => {
     const { type, title, component, priority, body } = req.body ?? {}
-    if (!type || !['task', 'bug'].includes(type) || !title?.trim() || !component?.trim()) {
-      return reply.code(400).send({ error: 'type, title and component are required' })
+    if (!type || !['task', 'bug'].includes(type) || !title?.trim() || !component?.trim() || !body?.trim()) {
+      return reply.code(400).send({ error: 'type, title, component and description are required' })
     }
     if (priority !== undefined && !PRIORITIES.includes(priority)) {
       return reply.code(400).send({ error: `invalid priority: ${priority}` })
@@ -70,8 +70,8 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
   app.post<{ Params: { id: string } }>('/api/tasks/:id/dispatch', (req, reply) => {
     const item = store.getItem(req.params.id)
     if (!item) return reply.code(404).send({ error: 'not found' })
-    if (item.status !== 'ready') {
-      return reply.code(409).send({ error: `task is ${item.status}; only ready tasks can be dispatched` })
+    if (!['backlog', 'ready', 'failed'].includes(item.status)) {
+      return reply.code(409).send({ error: `cannot dispatch a task in '${item.status}'` })
     }
     try {
       return reply.code(202).send(deps.runner.dispatchTask(item.id))
@@ -127,6 +127,23 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     }
     hub.broadcast({ type: 'board_update' })
     return { ok: true }
+  })
+
+  app.delete<{ Params: { id: string } }>('/api/tasks/:id', (req, reply) => {
+    const item = store.getItem(req.params.id)
+    if (!item) return reply.code(404).send({ error: 'not found' })
+    if (item.status === 'ai_running') {
+      return reply.code(409).send({ error: 'a job is running on this task; cancel it first' })
+    }
+    store.deleteItem(item.id)
+    hub.broadcast({ type: 'board_update' })
+    return { ok: true }
+  })
+
+  app.post('/api/jobs/clear-finished', (_req, reply) => {
+    const cleared = deps.runner.clearFinished()
+    hub.broadcast({ type: 'board_update' })
+    return reply.send({ cleared })
   })
 
   function requireReview(id: string, reply: { code: (n: number) => { send: (b: unknown) => unknown } }) {

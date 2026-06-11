@@ -16,7 +16,7 @@ describe('task routes', () => {
   it('creates a task', async () => {
     const res = await app.inject({
       method: 'POST', url: '/api/tasks', cookies: cookie,
-      payload: { type: 'task', title: 'New work', component: 'infra' },
+      payload: { type: 'task', title: 'New work', component: 'infra', body: 'detailed description' },
     })
     expect(res.statusCode).toBe(201)
     expect(res.json().id).toBe('TASK-001')
@@ -33,7 +33,7 @@ describe('task routes', () => {
   it('patches a task but refuses manual ai_running', async () => {
     await app.inject({
       method: 'POST', url: '/api/tasks', cookies: cookie,
-      payload: { type: 'task', title: 'New work', component: 'infra' },
+      payload: { type: 'task', title: 'New work', component: 'infra', body: 'detailed description' },
     })
     const ok = await app.inject({
       method: 'PATCH', url: '/api/tasks/TASK-001', cookies: cookie,
@@ -58,7 +58,7 @@ describe('task routes', () => {
   it('rejects invalid status enum in PATCH and leaves item unchanged', async () => {
     await app.inject({
       method: 'POST', url: '/api/tasks', cookies: cookie,
-      payload: { type: 'task', title: 'Enum test', component: 'infra' },
+      payload: { type: 'task', title: 'Enum test', component: 'infra', body: 'detailed description' },
     })
     const bad = await app.inject({
       method: 'PATCH', url: '/api/tasks/TASK-001', cookies: cookie,
@@ -73,7 +73,7 @@ describe('task routes', () => {
   it('strips non-whitelisted keys: id and created are never overwritten', async () => {
     await app.inject({
       method: 'POST', url: '/api/tasks', cookies: cookie,
-      payload: { type: 'task', title: 'Whitelist test', component: 'infra' },
+      payload: { type: 'task', title: 'Whitelist test', component: 'infra', body: 'detailed description' },
     })
     const res = await app.inject({
       method: 'PATCH', url: '/api/tasks/TASK-001', cookies: cookie,
@@ -88,7 +88,7 @@ describe('task routes', () => {
   it('rejects invalid priority in POST', async () => {
     const res = await app.inject({
       method: 'POST', url: '/api/tasks', cookies: cookie,
-      payload: { type: 'task', title: 'Priority test', component: 'infra', priority: 'P9' },
+      payload: { type: 'task', title: 'Priority test', component: 'infra', priority: 'P9', body: 'detailed description' },
     })
     expect(res.statusCode).toBe(400)
   })
@@ -97,16 +97,17 @@ describe('task routes', () => {
 describe('job routes', () => {
   it('dispatches a ready task', async () => {
     await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
-      payload: { type: 'task', title: 'Work', component: 'infra' } })
+      payload: { type: 'task', title: 'Work', component: 'infra', body: 'detailed description' } })
     await app.inject({ method: 'PATCH', url: '/api/tasks/TASK-001', cookies: cookie, payload: { status: 'ready' } })
     const res = await app.inject({ method: 'POST', url: '/api/tasks/TASK-001/dispatch', cookies: cookie })
     expect(res.statusCode).toBe(202)
     expect(res.json().state).toBe('running')
   })
 
-  it('refuses to dispatch a non-ready task', async () => {
+  it('refuses to dispatch a task in review or done', async () => {
     await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
-      payload: { type: 'task', title: 'Work', component: 'infra' } })
+      payload: { type: 'task', title: 'Work', component: 'infra', body: 'detailed description' } })
+    await app.inject({ method: 'PATCH', url: '/api/tasks/TASK-001', cookies: cookie, payload: { status: 'review' } })
     const res = await app.inject({ method: 'POST', url: '/api/tasks/TASK-001/dispatch', cookies: cookie })
     expect(res.statusCode).toBe(409)
   })
@@ -121,7 +122,7 @@ describe('job routes', () => {
 
   it('cancels a running job', async () => {
     await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
-      payload: { type: 'task', title: 'Work', component: 'infra' } })
+      payload: { type: 'task', title: 'Work', component: 'infra', body: 'detailed description' } })
     await app.inject({ method: 'PATCH', url: '/api/tasks/TASK-001', cookies: cookie, payload: { status: 'ready' } })
     const dispatched = await app.inject({ method: 'POST', url: '/api/tasks/TASK-001/dispatch', cookies: cookie })
     const jobId = dispatched.json().id
@@ -149,7 +150,7 @@ describe('job routes', () => {
 
 async function makeReviewTask(): Promise<string> {
   await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
-    payload: { type: 'task', title: 'Reviewable', component: 'infra' } })
+    payload: { type: 'task', title: 'Reviewable', component: 'infra', body: 'detailed description' } })
   await app.inject({ method: 'PATCH', url: '/api/tasks/TASK-001', cookies: cookie, payload: { status: 'review' } })
   return 'TASK-001'
 }
@@ -178,7 +179,7 @@ describe('review routes', () => {
 
   it('refuses review actions on non-review tasks', async () => {
     await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
-      payload: { type: 'task', title: 'Fresh', component: 'infra' } })
+      payload: { type: 'task', title: 'Fresh', component: 'infra', body: 'detailed description' } })
     const res = await app.inject({ method: 'POST', url: '/api/tasks/TASK-001/merge', cookies: cookie })
     expect(res.statusCode).toBe(409)
   })
@@ -202,7 +203,7 @@ describe('rescan review routes', () => {
 describe('console routes', () => {
   async function dispatched(): Promise<{ jobId: string }> {
     await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
-      payload: { type: 'task', title: 'Work', component: 'infra' } })
+      payload: { type: 'task', title: 'Work', component: 'infra', body: 'detailed description' } })
     await app.inject({ method: 'PATCH', url: '/api/tasks/TASK-001', cookies: cookie, payload: { status: 'ready' } })
     const res = await app.inject({ method: 'POST', url: '/api/tasks/TASK-001/dispatch', cookies: cookie })
     return { jobId: res.json().id }
@@ -271,5 +272,55 @@ describe('cache headers', () => {
     const asset = await app.inject({ method: 'GET', url: '/assets/app-test.js' })
     expect(asset.statusCode).toBe(200)
     expect(asset.headers['cache-control']).toContain('immutable')
+  })
+})
+
+describe('crud + lifecycle', () => {
+  async function makeTask(status?: string): Promise<string> {
+    await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
+      payload: { type: 'task', title: 'Work', component: 'infra', body: 'detail' } })
+    if (status) await app.inject({ method: 'PATCH', url: '/api/tasks/TASK-001', cookies: cookie, payload: { status } })
+    return 'TASK-001'
+  }
+
+  it('rejects create without a description', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
+      payload: { type: 'task', title: 'No desc', component: 'infra' } })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('deletes a task', async () => {
+    const id = await makeTask()
+    const res = await app.inject({ method: 'DELETE', url: `/api/tasks/${id}`, cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    const board = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
+    expect(board.json().items).toHaveLength(0)
+  })
+
+  it('404s deleting an unknown task and 409s while a job runs', async () => {
+    const unknown = await app.inject({ method: 'DELETE', url: '/api/tasks/TASK-999', cookies: cookie })
+    expect(unknown.statusCode).toBe(404)
+    const id = await makeTask('ready')
+    await app.inject({ method: 'POST', url: `/api/tasks/${id}/dispatch`, cookies: cookie })  // -> ai_running
+    const busy = await app.inject({ method: 'DELETE', url: `/api/tasks/${id}`, cookies: cookie })
+    expect(busy.statusCode).toBe(409)
+  })
+
+  it('dispatches from backlog (not just ready)', async () => {
+    const id = await makeTask()  // status backlog
+    const res = await app.inject({ method: 'POST', url: `/api/tasks/${id}/dispatch`, cookies: cookie })
+    expect(res.statusCode).toBe(202)
+  })
+
+  it('refuses dispatch from review/done', async () => {
+    const id = await makeTask('review')
+    const res = await app.inject({ method: 'POST', url: `/api/tasks/${id}/dispatch`, cookies: cookie })
+    expect(res.statusCode).toBe(409)
+  })
+
+  it('clears finished jobs', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/jobs/clear-finished', cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toHaveProperty('cleared')
   })
 })
