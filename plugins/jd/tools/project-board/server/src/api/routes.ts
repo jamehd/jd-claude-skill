@@ -1,11 +1,13 @@
 import type { FastifyInstance } from 'fastify'
 import path from 'node:path'
-import { existsSync, readFileSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import type { ServerDeps } from '../server.js'
 import type { ItemStatus, ItemType, Priority } from '../../../ui/src/types.js'
 import { STATUSES, PRIORITIES } from '../markdown.js'
 import { SAFE_ID } from '../jobs/git.js'
 import { normalizeLine } from '../jobs/events.js'
+import { parseRequirementsDir } from '../jobs/requirements.js'
+import { parseStatusDoc, buildCandidates, dedupeCandidates } from '../jobs/candidates.js'
 
 interface CreateBody { type?: ItemType; title?: string; component?: string; priority?: Priority; body?: string }
 interface PatchBody { title?: string; status?: ItemStatus; priority?: Priority; component?: string; body?: string }
@@ -195,4 +197,30 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     hub.broadcast({ type: 'board_update' })
     return updated
   })
+
+  app.get('/api/scan-candidates', () => {
+    const docs = []
+    for (const f of readdirSync(store.statusDir).filter((f) => f.endsWith('.md'))) {
+      try { docs.push(parseStatusDoc(readFileSync(path.join(store.statusDir, f), 'utf8'))) } catch { /* skip unparseable */ }
+    }
+    const reqIndex = parseRequirementsDir(deps.config.repoRoot)
+    return { candidates: dedupeCandidates(buildCandidates(reqIndex, docs), store.scan().items) }
+  })
+
+  app.post<{ Body: { items?: { type?: ItemType; title?: string; component?: string; priority?: Priority; body?: string }[] } }>(
+    '/api/tasks/bulk', (req, reply) => {
+      const items = req.body?.items
+      if (!Array.isArray(items) || items.length === 0) return reply.code(400).send({ error: 'items required' })
+      const created: string[] = []
+      const rejected: { index: number; error: string }[] = []
+      items.forEach((it, index) => {
+        if (!it?.type || !['task', 'bug'].includes(it.type) || !it.title?.trim() || !it.component?.trim() || !it.body?.trim()) {
+          rejected.push({ index, error: 'type, title, component and body are required' })
+          return
+        }
+        created.push(store.createItem({ type: it.type, title: it.title.trim(), component: it.component.trim(), priority: it.priority, body: it.body }).id)
+      })
+      if (created.length > 0) hub.broadcast({ type: 'board_update' })
+      return { created, rejected }
+    })
 }
