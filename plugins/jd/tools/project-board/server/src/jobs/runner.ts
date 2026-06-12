@@ -560,6 +560,10 @@ export class JobRunner {
     this.clearTimer(job.id)
     if (this.completedSuccessfully(job)) {
       if (job.kind !== 'rescan') {
+        // Gate review behind the component's test command. Returning early skips the
+        // trailing pump(); the gate's own exit handler finalizes and pumps.
+        const cmd = this.testCommandFor(job)
+        if (cmd) { this.startTestGate(job, cmd); return }
         this.afterSuccess(job)
         this.finish(job, 'succeeded')
       } else {
@@ -634,6 +638,56 @@ export class JobRunner {
     if (stray.length === 0) return undefined
     const paths = stray.map((l) => l.slice(3).trim()).join(', ')
     return `rescan touched files outside project-board/data/status: ${paths}`
+  }
+
+  // Resolves the configured per-component test command for a task/resolve job, if any.
+  private testCommandFor(job: Job): string | undefined {
+    if (!job.taskId) return undefined
+    const item = this.deps!.store.getItem(job.taskId)
+    if (!item) return undefined
+    try {
+      const map = JSON.parse(readFileSync(path.join(this.deps!.store.dataDir, 'test-commands.json'), 'utf8')) as Record<string, string>
+      const cmd = map[item.component]
+      return cmd && cmd.trim() ? cmd : undefined
+    } catch { return undefined }
+  }
+
+  // Runs the component's test command as a non-blocking child in the worktree before
+  // the task reaches review. Reuses the running map + timer so cancel/shutdown reach it.
+  private startTestGate(job: Job, cmd: string): void {
+    this.note(job, 'info', `Test gate: ${cmd}`)
+    const cwd = this.cwds.get(job.id) ?? this.deps!.git.worktreePath(job.taskId!)
+    const proc = this.spawnFn('bash', ['-lc', cmd], { cwd })
+    this.running.set(job.id, { proc, steering: false, buffer: '' })
+    this.armTimer(job)
+    const onChunk = (b: Buffer) => {
+      const text = b.toString()
+      appendFileSync(this.logFile(job), JSON.stringify({ _board: 'raw', text }) + '\n')
+      this.emit(job, { kind: 'raw', text })
+    }
+    proc.stdout?.on('data', onChunk)
+    proc.stderr?.on('data', onChunk)
+    proc.on('exit', (code) => {
+      if (this.running.get(job.id)?.proc !== proc) return
+      this.running.delete(job.id)
+      this.clearTimer(job.id)
+      // Cancel/shutdown killed the gate mid-run: honor that terminal state instead of
+      // re-deriving pass/fail from the (signal-driven) exit code.
+      if (job.state === 'cancelled' || job.state === 'interrupted') {
+        this.afterFailure(job, job.state === 'cancelled' ? 'cancelled by user' : 'server shutdown')
+        this.finishKeepState(job)
+        this.pump()
+        return
+      }
+      if (code === 0) {
+        this.afterSuccess(job)
+        this.finish(job, 'succeeded')
+      } else {
+        this.afterFailure(job, `test gate failed (exit ${code}): ${cmd}`)
+        this.finish(job, 'failed')
+      }
+      this.pump()
+    })
   }
 
   private afterSuccess(job: Job): void {
