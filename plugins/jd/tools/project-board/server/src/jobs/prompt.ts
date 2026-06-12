@@ -39,9 +39,14 @@ export function buildTaskPrompt(item: BoardItem, requirements?: Map<string, Requ
   if (item.plan?.trim()) {
     const p = item.plan.trim()
     let planText = item.plan
-    // A single-line *.md value that resolves under repoRoot is a committed plan file; read it.
-    if (repoRoot && !p.includes('\n') && /\.md$/.test(p) && existsSync(path.join(repoRoot, p))) {
-      planText = readFileSync(path.join(repoRoot, p), 'utf8')
+    // A single-line *.md value that resolves to a file INSIDE repoRoot is a committed
+    // plan file; read it. The containment check rejects `../` escapes from the owner-entered path.
+    if (repoRoot && !p.includes('\n') && /\.md$/.test(p)) {
+      const root = path.resolve(repoRoot)
+      const abs = path.resolve(root, p)
+      if ((abs === root || abs.startsWith(root + path.sep)) && existsSync(abs)) {
+        planText = readFileSync(abs, 'utf8')
+      }
     }
     lines.push('', '--- APPROVED PLAN — FOLLOW IT ---', planText.trim(), '--- END APPROVED PLAN ---')
   }

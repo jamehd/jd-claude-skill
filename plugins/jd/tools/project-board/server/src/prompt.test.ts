@@ -93,4 +93,13 @@ describe('buildTaskPrompt plan injection', () => {
   it('omits the plan block when no plan', () => {
     expect(buildTaskPrompt(itemFull())).not.toContain('APPROVED PLAN')
   })
+  it('does not read a file outside repoRoot (path traversal is treated as inline)', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'bg-'))
+    const secretDir = mkdtempSync(path.join(tmpdir(), 'secret-'))
+    writeFileSync(path.join(secretDir, 'leak.md'), 'TOP SECRET CONTENT')
+    const rel = path.join(path.relative(root, secretDir), 'leak.md') // e.g. ../secret-xxx/leak.md
+    const p = buildTaskPrompt(itemFull({ plan: rel }), undefined, root)
+    expect(p).not.toContain('TOP SECRET CONTENT')
+    expect(p).toContain(rel) // the escaping path is kept as inline text, not read
+  })
 })

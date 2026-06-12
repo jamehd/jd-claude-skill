@@ -90,7 +90,7 @@ export function Kanban({ items, onSelect }: { items: BoardItem[]; onSelect: (id:
                   <span className="text-xs text-text-muted">{item.component}</span>
                   <span className="flex gap-1">
                     {item.requiresShaping && !item.plan?.trim() && (
-                      <span className="rounded-full border border-shape px-1.5 py-0.5 font-mono text-[9px] uppercase text-shape">⚙ nắn</span>
+                      <span className="rounded-full border border-shape-border px-1.5 py-0.5 font-mono text-[9px] uppercase text-shape">⚙ nắn</span>
                     )}
                     {item.plan?.trim() && (
                       <span className="rounded-full border border-ok-border px-1.5 py-0.5 font-mono text-[9px] uppercase text-ok">✓ nắn</span>

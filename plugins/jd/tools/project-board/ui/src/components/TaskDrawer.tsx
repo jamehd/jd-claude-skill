@@ -4,7 +4,7 @@ import type { BoardItem, ComponentStatus, Priority } from '../types.js'
 import { DiffView } from './DiffView.js'
 
 const PRIORITIES: Priority[] = ['P0', 'P1', 'P2', 'P3']
-const CAN_EXECUTE = ['backlog', 'ready', 'failed']
+const CAN_EXECUTE = ['backlog', 'ready']
 const SHAPEABLE: string[] = ['backlog', 'ready']
 
 export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
