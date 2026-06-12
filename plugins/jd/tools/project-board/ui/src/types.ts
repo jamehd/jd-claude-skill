@@ -41,6 +41,16 @@ export interface Job {
   segments?: number
 }
 
+export interface AutoState {
+  enabled: boolean
+  paused: boolean
+  pauseReason?: string
+  maxAuto: number
+  dispatched: number
+  consecutiveFailures: number
+  maxConcurrent: number
+}
+
 export type NoteType = 'user_message' | 'steer' | 'queued' | 'error' | 'info'
 
 export type ConsoleEvent =

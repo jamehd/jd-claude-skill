@@ -3,7 +3,7 @@ import path from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
 import type { BoardStore } from '../store.js'
 import type { WsHub } from '../ws.js'
-import type { ConsoleEvent, Job, JobKind, NoteType } from '../../../ui/src/types.js'
+import type { AutoState, ConsoleEvent, Job, JobKind, NoteType } from '../../../ui/src/types.js'
 import { buildTaskPrompt, buildRescanPrompt } from './prompt.js'
 import { parseRequirementsDir } from './requirements.js'
 import { normalizeLine } from './events.js'
@@ -53,11 +53,19 @@ export class JobRunner {
   private porcelainSnapshots = new Map<string, Set<string>>()
   private spawnFn: SpawnFn
 
+  private auto = { enabled: false, paused: false, pauseReason: undefined as string | undefined,
+    maxAuto: 10, failureThreshold: 3, dispatched: 0, consecutiveFailures: 0 }
+  private autoJobs = new Set<string>()
+  private autoTimer?: NodeJS.Timeout
+  private shuttingDown = false
+
   constructor(private deps?: RunnerDeps) {
     this.spawnFn = deps?.spawnFn ?? spawn
     if (deps) {
       this.recoverInterrupted()
       this.reconcileOrphanedTasks()
+      this.loadAuto()
+      if (this.auto.enabled) this.startAutoInterval()
     }
   }
 
@@ -183,7 +191,92 @@ export class JobRunner {
     this.running.get(jobId)?.proc.kill('SIGTERM')
   }
 
+  getAuto(): AutoState {
+    return {
+      enabled: this.auto.enabled, paused: this.auto.paused, pauseReason: this.auto.pauseReason,
+      maxAuto: this.auto.maxAuto, dispatched: this.auto.dispatched,
+      consecutiveFailures: this.auto.consecutiveFailures,
+      maxConcurrent: this.deps?.maxConcurrent ?? 1,
+    }
+  }
+
+  setAuto(patch: { enabled?: boolean; maxAuto?: number }): AutoState {
+    if (typeof patch.maxAuto === 'number' && patch.maxAuto >= 1) this.auto.maxAuto = Math.floor(patch.maxAuto)
+    if (typeof patch.enabled === 'boolean') {
+      this.auto.enabled = patch.enabled
+      // Any enable (including resume) clears the brakes for a fresh session.
+      this.auto.dispatched = 0
+      this.auto.consecutiveFailures = 0
+      this.auto.paused = false
+      this.auto.pauseReason = undefined
+    } else if (patch.maxAuto !== undefined) {
+      // Raising the cap can lift a cap-induced stall.
+      this.auto.dispatched = 0
+    }
+    this.persistAuto()
+    if (this.auto.enabled) { this.startAutoInterval(); this.autoTick() } else { this.stopAutoInterval() }
+    this.deps?.hub.broadcast({ type: 'board_update' })
+    return this.getAuto()
+  }
+
+  autoTick(): void {
+    if (!this.deps || this.shuttingDown) return
+    while (this.auto.enabled && !this.auto.paused
+      && this.auto.dispatched < this.auto.maxAuto
+      && this.running.size < this.deps.maxConcurrent) {
+      const next = this.nextReadyTask()
+      if (!next) break
+      try {
+        const job = this.dispatchTask(next)
+        this.autoJobs.add(job.id)
+        this.auto.dispatched++
+        this.persistAuto()
+      } catch { break }
+    }
+  }
+
+  private nextReadyTask(): string | undefined {
+    const order: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3 }
+    const ready = this.deps!.store.scan().items
+      .filter((i) => i.status === 'ready' && !this.hasActiveJob((j) => j.kind === 'task' && j.taskId === i.id))
+      .sort((a, b) => (order[a.priority] - order[b.priority]) || a.created.localeCompare(b.created) || a.id.localeCompare(b.id))
+    return ready[0]?.id
+  }
+
+  private startAutoInterval(): void {
+    if (this.autoTimer) return
+    this.autoTimer = setInterval(() => this.autoTick(), 8000)
+    this.autoTimer.unref?.()
+  }
+
+  private stopAutoInterval(): void {
+    if (this.autoTimer) clearInterval(this.autoTimer)
+    this.autoTimer = undefined
+  }
+
+  private loadAuto(): void {
+    try {
+      const raw = JSON.parse(readFileSync(this.autoFile(), 'utf8')) as { enabled?: boolean; maxAuto?: number; failureThreshold?: number }
+      if (typeof raw.enabled === 'boolean') this.auto.enabled = raw.enabled
+      if (typeof raw.maxAuto === 'number' && raw.maxAuto >= 1) this.auto.maxAuto = Math.floor(raw.maxAuto)
+      if (typeof raw.failureThreshold === 'number' && raw.failureThreshold >= 1) this.auto.failureThreshold = Math.floor(raw.failureThreshold)
+    } catch { /* missing/corrupt -> defaults */ }
+  }
+
+  private persistAuto(): void {
+    if (!this.deps) return
+    try {
+      writeFileSync(this.autoFile(), JSON.stringify({ enabled: this.auto.enabled, maxAuto: this.auto.maxAuto, failureThreshold: this.auto.failureThreshold }, null, 2))
+    } catch { /* best-effort */ }
+  }
+
+  private autoFile(): string {
+    return path.join(this.deps!.store.dataDir, 'auto.json')
+  }
+
   shutdown(): void {
+    this.shuttingDown = true
+    this.stopAutoInterval()
     for (const [jobId, entry] of this.running) {
       const job = this.jobs.get(jobId)
       if (job) {
@@ -470,7 +563,19 @@ export class JobRunner {
   private finishKeepState(job: Job): void {
     job.endedAt = new Date().toISOString()
     this.persist(job)
+    if (this.autoJobs.has(job.id)) {
+      if (job.state === 'failed') {
+        this.auto.consecutiveFailures++
+        if (this.auto.consecutiveFailures >= this.auto.failureThreshold) {
+          this.auto.paused = true
+          this.auto.pauseReason = `${this.auto.failureThreshold} auto jobs failed in a row`
+        }
+      } else if (job.state === 'succeeded') {
+        this.auto.consecutiveFailures = 0
+      }
+    }
     this.deps?.hub.broadcast({ type: 'board_update' })
+    this.autoTick()
   }
 
   private persist(job: Job): void {
