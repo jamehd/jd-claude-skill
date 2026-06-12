@@ -41,10 +41,11 @@ export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
   }, [item.id, item.status])
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    // When the diff modal is open it owns Escape; don't also close the drawer underneath.
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !diffOpen) onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, diffOpen])
 
   const dirty = title !== item.title || description !== item.body.trim() || priority !== item.priority || component !== item.component
   const canSave = dirty && title.trim() && description.trim()
