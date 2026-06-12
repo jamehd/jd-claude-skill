@@ -32,7 +32,10 @@ export function useBoard(onUnauthorized: () => void) {
     let timer: ReturnType<typeof setTimeout> | undefined
     function connect() {
       if (closed) return
-      const ws = new WebSocket(`ws://${location.host}/ws`)
+      // Match the page scheme so the WS works behind an https tunnel (tailscale serve /
+      // cloudflare): browsers block ws:// on an https page (mixed content).
+      const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:'
+      const ws = new WebSocket(`${wsProto}//${location.host}/ws`)
       wsRef.current = ws
       ws.onmessage = (ev) => {
         const msg = JSON.parse(ev.data) as WsMessage
