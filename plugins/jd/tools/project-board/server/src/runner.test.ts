@@ -793,3 +793,67 @@ describe('AI resolve conflict', () => {
     await vi.waitFor(() => expect(t.store.getItem(id)?.status).toBe('review'))
   })
 })
+
+describe('board test gate', () => {
+  function readyTask(t: ReturnType<typeof setup>) {
+    const id = t.store.createItem({ type: 'task', title: 'x', component: 'infra' }).id
+    t.store.updateItem(id, { status: 'ready' })
+    return id
+  }
+  function setCmd(t: ReturnType<typeof setup>, map: Record<string, string>) {
+    writeFileSync(`${t.dataDir}/test-commands.json`, JSON.stringify(map))
+  }
+  // spawnCalls records ONLY args (not bin); the bin lands in spawnFn.mock.calls[i][0].
+  function gateSpawnBin(t: ReturnType<typeof setup>, i: number) {
+    return (t.spawnFn as ReturnType<typeof vi.fn>).mock.calls[i][0]
+  }
+
+  it('pass gate → review', async () => {
+    const t = setup()
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    setCmd(t, { infra: 'echo ok' })
+    const id = readyTask(t); t.runner.dispatchTask(id)
+    t.sendInit(0); t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.spawnCalls.length).toBe(2))
+    expect(gateSpawnBin(t, 1)).toBe('bash')
+    expect(t.spawnCalls[1]).toEqual(expect.arrayContaining(['-lc', 'echo ok']))
+    expect(t.store.getItem(id)?.status).toBe('ai_running')   // gate running, not review yet
+    t.procs[1].emit('exit', 0)
+    await vi.waitFor(() => expect(t.store.getItem(id)?.status).toBe('review'))
+  })
+
+  it('fail gate → not review', async () => {
+    const t = setup()
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    setCmd(t, { infra: 'exit 1' })
+    const id = readyTask(t); t.runner.dispatchTask(id)
+    t.sendInit(0); t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.spawnCalls.length).toBe(2))
+    expect(gateSpawnBin(t, 1)).toBe('bash')
+    expect(t.spawnCalls[1]).toEqual(expect.arrayContaining(['-lc', 'exit 1']))
+    t.procs[1].emit('exit', 1)
+    await vi.waitFor(() => expect(t.store.getItem(id)?.status).not.toBe('review'))
+    expect(t.store.getItem(id)?.status).not.toBe('ai_running')
+  })
+
+  it('no config → straight to review (single spawn)', async () => {
+    const t = setup()
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    const id = readyTask(t); t.runner.dispatchTask(id)
+    t.sendInit(0); t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.store.getItem(id)?.status).toBe('review'))
+    expect(t.spawnCalls.length).toBe(1)
+  })
+
+  it('rejects steering while the gate runs; the gate proc survives and completes', async () => {
+    const t = setup()
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    setCmd(t, { infra: 'echo ok' })
+    const id = readyTask(t); const job = t.runner.dispatchTask(id)
+    t.sendInit(0); t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.spawnCalls.length).toBe(2))   // gate running
+    expect(() => t.runner.message(job.id, 'hey', 'steer')).toThrow(/test gate/i)
+    t.procs[1].emit('exit', 0)                                    // gate not killed → finishes normally
+    await vi.waitFor(() => expect(t.store.getItem(id)?.status).toBe('review'))
+  })
+})

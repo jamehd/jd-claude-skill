@@ -12,6 +12,18 @@ export function buildTaskPrompt(item: BoardItem, requirements?: Map<string, Requ
     '--- ITEM FILE ---',
     serializeItem(item),
     '--- END ITEM FILE ---',
+  ]
+
+  if (item.plan?.trim()) {
+    lines.push(
+      '',
+      'An approved implementation plan is provided below (APPROVED PLAN). Execute it using',
+      'the `superpowers:subagent-driven-development` skill: a fresh implementer per task (TDD),',
+      'then a spec-compliance review and a code-quality review, fixing issues before moving on.',
+    )
+  }
+
+  lines.push(
     '',
     'You MUST finish by doing ALL of the following:',
     '1. Implement the item and run the tests relevant to your change.',
@@ -19,7 +31,7 @@ export function buildTaskPrompt(item: BoardItem, requirements?: Map<string, Requ
     '3. End your final output with a short summary of what you did and the test results.',
     '4. Do NOT modify anything under project-board/data/ — task state is managed by the dashboard.',
     '5. Do not push, do not merge, do not touch branches other than the current one.',
-  ]
+  )
 
   const ids = extractReqIds(item.body)
   if (requirements && ids.length > 0) {

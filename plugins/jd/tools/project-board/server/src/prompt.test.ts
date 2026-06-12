@@ -119,3 +119,15 @@ describe('buildResolvePrompt', () => {
     expect(p).toContain('delta only')
   })
 })
+
+describe('buildTaskPrompt skill-driven', () => {
+  it('references subagent-driven-development when a plan is attached', () => {
+    const p = buildTaskPrompt(itemFull({ plan: 'Step 1. do it' }))
+    expect(p).toMatch(/subagent-driven-development/)
+    expect(p).toContain('APPROVED PLAN')
+  })
+  it('does NOT reference the skill when there is no plan', () => {
+    const p = buildTaskPrompt(itemFull())
+    expect(p).not.toMatch(/subagent-driven-development/)
+  })
+})
