@@ -4,7 +4,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { gatedReadyStatus, type BoardStore } from '../store.js'
 import type { WsHub } from '../ws.js'
 import type { AutoState, ConsoleEvent, Job, JobKind, NoteType, RateLimitSnapshot, UsageReport, UsageBucket, JobUsage } from '../../../ui/src/types.js'
-import { buildTaskPrompt, buildRescanPrompt } from './prompt.js'
+import { buildTaskPrompt, buildRescanPrompt, buildResolvePrompt } from './prompt.js'
 import { parseRequirementsDir } from './requirements.js'
 import { normalizeLine } from './events.js'
 
@@ -129,6 +129,10 @@ export class JobRunner {
       throw new Error(`task ${taskId} already has an active job`)
     }
     return this.enqueue('task', taskId)
+  }
+
+  dispatchResolve(taskId: string): Job {
+    return this.enqueue('resolve', taskId)
   }
 
   dispatchRescan(): Job {
@@ -420,6 +424,21 @@ export class JobRunner {
       }
       store.updateItem(item.id, { status: 'ai_running', job: job.id })
       prompt = buildTaskPrompt(item, parseRequirementsDir(this.deps!.repoRoot), this.deps!.repoRoot)
+    } else if (job.kind === 'resolve') {
+      job.branch = `board/${job.taskId!}`
+      // Resolve reuses the task's EXISTING worktree (recreating it would wipe the work).
+      if (!git.hasWorktree(job.taskId!)) {
+        this.finish(job, 'failed', 'worktree missing; re-run the task instead')
+        return
+      }
+      const item = store.getItem(job.taskId!)
+      if (!item) {
+        this.finish(job, 'failed', `task not found: ${job.taskId}`)
+        return
+      }
+      cwd = git.worktreePath(job.taskId!)
+      store.updateItem(item.id, { status: 'ai_running', job: job.id })
+      prompt = buildResolvePrompt(item, parseRequirementsDir(this.deps!.repoRoot))
     } else {
       // Rescan writes status files directly to disk in the live repo; no worktree.
       cwd = this.deps!.repoRoot
@@ -540,7 +559,7 @@ export class JobRunner {
     }
     this.clearTimer(job.id)
     if (this.completedSuccessfully(job)) {
-      if (job.kind === 'task') {
+      if (job.kind !== 'rescan') {
         this.afterSuccess(job)
         this.finish(job, 'succeeded')
       } else {
@@ -552,7 +571,7 @@ export class JobRunner {
         }
       }
     } else {
-      const reason = job.kind === 'task'
+      const reason = job.kind !== 'rescan'
         ? 'process exited 0 but no commits found on the branch'
         : 'process exited 0 but no files under project-board/data/status changed'
       this.afterFailure(job, reason)
@@ -583,7 +602,7 @@ export class JobRunner {
   }
 
   private completedSuccessfully(job: Job): boolean {
-    if (job.kind === 'task') {
+    if (job.kind !== 'rescan') {
       return this.deps!.git.changedFiles(job.taskId!).length > 0
     }
     // Rescan succeeds iff a status .md is new or newer than the pre-run snapshot.
