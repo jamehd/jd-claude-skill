@@ -326,7 +326,8 @@ export class JobRunner {
     const fiveHourStart = this.lastRateLimit?.resetsAt
       ? this.lastRateLimit.resetsAt * 1000 - 5 * 60 * 60 * 1000
       : now - 5 * 60 * 60 * 1000
-    const todayStr = new Date().toISOString().slice(0, 10)
+    // Server-local date (en-CA renders YYYY-MM-DD) so "today" matches the operator's day, not UTC.
+    const todayStr = new Date().toLocaleDateString('en-CA')
     const add = (b: UsageBucket, u: JobUsage, cost: number) => {
       b.inputTokens += u.inputTokens; b.outputTokens += u.outputTokens
       b.cacheReadTokens += u.cacheReadTokens; b.cacheCreationTokens += u.cacheCreationTokens
@@ -338,7 +339,7 @@ export class JobRunner {
       add(windows.total, job.usage, cost)
       const ended = job.endedAt ? Date.parse(job.endedAt) : 0
       if (ended >= fiveHourStart) add(windows.fiveHour, job.usage, cost)
-      if (job.endedAt && job.endedAt.slice(0, 10) === todayStr) add(windows.today, job.usage, cost)
+      if (job.endedAt && new Date(job.endedAt).toLocaleDateString('en-CA') === todayStr) add(windows.today, job.usage, cost)
     }
     return { rateLimit: this.lastRateLimit ?? null, windows }
   }

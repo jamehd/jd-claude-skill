@@ -732,6 +732,8 @@ describe('JobRunner', () => {
       t.procs[0].emit('exit', 0)
       await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
       expect(t.runner.getUsage().windows.total).toMatchObject({ inputTokens: 100, outputTokens: 100, costUsd: 1, jobs: 1 })
+      // a job that just ended is "today" in any timezone (local-date bucketing)
+      expect(t.runner.getUsage().windows.today.jobs).toBe(1)
     })
 
     it('reports empty usage with no data', () => {
