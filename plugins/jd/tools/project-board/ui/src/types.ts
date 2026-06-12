@@ -41,6 +41,8 @@ export interface Job {
   error?: string
   sessionId?: string
   segments?: number
+  usage?: JobUsage
+  costUsd?: number
 }
 
 export interface AutoState {
@@ -54,6 +56,35 @@ export interface AutoState {
   failureThreshold: number
 }
 
+export interface JobUsage {
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheCreationTokens: number
+}
+
+export interface RateLimitSnapshot {
+  status: string
+  rateLimitType: string
+  resetsAt: number
+  isUsingOverage: boolean
+  capturedAt: string
+}
+
+export interface UsageBucket {
+  inputTokens: number
+  outputTokens: number
+  cacheReadTokens: number
+  cacheCreationTokens: number
+  costUsd: number
+  jobs: number
+}
+
+export interface UsageReport {
+  rateLimit: RateLimitSnapshot | null
+  windows: { fiveHour: UsageBucket; today: UsageBucket; total: UsageBucket }
+}
+
 export type NoteType = 'user_message' | 'steer' | 'queued' | 'error' | 'info'
 
 export type ConsoleEvent =
@@ -61,7 +92,8 @@ export type ConsoleEvent =
   | { kind: 'text_delta'; text: string }
   | { kind: 'tool_start'; toolId: string; tool: string; inputPreview: string }
   | { kind: 'tool_result'; toolId: string; output: string; isError: boolean }
-  | { kind: 'turn_result'; ok: boolean; durationMs?: number; costUsd?: number }
+  | { kind: 'turn_result'; ok: boolean; durationMs?: number; costUsd?: number; usage?: JobUsage }
+  | { kind: 'rate_limit'; status: string; rateLimitType: string; resetsAt: number; isUsingOverage: boolean }
   | { kind: 'note'; noteType: NoteType; text: string }
   | { kind: 'raw'; text: string }
 

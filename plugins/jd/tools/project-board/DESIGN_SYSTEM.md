@@ -194,6 +194,7 @@ must render correctly on an offline LAN.
   client-side if `requiresShaping && !plan?.trim()`; a danger message appears
   above the board.
 - **Settings gear (SettingsPanel)** — a secondary icon button (⚙) in the header row. On click it opens a surface popover anchored to the right edge (z-20, `w-72`, `shadow-2xl`). The popover contains number inputs for runtime operational knobs: concurrent task slots (1–8), maxAuto per session, and failure threshold for auto-pause. A "Lưu" primary button (accent gradient) posts the patch and shows inline feedback. Popover closes on outside-click or Escape.
+- **"Gói AI" usage panel (UsagePanel)** — a compact surface card in the header row (after SettingsPanel). Two lines: (1) label "Gói AI" + a rate-limit status pill (mono 9px uppercase, `text-ok` border when allowed, `text-danger` when throttled) + a live reset countdown in `text-secondary` with rate-limit type in parens; (2) 5-hour token roll-up (`text-primary`), estimated cost as `$X.XX` (`text-muted`, tooltip clarifies it is an API-price proxy — not real billing), and all-time totals in `text-muted`. Refreshes on every job-list change; countdown ticks via a 1s interval without re-fetching. Shows nothing until the first fetch resolves.
 - **Console** — header strip on surface (mono ids, state pill); stream area on
   base with reading-baseline assistant text; tool cards are surface `<details>`
   with a mono summary and a sunken result well (danger fg on errors); system

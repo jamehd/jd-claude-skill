@@ -61,3 +61,24 @@ describe('normalizeLine', () => {
     expect((res as { isError: boolean }).isError).toBe(true)
   })
 })
+
+describe('normalizeLine usage + rate_limit', () => {
+  it('parses a rate_limit_event', () => {
+    const line = JSON.stringify({ type: 'rate_limit_event', rate_limit_info: {
+      status: 'allowed', rateLimitType: 'five_hour', resetsAt: 1781265600, isUsingOverage: false } })
+    const [ev] = normalizeLine(line)
+    expect(ev).toMatchObject({ kind: 'rate_limit', status: 'allowed', rateLimitType: 'five_hour', resetsAt: 1781265600, isUsingOverage: false })
+  })
+  it('parses usage on a result event into turn_result', () => {
+    const line = JSON.stringify({ type: 'result', subtype: 'success', duration_ms: 1000, total_cost_usd: 0.42,
+      usage: { input_tokens: 100, output_tokens: 50, cache_read_input_tokens: 10, cache_creation_input_tokens: 5 } })
+    const [ev] = normalizeLine(line)
+    expect(ev).toMatchObject({ kind: 'turn_result', ok: true, costUsd: 0.42 })
+    expect((ev as { usage?: unknown }).usage).toMatchObject({ inputTokens: 100, outputTokens: 50, cacheReadTokens: 10, cacheCreationTokens: 5 })
+  })
+  it('result without usage still yields turn_result (usage undefined)', () => {
+    const [ev] = normalizeLine(JSON.stringify({ type: 'result', subtype: 'success' }))
+    expect(ev).toMatchObject({ kind: 'turn_result', ok: true })
+    expect((ev as { usage?: unknown }).usage).toBeUndefined()
+  })
+})

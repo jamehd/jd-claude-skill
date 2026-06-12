@@ -1,0 +1,52 @@
+import { useCallback, useEffect, useState } from 'react'
+import { api } from '../api.js'
+import type { UsageReport } from '../types.js'
+
+function fmt(n: number): string {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M'
+  if (n >= 1_000) return (n / 1_000).toFixed(1) + 'k'
+  return String(n)
+}
+
+function countdown(resetsAt: number, now: number): string {
+  const s = Math.max(0, resetsAt - Math.floor(now / 1000))
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = s % 60
+  return `${h}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
+}
+
+export function UsagePanel({ refreshKey }: { refreshKey: number }) {
+  const [usage, setUsage] = useState<UsageReport | null>(null)
+  const [now, setNow] = useState(() => Date.now())
+
+  const load = useCallback(() => { api.getUsage().then(setUsage).catch(() => {}) }, [])
+  useEffect(() => { load() }, [load, refreshKey])
+  // Tick every second so the countdown stays live without re-fetching
+  useEffect(() => { const t = setInterval(() => setNow(Date.now()), 1000); return () => clearInterval(t) }, [])
+
+  if (!usage) return null
+  const rl = usage.rateLimit
+  const fh = usage.windows.fiveHour
+  const tot = usage.windows.total
+  const ok = !rl || rl.status === 'allowed'
+  const tone = ok ? 'text-ok' : 'text-danger'
+
+  return (
+    <div className="flex flex-col gap-0.5 rounded-xl border border-border bg-surface px-3 py-2 text-xs">
+      <div className="flex items-center gap-2">
+        <span className="text-text-muted">Gói AI</span>
+        {rl ? (
+          <>
+            <span className={`rounded-full border border-current px-1.5 py-0.5 font-mono text-[9px] uppercase ${tone}`}>{rl.status}{rl.isUsingOverage ? ' · overage' : ''}</span>
+            <span className="text-text-secondary">reset {countdown(rl.resetsAt, now)} ({rl.rateLimitType})</span>
+          </>
+        ) : <span className="text-text-muted">chưa có dữ liệu</span>}
+      </div>
+      <div className="text-text-secondary" title={`cache read ${fmt(fh.cacheReadTokens)} · cache create ${fmt(fh.cacheCreationTokens)}`}>
+        5h: <span className="text-text-primary">{fmt(fh.inputTokens + fh.outputTokens)} tok</span>
+        {/* $ is an API-price proxy — not real billing */}
+        <span className="text-text-muted" title="tham khảo theo giá API — không phải tiền thật"> · ${fh.costUsd.toFixed(2)}</span>
+        <span className="text-text-muted"> · tổng {fmt(tot.inputTokens + tot.outputTokens)} tok ({tot.jobs} job)</span>
+      </div>
+    </div>
+  )
+}

@@ -491,6 +491,19 @@ describe('settings via /api/auto', () => {
   })
 })
 
+describe('usage route', () => {
+  it('GET /api/usage returns rateLimit + three buckets', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/usage', cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    const j = res.json()
+    expect('rateLimit' in j).toBe(true)
+    expect(j.windows).toHaveProperty('fiveHour')
+    expect(j.windows).toHaveProperty('today')
+    expect(j.windows.total).toHaveProperty('inputTokens')
+    expect(j.windows.total).toHaveProperty('jobs')
+  })
+})
+
 describe('cache headers', () => {
   it('serves html with no-cache and hashed assets as immutable', async () => {
     const root = await app.inject({ method: 'GET', url: '/' })

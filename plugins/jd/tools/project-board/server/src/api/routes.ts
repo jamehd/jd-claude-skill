@@ -256,6 +256,8 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
 
   app.get('/api/auto', () => deps.runner.getAuto())
 
+  app.get('/api/usage', () => deps.runner.getUsage())
+
   app.post<{ Body: { enabled?: boolean; maxAuto?: number; maxConcurrent?: number; failureThreshold?: number } }>('/api/auto', (req, reply) => {
     const { enabled, maxAuto, maxConcurrent, failureThreshold } = req.body ?? {}
     if (maxAuto !== undefined && (typeof maxAuto !== 'number' || maxAuto < 1)) {
