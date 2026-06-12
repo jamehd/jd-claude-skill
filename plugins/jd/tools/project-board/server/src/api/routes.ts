@@ -256,12 +256,18 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
 
   app.get('/api/auto', () => deps.runner.getAuto())
 
-  app.post<{ Body: { enabled?: boolean; maxAuto?: number } }>('/api/auto', (req, reply) => {
-    const { enabled, maxAuto } = req.body ?? {}
+  app.post<{ Body: { enabled?: boolean; maxAuto?: number; maxConcurrent?: number; failureThreshold?: number } }>('/api/auto', (req, reply) => {
+    const { enabled, maxAuto, maxConcurrent, failureThreshold } = req.body ?? {}
     if (maxAuto !== undefined && (typeof maxAuto !== 'number' || maxAuto < 1)) {
       return reply.code(400).send({ error: 'maxAuto must be a positive number' })
     }
-    return deps.runner.setAuto({ enabled, maxAuto })
+    if (maxConcurrent !== undefined && (typeof maxConcurrent !== 'number' || maxConcurrent < 1 || maxConcurrent > 8)) {
+      return reply.code(400).send({ error: 'maxConcurrent must be between 1 and 8' })
+    }
+    if (failureThreshold !== undefined && (typeof failureThreshold !== 'number' || failureThreshold < 1)) {
+      return reply.code(400).send({ error: 'failureThreshold must be a positive number' })
+    }
+    return deps.runner.setAuto({ enabled, maxAuto, maxConcurrent, failureThreshold })
   })
 
   app.post<{ Body: { items?: { type?: ItemType; title?: string; component?: string; priority?: Priority; body?: string; requiresShaping?: boolean }[] } }>(

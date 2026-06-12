@@ -603,6 +603,68 @@ describe('JobRunner', () => {
     })
   })
 
+  describe('settings (maxConcurrent + failureThreshold)', () => {
+    // Mirror setup()'s runner construction so a "fresh boot" sees the same store/deps/dataDir.
+    function freshRunner(t: ReturnType<typeof setup>): JobRunner {
+      return new JobRunner({
+        store: t.store, hub: new WsHub(), git: t.git, spawnFn: t.spawnFn, repoRoot: t.dataDir,
+        jobsDir: path.join(t.dataDir, 'jobs'), claudeBin: 'claude', timeoutMs: 5000, maxConcurrent: 1,
+      })
+    }
+
+    it('getAuto reports maxConcurrent (number) and failureThreshold default of 3', () => {
+      const t = setup()
+      const auto = t.runner.getAuto()
+      expect(typeof auto.maxConcurrent).toBe('number')
+      expect(auto.maxConcurrent).toBe(1)
+      expect(auto.failureThreshold).toBe(3)
+    })
+
+    it('raising maxConcurrent starts a queued job via re-pump', () => {
+      const t = setup()
+      const a = ready(t, 'A', 'P1')
+      const b = ready(t, 'B', 'P1')
+      t.runner.dispatchTask(a)
+      const jobB = t.runner.dispatchTask(b)
+      expect(jobB.state).toBe('queued')
+      expect(t.spawnCalls).toHaveLength(1)
+
+      t.runner.setAuto({ maxConcurrent: 2 })
+      expect(t.runner.getAuto().maxConcurrent).toBe(2)
+      // The re-pump should have started the queued job B.
+      expect(t.spawnCalls).toHaveLength(2)
+    })
+
+    it('lowering maxConcurrent does not kill running jobs and caps new dispatch', () => {
+      const t = setup()
+      t.runner.setAuto({ maxConcurrent: 2 })
+      const a = ready(t, 'A', 'P1')
+      const b = ready(t, 'B', 'P1')
+      t.runner.dispatchTask(a)
+      t.runner.dispatchTask(b)
+      expect(t.spawnCalls).toHaveLength(2)
+
+      t.runner.setAuto({ maxConcurrent: 1 })
+      const c = ready(t, 'C', 'P1')
+      const jobC = t.runner.dispatchTask(c)
+      // Two jobs already running stay running; c is queued, not started.
+      expect(jobC.state).toBe('queued')
+      expect(t.spawnCalls).toHaveLength(2)
+    })
+
+    it('persists maxConcurrent + failureThreshold; a fresh runner restores them', () => {
+      const t = setup()
+      t.runner.setAuto({ maxConcurrent: 4, failureThreshold: 5 })
+      const raw = JSON.parse(readFileSync(path.join(t.dataDir, 'auto.json'), 'utf8'))
+      expect(raw.maxConcurrent).toBe(4)
+      expect(raw.failureThreshold).toBe(5)
+
+      const restored = freshRunner(t)
+      expect(restored.getAuto().maxConcurrent).toBe(4)
+      expect(restored.getAuto().failureThreshold).toBe(5)
+    })
+  })
+
   it('clearFinished removes finished jobs + files, keeps active ones', async () => {
     const t = setup()
     // job 1: succeeds

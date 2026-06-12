@@ -51,6 +51,7 @@ export interface AutoState {
   dispatched: number
   consecutiveFailures: number
   maxConcurrent: number
+  failureThreshold: number
 }
 
 export type NoteType = 'user_message' | 'steer' | 'queued' | 'error' | 'info'

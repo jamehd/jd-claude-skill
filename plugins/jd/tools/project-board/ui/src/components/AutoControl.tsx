@@ -18,11 +18,6 @@ export function AutoControl({ refreshKey }: { refreshKey: number }) {
     setBusy(true)
     try { setAuto(await api.setAuto({ enabled: true })) } catch { /* ignore */ } finally { setBusy(false) }
   }
-  async function setMax(n: number) {
-    setBusy(true)
-    try { setAuto(await api.setAuto({ maxAuto: n })) } catch { /* ignore */ } finally { setBusy(false) }
-  }
-
   if (!auto) return null
   const label = !auto.enabled ? 'Tự động: Tắt'
     : auto.paused ? `Tự động: Tạm dừng — ${auto.pauseReason ?? ''}`
@@ -40,10 +35,6 @@ export function AutoControl({ refreshKey }: { refreshKey: number }) {
         <button disabled={busy} onClick={() => void resume()}
           className="rounded border border-border px-2 py-1 text-xs text-text-secondary transition-colors duration-150 hover:bg-raised">Tiếp tục</button>
       )}
-      <input type="number" min={1} value={auto.maxAuto}
-        onChange={(e) => { const n = Number(e.target.value); if (n >= 1) void setMax(n) }}
-        title="Số task tối đa auto chạy mỗi phiên"
-        className="w-14 rounded border border-border bg-sunken px-1 py-1 text-xs text-text-primary outline-none focus:border-accent" />
     </div>
   )
 }

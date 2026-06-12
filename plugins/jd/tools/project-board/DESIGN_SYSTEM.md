@@ -193,6 +193,7 @@ must render correctly on an offline LAN.
 - **Drag guard (Kanban)** — dropping a card onto the `ready` column is blocked
   client-side if `requiresShaping && !plan?.trim()`; a danger message appears
   above the board.
+- **Settings gear (SettingsPanel)** — a secondary icon button (⚙) in the header row. On click it opens a surface popover anchored to the right edge (z-20, `w-72`, `shadow-2xl`). The popover contains number inputs for runtime operational knobs: concurrent task slots (1–8), maxAuto per session, and failure threshold for auto-pause. A "Lưu" primary button (accent gradient) posts the patch and shows inline feedback. Popover closes on outside-click or Escape.
 - **Console** — header strip on surface (mono ids, state pill); stream area on
   base with reading-baseline assistant text; tool cards are surface `<details>`
   with a mono summary and a sunken result well (danger fg on errors); system

@@ -63,10 +63,13 @@ export class JobRunner {
   private autoFailedTasks = new Set<string>()
   private autoTimer?: NodeJS.Timeout
   private shuttingDown = false
+  // Runtime concurrency limit; seeded from deps then overridden by any persisted value.
+  private maxConcurrent = 1
 
   constructor(private deps?: RunnerDeps) {
     this.spawnFn = deps?.spawnFn ?? spawn
     if (deps) {
+      this.maxConcurrent = deps.maxConcurrent
       this.recoverInterrupted()
       this.reconcileOrphanedTasks()
       this.loadAuto()
@@ -201,12 +204,19 @@ export class JobRunner {
       enabled: this.auto.enabled, paused: this.auto.paused, pauseReason: this.auto.pauseReason,
       maxAuto: this.auto.maxAuto, dispatched: this.auto.dispatched,
       consecutiveFailures: this.auto.consecutiveFailures,
-      maxConcurrent: this.deps?.maxConcurrent ?? 1,
+      maxConcurrent: this.maxConcurrent,
+      failureThreshold: this.auto.failureThreshold,
     }
   }
 
-  setAuto(patch: { enabled?: boolean; maxAuto?: number }): AutoState {
+  setAuto(patch: { enabled?: boolean; maxAuto?: number; maxConcurrent?: number; failureThreshold?: number }): AutoState {
     if (typeof patch.maxAuto === 'number' && patch.maxAuto >= 1) this.auto.maxAuto = Math.floor(patch.maxAuto)
+    if (typeof patch.failureThreshold === 'number' && patch.failureThreshold >= 1) this.auto.failureThreshold = Math.floor(patch.failureThreshold)
+    let pumpNeeded = false
+    if (typeof patch.maxConcurrent === 'number' && patch.maxConcurrent >= 1) {
+      this.maxConcurrent = Math.floor(patch.maxConcurrent)
+      pumpNeeded = true
+    }
     if (typeof patch.enabled === 'boolean') {
       this.auto.enabled = patch.enabled
       // Any enable (including resume) clears the brakes for a fresh session.
@@ -220,6 +230,8 @@ export class JobRunner {
       this.auto.dispatched = 0
     }
     this.persistAuto()
+    // Raising the limit can free queued jobs immediately, before any auto interval.
+    if (pumpNeeded) this.pump()
     if (this.auto.enabled) { this.startAutoInterval(); this.autoTick() } else { this.stopAutoInterval() }
     this.deps?.hub.broadcast({ type: 'board_update' })
     return this.getAuto()
@@ -229,7 +241,7 @@ export class JobRunner {
     if (!this.deps || this.shuttingDown) return
     while (this.auto.enabled && !this.auto.paused
       && this.auto.dispatched < this.auto.maxAuto
-      && this.running.size < this.deps.maxConcurrent) {
+      && this.running.size < this.maxConcurrent) {
       const next = this.nextReadyTask()
       if (!next) break
       try {
@@ -262,9 +274,10 @@ export class JobRunner {
 
   private loadAuto(): void {
     try {
-      const raw = JSON.parse(readFileSync(this.autoFile(), 'utf8')) as { enabled?: boolean; maxAuto?: number; failureThreshold?: number }
+      const raw = JSON.parse(readFileSync(this.autoFile(), 'utf8')) as { enabled?: boolean; maxAuto?: number; maxConcurrent?: number; failureThreshold?: number }
       if (typeof raw.enabled === 'boolean') this.auto.enabled = raw.enabled
       if (typeof raw.maxAuto === 'number' && raw.maxAuto >= 1) this.auto.maxAuto = Math.floor(raw.maxAuto)
+      if (typeof raw.maxConcurrent === 'number' && raw.maxConcurrent >= 1) this.maxConcurrent = Math.floor(raw.maxConcurrent)
       if (typeof raw.failureThreshold === 'number' && raw.failureThreshold >= 1) this.auto.failureThreshold = Math.floor(raw.failureThreshold)
     } catch { /* missing/corrupt -> defaults */ }
   }
@@ -272,7 +285,7 @@ export class JobRunner {
   private persistAuto(): void {
     if (!this.deps) return
     try {
-      writeFileSync(this.autoFile(), JSON.stringify({ enabled: this.auto.enabled, maxAuto: this.auto.maxAuto, failureThreshold: this.auto.failureThreshold }, null, 2))
+      writeFileSync(this.autoFile(), JSON.stringify({ enabled: this.auto.enabled, maxAuto: this.auto.maxAuto, maxConcurrent: this.maxConcurrent, failureThreshold: this.auto.failureThreshold }, null, 2))
     } catch { /* best-effort */ }
   }
 
@@ -328,7 +341,7 @@ export class JobRunner {
 
   private pump(): void {
     if (!this.deps) return
-    while (this.running.size < this.deps.maxConcurrent && this.dispatchQueue.length > 0) {
+    while (this.running.size < this.maxConcurrent && this.dispatchQueue.length > 0) {
       this.start(this.dispatchQueue.shift()!)
     }
   }
