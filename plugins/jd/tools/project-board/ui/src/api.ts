@@ -39,6 +39,6 @@ export const api = {
   bulkCreate: (items: { type: string; title: string; component: string; priority: string; body: string; requiresShaping?: boolean }[]) =>
     request<{ created: string[]; rejected: { index: number; error: string }[] }>('/api/tasks/bulk', { method: 'POST', body: JSON.stringify({ items }) }),
   getAuto: () => request<AutoState>('/api/auto'),
-  setAuto: (patch: { enabled?: boolean; maxAuto?: number }) =>
+  setAuto: (patch: { enabled?: boolean; maxAuto?: number; maxConcurrent?: number; failureThreshold?: number }) =>
     request<AutoState>('/api/auto', { method: 'POST', body: JSON.stringify(patch) }),
 }
