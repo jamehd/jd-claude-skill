@@ -100,4 +100,19 @@ export class BoardGit {
       throw new Error(stderr ? `${stderr}\n${base}` : base)
     }
   }
+
+  // Verifies via gh whether the task's PR has been merged on GitHub.
+  isPrMerged(taskId: string): boolean {
+    this.assertSafeId(taskId)
+    let out: string
+    try {
+      out = execFileSync('gh', ['pr', 'view', this.branchName(taskId), '--json', 'state', '-q', '.state'],
+        { cwd: this.repoRoot, encoding: 'utf8' }).trim()
+    } catch (e: unknown) {
+      const stderr = (e as { stderr?: string }).stderr?.trim()
+      const base = e instanceof Error ? e.message : String(e)
+      throw new Error(stderr ? `${stderr}\n${base}` : base)
+    }
+    return out === 'MERGED'
+  }
 }

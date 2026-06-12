@@ -17,6 +17,7 @@ export interface GitOps {
   branchDiff(taskId: string): string
   mergeBranch(taskId: string, message: string): void
   createPr(taskId: string, title: string, body: string): string
+  isPrMerged(taskId: string): boolean
   hasWorktree(taskId: string): boolean
   worktreePath(taskId: string): string
   porcelain(): string[]

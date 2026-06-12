@@ -1,3 +1,4 @@
+import { vi } from 'vitest'
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
@@ -20,11 +21,12 @@ export function makeDeps(): ServerDeps {
   const hub = new WsHub()
   const git: GitOps = {
     createWorktree: () => dataDir,
-    removeWorktree: () => {},
+    removeWorktree: vi.fn(() => {}),
     changedFiles: () => [],
     branchDiff: () => 'diff --git a/x b/x',
     mergeBranch: () => {},
     createPr: () => 'https://github.com/example/pr/1',
+    isPrMerged: vi.fn(() => true),
     hasWorktree: () => true,
     worktreePath: () => dataDir,
     porcelain: () => [],

@@ -3,7 +3,7 @@ import path from 'node:path'
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import type { ServerDeps } from '../server.js'
 import type { ItemStatus, ItemType, Priority } from '../../../ui/src/types.js'
-import { STATUSES, PRIORITIES } from '../markdown.js'
+import { PRIORITIES } from '../markdown.js'
 import { SAFE_ID } from '../jobs/git.js'
 import { normalizeLine } from '../jobs/events.js'
 import { parseRequirementsDir } from '../jobs/requirements.js'
@@ -15,8 +15,8 @@ interface PatchBody { title?: string; status?: ItemStatus; priority?: Priority; 
 // Patchable user-supplied fields; id/created/type are immutable after creation.
 const PATCH_WHITELIST = ['title', 'status', 'priority', 'component', 'body'] as const
 
-// Statuses settable by users; ai_running is system-only.
-const USER_STATUSES = STATUSES.filter((s) => s !== 'ai_running')
+// Statuses settable by users; ai_running and pr are system-managed.
+const USER_STATUSES: ItemStatus[] = ['backlog', 'ready', 'review', 'done']
 
 export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
   const { store, hub } = deps
@@ -140,6 +140,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
       return reply.code(409).send({ error: 'a job is running on this task; cancel it first' })
     }
     store.deleteItem(item.id)
+    try { deps.git.removeWorktree(item.id) } catch { /* best-effort */ }
     hub.broadcast({ type: 'board_update' })
     return { ok: true }
   })
@@ -185,7 +186,23 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     } catch (err) {
       return reply.code(502).send({ error: err instanceof Error ? err.message : String(err) })
     }
-    store.appendToBody(item.id, `PR: ${url}`)
+    const updated = store.updateItem(item.id, { pr: url, status: 'pr' })
+    hub.broadcast({ type: 'board_update' })
+    return updated
+  })
+
+  app.post<{ Params: { id: string } }>('/api/tasks/:id/finalize-pr', (req, reply) => {
+    const item = store.getItem(req.params.id)
+    if (!item) return reply.code(404).send({ error: 'not found' })
+    if (item.status !== 'pr') return reply.code(409).send({ error: `task is ${item.status}, not pr` })
+    let merged: boolean
+    try {
+      merged = deps.git.isPrMerged(item.id)
+    } catch (err) {
+      return reply.code(502).send({ error: err instanceof Error ? err.message : String(err) })
+    }
+    if (!merged) return reply.code(409).send({ error: 'PR chưa được merge' })
+    deps.git.removeWorktree(item.id)
     const updated = store.updateItem(item.id, { status: 'done' })
     hub.broadcast({ type: 'board_update' })
     return updated
