@@ -28,7 +28,7 @@ function body(req: Requirement | undefined, reqId: string, lead: string): string
   const lines = [lead]
   if (req?.statement) lines.push('', req.statement)
   if (req && req.acceptance.length > 0) {
-    lines.push('', 'Acceptance:')
+    lines.push('', 'Tiêu chí chấp nhận:')
     for (const ac of req.acceptance) lines.push(`- ${ac}`)
   }
   lines.push('', `Req: ${reqId}`)
@@ -43,14 +43,14 @@ export function buildCandidates(reqIndex: Map<string, Requirement>, docs: Status
       const title = req?.title ?? row.id
       if (row.state === 'missing') {
         out.push({ kind: 'implement', type: 'task', component: doc.component, reqId: row.id, priority: 'P1',
-          title: `Implement ${row.id}: ${title}`, body: body(req, row.id, `Detected by scan: ${row.id} is missing. ${row.note}`.trim()) })
+          title: `Hiện thực ${row.id}: ${title}`, body: body(req, row.id, `Scan phát hiện: ${row.id} chưa làm. ${row.note}`.trim()) })
       } else if (row.state === 'partial') {
         out.push({ kind: 'implement', type: 'task', component: doc.component, reqId: row.id, priority: 'P2',
-          title: `Complete ${row.id}: ${title}`, body: body(req, row.id, `Detected by scan: ${row.id} is partial. ${row.note}`.trim()) })
+          title: `Hoàn thiện ${row.id}: ${title}`, body: body(req, row.id, `Scan phát hiện: ${row.id} làm dở dang. ${row.note}`.trim()) })
       }
       if (row.state !== 'missing' && !row.tested) {
         out.push({ kind: 'test', type: 'task', component: doc.component, reqId: row.id, priority: 'P2',
-          title: `Add tests for ${row.id}: ${title}`, body: body(req, row.id, `Detected by scan: ${row.id} is untested. ${row.note}`.trim()) })
+          title: `Thêm test cho ${row.id}: ${title}`, body: body(req, row.id, `Scan phát hiện: ${row.id} chưa có test. ${row.note}`.trim()) })
       }
     }
   }
@@ -58,8 +58,9 @@ export function buildCandidates(reqIndex: Map<string, Requirement>, docs: Status
 }
 
 function itemKind(item: BoardItem): 'implement' | 'test' | null {
-  if (item.title.startsWith('Add tests')) return 'test'
-  if (item.title.startsWith('Implement ') || item.title.startsWith('Complete ')) return 'implement'
+  if (item.title.startsWith('Thêm test') || item.title.startsWith('Add tests')) return 'test'
+  if (item.title.startsWith('Hiện thực ') || item.title.startsWith('Hoàn thiện ')
+    || item.title.startsWith('Implement ') || item.title.startsWith('Complete ')) return 'implement'
   return null
 }
 
