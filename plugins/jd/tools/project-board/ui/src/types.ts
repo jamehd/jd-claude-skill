@@ -13,6 +13,8 @@ export interface BoardItem {
   updated: string
   job?: string
   pr?: string
+  requiresShaping?: boolean
+  plan?: string
   extra?: Record<string, unknown>
   body: string
 }

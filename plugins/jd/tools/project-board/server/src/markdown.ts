@@ -16,7 +16,7 @@ function oneOf<T extends string>(value: string, allowed: readonly T[], key: stri
   return value as T
 }
 
-const KNOWN_KEYS = new Set(['id', 'type', 'title', 'status', 'priority', 'component', 'created', 'updated', 'job', 'pr'])
+const KNOWN_KEYS = new Set(['id', 'type', 'title', 'status', 'priority', 'component', 'created', 'updated', 'job', 'pr', 'requiresShaping', 'plan'])
 
 export function parseItem(raw: string): BoardItem {
   const { data, content } = matter(raw)
@@ -33,6 +33,8 @@ export function parseItem(raw: string): BoardItem {
   }
   if (data.job) item.job = String(data.job)
   if (data.pr) item.pr = String(data.pr)
+  if (data.requiresShaping) item.requiresShaping = true
+  if (data.plan) item.plan = String(data.plan)
   const extraEntries = Object.entries(data).filter(([k]) => !KNOWN_KEYS.has(k))
   if (extraEntries.length > 0) item.extra = Object.fromEntries(extraEntries)
   return item

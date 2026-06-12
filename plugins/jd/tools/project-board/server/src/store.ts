@@ -10,6 +10,7 @@ export interface CreateItemInput {
   component: string
   priority?: Priority
   body?: string
+  requiresShaping?: boolean
 }
 
 export interface ScanResult {
@@ -90,6 +91,7 @@ export class BoardStore {
       updated: today(),
       body: (input.body ?? input.title) + '\n',
     }
+    if (input.requiresShaping) item.requiresShaping = true
     writeFileSync(path.join(this.tasksDir, `${id}-${slugify(input.title)}.md`), serializeItem(item))
     return item
   }

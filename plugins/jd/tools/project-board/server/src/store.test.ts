@@ -106,4 +106,15 @@ describe('BoardStore', () => {
   it('throws when deleting an unknown item', () => {
     expect(() => store.deleteItem('TASK-999')).toThrow(/not found/)
   })
+
+  it('createItem without requiresShaping leaves the field undefined', () => {
+    const item = store.createItem({ type: 'task', title: 'plain', component: 'infra' })
+    expect(item.requiresShaping).toBeUndefined()
+  })
+
+  it('createItem with requiresShaping persists the field', () => {
+    const item = store.createItem({ type: 'task', title: 'gated', component: 'infra', requiresShaping: true })
+    expect(item.requiresShaping).toBe(true)
+    expect(store.getItem(item.id)?.requiresShaping).toBe(true)
+  })
 })
