@@ -54,12 +54,30 @@ export function normalizeLine(line: string): ConsoleEvent[] {
         isError: Boolean(b.is_error),
       }))
   }
+  if (o.type === 'rate_limit_event') {
+    const info = (o.rate_limit_info ?? {}) as Record<string, unknown>
+    return [{
+      kind: 'rate_limit',
+      status: String(info.status ?? 'unknown'),
+      rateLimitType: String(info.rateLimitType ?? ''),
+      resetsAt: typeof info.resetsAt === 'number' ? info.resetsAt : 0,
+      isUsingOverage: Boolean(info.isUsingOverage),
+    }]
+  }
   if (o.type === 'result') {
+    const u = (o.usage ?? undefined) as Record<string, unknown> | undefined
+    const usage = u ? {
+      inputTokens: Number(u.input_tokens ?? 0),
+      outputTokens: Number(u.output_tokens ?? 0),
+      cacheReadTokens: Number(u.cache_read_input_tokens ?? 0),
+      cacheCreationTokens: Number(u.cache_creation_input_tokens ?? 0),
+    } : undefined
     return [{
       kind: 'turn_result',
       ok: o.subtype === 'success',
       durationMs: typeof o.duration_ms === 'number' ? o.duration_ms : undefined,
       costUsd: typeof o.total_cost_usd === 'number' ? o.total_cost_usd : undefined,
+      usage,
     }]
   }
   return []
