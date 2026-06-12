@@ -72,7 +72,15 @@ export class BoardGit {
     }
     const branch = this.git(['rev-parse', '--abbrev-ref', 'HEAD']).trim()
     if (branch !== 'main') throw new Error(`repo is on ${branch}, expected main`)
-    this.git(['merge', '--squash', this.branchName(taskId)])
+    try {
+      this.git(['merge', '--squash', this.branchName(taskId)])
+    } catch {
+      // A squash conflict stages partial/conflicted changes but creates no MERGE_HEAD,
+      // so `git merge --abort` won't work — reset --hard restores the pre-merge clean main
+      // (the dirty-tree guard above proved it was clean) instead of leaving conflict markers.
+      try { this.git(['reset', '--hard', 'HEAD']) } catch { /* best effort */ }
+      throw new Error(`merge conflict with main for ${this.branchName(taskId)}; main left unchanged — re-run the task (it rebranches from main) or merge manually`)
+    }
     try {
       this.git(['commit', '-m', message])
     } catch (err) {

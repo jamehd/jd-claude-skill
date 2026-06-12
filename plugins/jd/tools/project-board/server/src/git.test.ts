@@ -125,4 +125,22 @@ describe('BoardGit', () => {
     // branchDiff on a non-existent branch triggers exit 128 with "fatal: ..." stderr
     expect(() => git.branchDiff('NOPE')).toThrow(/fatal|unknown revision/i)
   })
+
+  it('on a squash conflict with main, throws and leaves main clean (no conflict markers)', () => {
+    const wt = git.createWorktree('TASK-007')            // branched from main (a.txt = hello)
+    writeFileSync(path.join(wt, 'a.txt'), 'branch change\n')
+    sh(wt, 'commit', '-am', 'branch edit')
+    // main diverges on the same file so the squash must conflict
+    writeFileSync(path.join(repo, 'a.txt'), 'main change\n')
+    sh(repo, 'commit', '-am', 'main edit')
+
+    expect(() => git.mergeBranch('TASK-007', 'board: TASK-007')).toThrow(/conflict/i)
+    // reset --hard undid the conflicted squash → tracked files are clean (the kept
+    // .board-worktrees/ dir is untracked, matching the merge guard's semantics)
+    expect(sh(repo, 'status', '--porcelain', '--untracked-files=no').trim()).toBe('')
+    // a.txt is main's committed version, not a conflict-markered hybrid
+    expect(sh(repo, 'show', 'HEAD:a.txt')).toContain('main change')
+    expect(sh(repo, 'show', 'HEAD:a.txt')).not.toContain('<<<<<<<')
+    git.removeWorktree('TASK-007')
+  })
 })
