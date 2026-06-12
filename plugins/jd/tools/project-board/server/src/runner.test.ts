@@ -844,4 +844,16 @@ describe('board test gate', () => {
     await vi.waitFor(() => expect(t.store.getItem(id)?.status).toBe('review'))
     expect(t.spawnCalls.length).toBe(1)
   })
+
+  it('rejects steering while the gate runs; the gate proc survives and completes', async () => {
+    const t = setup()
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    setCmd(t, { infra: 'echo ok' })
+    const id = readyTask(t); const job = t.runner.dispatchTask(id)
+    t.sendInit(0); t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.spawnCalls.length).toBe(2))   // gate running
+    expect(() => t.runner.message(job.id, 'hey', 'steer')).toThrow(/test gate/i)
+    t.procs[1].emit('exit', 0)                                    // gate not killed → finishes normally
+    await vi.waitFor(() => expect(t.store.getItem(id)?.status).toBe('review'))
+  })
 })

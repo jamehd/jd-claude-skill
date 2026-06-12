@@ -40,6 +40,7 @@ interface SegmentEntry {
   steering: boolean
   steerMessage?: string
   buffer: string
+  gate?: boolean   // true while this entry is the post-implement test-gate process (not a claude segment)
 }
 
 export class JobRunner {
@@ -149,8 +150,11 @@ export class JobRunner {
     if (job.state === 'queued') throw new Error('job has not started yet')
 
     if (job.state === 'running') {
-      this.note(job, 'user_message', text)
       const entry = this.running.get(jobId)
+      // The test gate is a non-claude process; steering/killing it would be read as a test
+      // failure and drop the message. Reject messaging until the gate finishes.
+      if (entry?.gate) throw new Error('test gate is running; wait for it to finish')
+      this.note(job, 'user_message', text)
       if (mode === 'steer' && entry && job.sessionId) {
         entry.steering = true
         entry.steerMessage = text
@@ -658,7 +662,7 @@ export class JobRunner {
     this.note(job, 'info', `Test gate: ${cmd}`)
     const cwd = this.cwds.get(job.id) ?? this.deps!.git.worktreePath(job.taskId!)
     const proc = this.spawnFn('bash', ['-lc', cmd], { cwd })
-    this.running.set(job.id, { proc, steering: false, buffer: '' })
+    this.running.set(job.id, { proc, steering: false, buffer: '', gate: true })
     this.armTimer(job)
     const onChunk = (b: Buffer) => {
       const text = b.toString()
