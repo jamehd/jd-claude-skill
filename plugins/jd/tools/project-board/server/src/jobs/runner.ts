@@ -355,7 +355,7 @@ export class JobRunner {
         return
       }
       store.updateItem(item.id, { status: 'ai_running', job: job.id })
-      prompt = buildTaskPrompt(item, parseRequirementsDir(this.deps!.repoRoot))
+      prompt = buildTaskPrompt(item, parseRequirementsDir(this.deps!.repoRoot), this.deps!.repoRoot)
     } else {
       // Rescan writes status files directly to disk in the live repo; no worktree.
       cwd = this.deps!.repoRoot

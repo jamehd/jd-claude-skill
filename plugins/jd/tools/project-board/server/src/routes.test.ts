@@ -398,6 +398,22 @@ describe('shaping gate', () => {
   })
 })
 
+describe('brainstorm-prompt route', () => {
+  it('GET /api/tasks/:id/brainstorm-prompt returns a prompt', async () => {
+    const c = await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
+      payload: { type: 'task', title: 'Shape me', component: 'infra', body: 'details' } })
+    const id = c.json().id
+    const res = await app.inject({ method: 'GET', url: `/api/tasks/${id}/brainstorm-prompt`, cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().prompt).toContain('Shape me')
+  })
+
+  it('returns 404 for an unknown task id', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/tasks/TASK-999/brainstorm-prompt', cookies: cookie })
+    expect(res.statusCode).toBe(404)
+  })
+})
+
 describe('auto routes', () => {
   it('GET /api/auto returns the disabled default shape', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/auto', cookies: cookie })

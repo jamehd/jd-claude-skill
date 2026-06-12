@@ -1,8 +1,10 @@
+import { existsSync, readFileSync } from 'node:fs'
+import path from 'node:path'
 import { serializeItem } from '../markdown.js'
 import type { BoardItem } from '../../../ui/src/types.js'
 import { extractReqIds, type Requirement } from './requirements.js'
 
-export function buildTaskPrompt(item: BoardItem, requirements?: Map<string, Requirement>): string {
+export function buildTaskPrompt(item: BoardItem, requirements?: Map<string, Requirement>, repoRoot?: string): string {
   const lines = [
     `You are working in a dedicated git worktree on branch board/${item.id} of the GameSync repo.`,
     'Implement the following item. Follow the conventions in CLAUDE.md (English code/docs, error standard, tests).',
@@ -34,6 +36,47 @@ export function buildTaskPrompt(item: BoardItem, requirements?: Map<string, Requ
     lines.push('--- END REQUIREMENTS ---')
   }
 
+  if (item.plan?.trim()) {
+    const p = item.plan.trim()
+    let planText = item.plan
+    // A single-line *.md value that resolves under repoRoot is a committed plan file; read it.
+    if (repoRoot && !p.includes('\n') && /\.md$/.test(p) && existsSync(path.join(repoRoot, p))) {
+      planText = readFileSync(path.join(repoRoot, p), 'utf8')
+    }
+    lines.push('', '--- APPROVED PLAN — FOLLOW IT ---', planText.trim(), '--- END APPROVED PLAN ---')
+  }
+
+  return lines.join('\n')
+}
+
+export function buildBrainstormPrompt(item: BoardItem, requirements?: Map<string, Requirement>): string {
+  const lines = [
+    `Brainstorm and shape board task ${item.id} for the GameSync project before it is executed.`,
+    '',
+    `Title: ${item.title}`,
+    '',
+    'Description:',
+    item.body.trim(),
+  ]
+  const ids = extractReqIds(item.body)
+  if (requirements && ids.length > 0) {
+    lines.push('', 'Requirements this task must satisfy:')
+    for (const id of ids) {
+      const r = requirements.get(id)
+      if (r) {
+        lines.push(`- ${r.id} — ${r.title}: ${r.statement}`)
+        for (const ac of r.acceptance) lines.push(`    AC: ${ac}`)
+      } else {
+        lines.push(`- ${id}: not found in docs/requirements`)
+      }
+    }
+  }
+  lines.push(
+    '',
+    'Use the superpowers brainstorming skill to turn this into a design, then writing-plans to produce an implementation plan.',
+    'Write the spec under docs/specs/ and the plan under docs/plans/.',
+    'When done, attach the plan to this board task: paste the plan into the task plan field, or set the plan field to the plan file path (e.g. docs/plans/<file>.md). The task can then move to Ready.',
+  )
   return lines.join('\n')
 }
 

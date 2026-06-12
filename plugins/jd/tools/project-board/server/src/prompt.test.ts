@@ -1,11 +1,19 @@
 import { describe, it, expect } from 'vitest'
-import { buildTaskPrompt, buildRescanPrompt } from './jobs/prompt.js'
+import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import path from 'node:path'
+import { buildTaskPrompt, buildRescanPrompt, buildBrainstormPrompt } from './jobs/prompt.js'
 import type { Requirement } from './jobs/requirements.js'
 import type { BoardItem } from '../../ui/src/types.js'
 
 function item(body: string): BoardItem {
   return { id: 'TASK-001', type: 'task', title: 'Do it', status: 'ready', priority: 'P2',
     component: 'cafe-service', created: '2026-06-11', updated: '2026-06-11', body }
+}
+
+function itemFull(extra: Partial<BoardItem> = {}): BoardItem {
+  return { id: 'TASK-001', type: 'task', title: 'Do X', status: 'ready', priority: 'P2',
+    component: 'infra', created: '2026-06-12', updated: '2026-06-12', body: 'Build the thing.\n', ...extra }
 }
 const REQS = new Map<string, Requirement>([
   ['CAFE-R3', { id: 'CAFE-R3', title: 'GetTheme RPC', statement: 'Serves theme over gRPC.', acceptance: ['theme < 1s', 'tests both paths'] }],
@@ -51,5 +59,38 @@ describe('buildRescanPrompt (requirements-aware)', () => {
   it('keeps the write-to-status-only, no-git constraint', () => {
     expect(p).toContain('project-board/data/status')
     expect(p.toLowerCase()).toMatch(/do not (run )?git|do not commit/)
+  })
+})
+
+describe('buildBrainstormPrompt', () => {
+  it('includes the title, body, and brainstorm/plan instructions', () => {
+    const p = buildBrainstormPrompt(itemFull())
+    expect(p).toContain('Do X')
+    expect(p).toContain('Build the thing.')
+    expect(p).toMatch(/brainstorm/i)
+    expect(p).toMatch(/docs\/plans/)
+  })
+})
+
+describe('buildTaskPrompt plan injection', () => {
+  it('injects inline plan text', () => {
+    const p = buildTaskPrompt(itemFull({ plan: 'Step 1. do it' }))
+    expect(p).toContain('APPROVED PLAN')
+    expect(p).toContain('Step 1. do it')
+  })
+  it('reads a plan file when plan is an existing repo path', () => {
+    const root = mkdtempSync(path.join(tmpdir(), 'bg-'))
+    mkdirSync(path.join(root, 'docs', 'plans'), { recursive: true })
+    writeFileSync(path.join(root, 'docs/plans/p.md'), '# The Plan\nDetailed steps here.')
+    const p = buildTaskPrompt(itemFull({ plan: 'docs/plans/p.md' }), undefined, root)
+    expect(p).toContain('Detailed steps here.')
+  })
+  it('treats a non-existent .md path as inline text (non-fatal)', () => {
+    const p = buildTaskPrompt(itemFull({ plan: 'docs/plans/missing.md' }), undefined, '/nonexistent-root')
+    expect(p).toContain('docs/plans/missing.md')
+    expect(p).toContain('APPROVED PLAN')
+  })
+  it('omits the plan block when no plan', () => {
+    expect(buildTaskPrompt(itemFull())).not.toContain('APPROVED PLAN')
   })
 })

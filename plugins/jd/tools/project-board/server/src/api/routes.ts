@@ -8,6 +8,7 @@ import { gatedReadyStatus } from '../store.js'
 import { SAFE_ID } from '../jobs/git.js'
 import { normalizeLine } from '../jobs/events.js'
 import { parseRequirementsDir } from '../jobs/requirements.js'
+import { buildBrainstormPrompt } from '../jobs/prompt.js'
 import { parseStatusDoc, buildCandidates, dedupeCandidates } from '../jobs/candidates.js'
 
 interface CreateBody { type?: ItemType; title?: string; component?: string; priority?: Priority; body?: string }
@@ -243,6 +244,13 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     }
     const reqIndex = parseRequirementsDir(deps.config.repoRoot)
     return { candidates: dedupeCandidates(buildCandidates(reqIndex, docs), store.scan().items) }
+  })
+
+  app.get<{ Params: { id: string } }>('/api/tasks/:id/brainstorm-prompt', (req, reply) => {
+    const item = store.getItem(req.params.id)
+    if (!item) return reply.code(404).send({ error: 'not found' })
+    const reqIndex = parseRequirementsDir(deps.config.repoRoot)
+    return { prompt: buildBrainstormPrompt(item, reqIndex) }
   })
 
   app.get('/api/auto', () => deps.runner.getAuto())
