@@ -648,11 +648,15 @@ export class JobRunner {
   }
 
   private afterFailure(job: Job, reason: string): void {
+    if (job.kind === 'rescan') return
     const { store } = this.deps!
-    if (job.kind !== 'task') return
     try {
       const t = store.getItem(job.taskId!)
-      store.updateItem(job.taskId!, { status: t ? gatedReadyStatus(t) : 'backlog' })
+      // A failed resolve returns the task to review (its branch work is intact — retry or
+      // merge manually); a failed task goes back to ready/backlog per the shaping gate.
+      // Either way the task must leave ai_running so it is never stuck.
+      const next = job.kind === 'resolve' ? 'review' : (t ? gatedReadyStatus(t) : 'backlog')
+      store.updateItem(job.taskId!, { status: next })
       store.appendToBody(job.taskId!, `## AI result\nJob ${job.id} failed: ${reason}\nWorktree/branch kept for inspection: board/${job.taskId}`)
     } catch { /* task file may be unparseable after a bad edit; job error is still recorded */ }
   }

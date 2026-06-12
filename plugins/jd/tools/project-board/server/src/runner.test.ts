@@ -781,4 +781,15 @@ describe('AI resolve conflict', () => {
     await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'))
     expect(t.runner.getJob(job.id)?.error).toMatch(/worktree/i)
   })
+
+  it('a FAILED resolve returns the task to review (never stuck in ai_running)', async () => {
+    const t = setup()
+    ;(t.git.hasWorktree as ReturnType<typeof vi.fn>).mockReturnValue(true)
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue([])  // exit 0 + no commits = failed
+    const id = reviewTask(t)
+    t.runner.dispatchResolve(id)
+    t.sendInit(0)
+    t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.store.getItem(id)?.status).toBe('review'))
+  })
 })
