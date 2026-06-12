@@ -27,7 +27,7 @@ export interface ComponentStatus {
   body: string
 }
 
-export type JobKind = 'task' | 'rescan'
+export type JobKind = 'task' | 'rescan' | 'resolve'
 export type JobState = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled' | 'interrupted'
 
 export interface Job {
