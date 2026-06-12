@@ -451,6 +451,46 @@ describe('auto routes', () => {
   })
 })
 
+describe('settings via /api/auto', () => {
+  it('GET /api/auto includes failureThreshold and maxConcurrent', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/auto', cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(typeof body.failureThreshold).toBe('number')
+    expect(typeof body.maxConcurrent).toBe('number')
+  })
+
+  it('POST sets maxConcurrent and failureThreshold', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/auto', cookies: cookie,
+      payload: { maxConcurrent: 3, failureThreshold: 5 },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toMatchObject({ maxConcurrent: 3, failureThreshold: 5 })
+  })
+
+  it('rejects maxConcurrent below 1 or above 8', async () => {
+    const low = await app.inject({
+      method: 'POST', url: '/api/auto', cookies: cookie,
+      payload: { maxConcurrent: 0 },
+    })
+    expect(low.statusCode).toBe(400)
+    const high = await app.inject({
+      method: 'POST', url: '/api/auto', cookies: cookie,
+      payload: { maxConcurrent: 9 },
+    })
+    expect(high.statusCode).toBe(400)
+  })
+
+  it('rejects failureThreshold below 1', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/auto', cookies: cookie,
+      payload: { failureThreshold: 0 },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+})
+
 describe('cache headers', () => {
   it('serves html with no-cache and hashed assets as immutable', async () => {
     const root = await app.inject({ method: 'GET', url: '/' })
