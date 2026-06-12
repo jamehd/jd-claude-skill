@@ -165,14 +165,14 @@ export class JobRunner {
 
     // succeeded | failed | interrupted -> continue-after-finish
     if (!job.sessionId) throw new Error('no session recorded for this job')
-    if (job.kind === 'task' && !this.deps!.git.hasWorktree(job.taskId!)) {
+    if (job.kind !== 'rescan' && !this.deps!.git.hasWorktree(job.taskId!)) {
       throw new Error('worktree no longer exists; session is read-only')
     }
     job.state = 'running'
     job.error = undefined
     job.endedAt = undefined
     this.persist(job)
-    if (job.kind === 'task') {
+    if (job.kind !== 'rescan') {
       const item = this.deps!.store.getItem(job.taskId!)
       if (item && item.status !== 'ai_running') {
         this.deps!.store.updateItem(item.id, { status: 'ai_running', job: job.id })
@@ -183,7 +183,7 @@ export class JobRunner {
       this.porcelainSnapshots.set(job.id, new Set(this.deps!.git.porcelain()))
     }
     if (!this.cwds.has(job.id)) {
-      this.cwds.set(job.id, job.kind === 'task' ? this.deps!.git.worktreePath(job.taskId!) : this.deps!.repoRoot)
+      this.cwds.set(job.id, job.kind !== 'rescan' ? this.deps!.git.worktreePath(job.taskId!) : this.deps!.repoRoot)
     }
     this.note(job, 'user_message', text)
     this.armTimer(job)
