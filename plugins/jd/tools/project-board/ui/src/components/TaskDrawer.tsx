@@ -5,6 +5,7 @@ import { DiffView } from './DiffView.js'
 
 const PRIORITIES: Priority[] = ['P0', 'P1', 'P2', 'P3']
 const CAN_EXECUTE = ['backlog', 'ready', 'failed']
+const SHAPEABLE: string[] = ['backlog', 'ready']
 
 export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
   item: BoardItem
@@ -20,10 +21,13 @@ export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [plan, setPlan] = useState(item.plan ?? '')
+  const [brainstorm, setBrainstorm] = useState<string | null>(null)
 
   useEffect(() => {
     setTitle(item.title); setDescription(item.body.trim()); setPriority(item.priority)
     setComponent(item.component); setConfirmDelete(false); setError('')
+    setPlan(item.plan ?? ''); setBrainstorm(null)
   }, [item.id]) // seed only on item change, not on every board refresh
 
   useEffect(() => {
@@ -87,6 +91,45 @@ export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
         </button>
 
         {error && <p className="text-sm text-danger">{error}</p>}
+
+        {SHAPEABLE.includes(item.status) && (
+          <div className="rounded-md border border-border bg-sunken p-3">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-text-secondary">
+                {item.requiresShaping ? (item.plan?.trim() ? '✓ Đã nắn (plan đã đính)' : '⚙ Cần brainstorm trước khi sang Ready') : 'Không cần brainstorm'}
+              </span>
+              <button disabled={busy} onClick={() => void act(() => api.patchTask(item.id, { requiresShaping: !item.requiresShaping }), false)}
+                className="rounded border border-border px-2 py-1 text-xs text-text-secondary transition-colors duration-150 hover:bg-raised">
+                {item.requiresShaping ? 'Bỏ yêu cầu nắn' : 'Đánh dấu cần nắn'}
+              </button>
+            </div>
+            {item.requiresShaping && (
+              <>
+                <button disabled={busy}
+                  onClick={() => void act(async () => {
+                    const { prompt } = await api.getBrainstormPrompt(item.id)
+                    setBrainstorm(prompt)
+                    try { await navigator.clipboard?.writeText(prompt) } catch { /* http LAN: manual copy below */ }
+                  }, false)}
+                  className="mt-2 w-full rounded border border-border py-1.5 text-xs text-text-secondary transition-colors duration-150 hover:bg-raised">
+                  Brainstorm → copy prompt cho terminal
+                </button>
+                {brainstorm !== null && (
+                  <textarea readOnly value={brainstorm} rows={4} onFocus={(e) => e.currentTarget.select()}
+                    className="mt-2 w-full resize-none rounded border border-border bg-base px-2 py-1 font-mono text-[11px] text-text-secondary outline-none" />
+                )}
+                <textarea value={plan} onChange={(e) => setPlan(e.target.value)} rows={3}
+                  placeholder="Dán plan (markdown) hoặc đường dẫn docs/plans/….md"
+                  className="mt-2 w-full resize-none rounded border border-border bg-sunken px-2 py-1 text-xs text-text-primary outline-none transition-colors duration-150 focus:border-accent" />
+                <button disabled={busy || plan === (item.plan ?? '')}
+                  onClick={() => void act(() => api.patchTask(item.id, { plan }), false)}
+                  className="mt-1 rounded border border-border px-2 py-1 text-xs text-text-secondary transition-colors duration-150 hover:bg-raised disabled:opacity-40">
+                  {plan === (item.plan ?? '') ? 'Plan đã lưu' : 'Lưu plan'}
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         <div className="border-t border-border pt-3">
           {CAN_EXECUTE.includes(item.status) && (
