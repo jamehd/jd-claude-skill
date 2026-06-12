@@ -1,7 +1,7 @@
 import matter from 'gray-matter'
 import type { BoardItem, ComponentStatus, ItemStatus, ItemType, Priority } from '../../ui/src/types.js'
 
-export const STATUSES: ItemStatus[] = ['backlog', 'ready', 'ai_running', 'review', 'done']
+export const STATUSES: ItemStatus[] = ['backlog', 'ready', 'ai_running', 'review', 'pr', 'done']
 export const TYPES: ItemType[] = ['task', 'bug']
 export const PRIORITIES: Priority[] = ['P0', 'P1', 'P2', 'P3']
 
@@ -16,7 +16,7 @@ function oneOf<T extends string>(value: string, allowed: readonly T[], key: stri
   return value as T
 }
 
-const KNOWN_KEYS = new Set(['id', 'type', 'title', 'status', 'priority', 'component', 'created', 'updated', 'job'])
+const KNOWN_KEYS = new Set(['id', 'type', 'title', 'status', 'priority', 'component', 'created', 'updated', 'job', 'pr'])
 
 export function parseItem(raw: string): BoardItem {
   const { data, content } = matter(raw)
@@ -32,6 +32,7 @@ export function parseItem(raw: string): BoardItem {
     body: content.trim() + '\n',
   }
   if (data.job) item.job = String(data.job)
+  if (data.pr) item.pr = String(data.pr)
   const extraEntries = Object.entries(data).filter(([k]) => !KNOWN_KEYS.has(k))
   if (extraEntries.length > 0) item.extra = Object.fromEntries(extraEntries)
   return item

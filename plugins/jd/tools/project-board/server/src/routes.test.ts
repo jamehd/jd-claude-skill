@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest'
+import { describe, it, expect, beforeEach, vi } from 'vitest'
 import type { FastifyInstance } from 'fastify'
 import { buildServer } from './server.js'
 import { makeDeps } from './test-helpers.js'
@@ -185,6 +185,47 @@ describe('review routes', () => {
       payload: { type: 'task', title: 'Fresh', component: 'infra', body: 'detailed description' } })
     const res = await app.inject({ method: 'POST', url: '/api/tasks/TASK-001/merge', cookies: cookie })
     expect(res.statusCode).toBe(409)
+  })
+})
+
+describe('pr lifecycle routes', () => {
+  it('Tạo PR moves the task to pr status with the pr url, not done', async () => {
+    const id = await makeReviewTask()
+    const res = await app.inject({ method: 'POST', url: `/api/tasks/${id}/pr`, cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('pr')
+    expect(res.json().pr).toBe('https://github.com/example/pr/1')
+  })
+
+  it('finalize-pr on a merged PR cleans up and marks done', async () => {
+    const id = await makeReviewTask()
+    await app.inject({ method: 'POST', url: `/api/tasks/${id}/pr`, cookies: cookie })
+    const res = await app.inject({ method: 'POST', url: `/api/tasks/${id}/finalize-pr`, cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('done')
+    expect((deps.git.removeWorktree as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(id)
+  })
+
+  it('finalize-pr 409s when the PR is not merged', async () => {
+    const id = await makeReviewTask()
+    await app.inject({ method: 'POST', url: `/api/tasks/${id}/pr`, cookies: cookie })
+    ;(deps.git.isPrMerged as ReturnType<typeof vi.fn>).mockReturnValue(false)
+    const res = await app.inject({ method: 'POST', url: `/api/tasks/${id}/finalize-pr`, cookies: cookie })
+    expect(res.statusCode).toBe(409)
+  })
+
+  it('finalize-pr 409s on a non-pr task', async () => {
+    const id = await makeReviewTask() // status review, no PR created
+    const res = await app.inject({ method: 'POST', url: `/api/tasks/${id}/finalize-pr`, cookies: cookie })
+    expect(res.statusCode).toBe(409)
+  })
+
+  it('DELETE also removes the worktree', async () => {
+    await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
+      payload: { type: 'task', title: 'Doomed', component: 'infra', body: 'x' } })
+    const res = await app.inject({ method: 'DELETE', url: '/api/tasks/TASK-001', cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    expect((deps.git.removeWorktree as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith('TASK-001')
   })
 })
 

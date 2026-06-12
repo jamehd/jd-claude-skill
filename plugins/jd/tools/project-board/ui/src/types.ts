@@ -1,5 +1,5 @@
 export type ItemType = 'task' | 'bug'
-export type ItemStatus = 'backlog' | 'ready' | 'ai_running' | 'review' | 'done'
+export type ItemStatus = 'backlog' | 'ready' | 'ai_running' | 'review' | 'pr' | 'done'
 export type Priority = 'P0' | 'P1' | 'P2' | 'P3'
 
 export interface BoardItem {
@@ -12,6 +12,7 @@ export interface BoardItem {
   created: string
   updated: string
   job?: string
+  pr?: string
   extra?: Record<string, unknown>
   body: string
 }

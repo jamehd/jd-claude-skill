@@ -101,3 +101,32 @@ Summary.
     expect(cs.tested).toBe(0)
   })
 })
+
+describe('pr status and pr field', () => {
+  const RAW_PR = `---
+id: TASK-009
+type: task
+title: With a PR
+status: pr
+priority: P2
+component: cafe-service
+created: 2026-06-12
+updated: 2026-06-12
+pr: https://github.com/jamehd/gamesync/pull/7
+---
+
+body here
+`
+  it('accepts the pr status', () => {
+    expect(parseItem(RAW_PR).status).toBe('pr')
+  })
+  it('parses and round-trips the pr url field', () => {
+    const item = parseItem(RAW_PR)
+    expect(item.pr).toBe('https://github.com/jamehd/gamesync/pull/7')
+    expect(parseItem(serializeItem(item))).toEqual(item)
+  })
+  it('does not sweep pr into extra', () => {
+    const item = parseItem(RAW_PR)
+    expect(item.extra).toBeUndefined()
+  })
+})

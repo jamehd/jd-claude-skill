@@ -7,6 +7,7 @@ const COLUMNS: { key: ItemStatus; label: string }[] = [
   { key: 'ready', label: 'Sẵn sàng' },
   { key: 'ai_running', label: 'AI đang làm' },
   { key: 'review', label: 'Review' },
+  { key: 'pr', label: 'PR mở' },
   { key: 'done', label: 'Hoàn thành' },
 ]
 
@@ -19,6 +20,7 @@ const STATUS_EDGE: Record<ItemStatus, string> = {
   ready: 'border-l-ready',
   ai_running: 'border-l-running',
   review: 'border-l-ok',
+  pr: 'border-l-pr',
   done: 'border-l-ok',
 }
 
@@ -36,6 +38,7 @@ const STATUS_PILL: Record<ItemStatus, string> = {
   ready: 'text-ready border-ready-border',
   ai_running: 'text-running border-running-border',
   review: 'text-ok border-ok-border',
+  pr: 'text-pr border-pr-border',
   done: 'text-ok border-ok-border',
 }
 
@@ -43,7 +46,7 @@ export function Kanban({ items, onSelect }: { items: BoardItem[]; onSelect: (id:
   const [error, setError] = useState('')
 
   async function drop(e: React.DragEvent, status: ItemStatus) {
-    if (status === 'ai_running') return
+    if (status === 'ai_running' || status === 'pr') return
     const id = e.dataTransfer.getData('text/plain')
     if (!id) return
     setError('')
@@ -56,14 +59,14 @@ export function Kanban({ items, onSelect }: { items: BoardItem[]; onSelect: (id:
       <div className="grid flex-1 grid-cols-5 gap-2 overflow-y-auto">
         {COLUMNS.map((col) => (
           <div key={col.key} className="flex flex-col gap-2 rounded-[10px] bg-sunken p-2"
-            onDragOver={(e) => { if (col.key !== 'ai_running') e.preventDefault() }}
+            onDragOver={(e) => { if (col.key !== 'ai_running' && col.key !== 'pr') e.preventDefault() }}
             onDrop={(e) => void drop(e, col.key)}>
             <h3 className="px-1 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
               {col.key === 'ai_running' && <span className="text-accent">◉ </span>}
               {col.label} · {items.filter((i) => i.status === col.key).length}
             </h3>
             {items.filter((i) => i.status === col.key).map((item) => (
-              <div key={item.id} draggable={item.status !== 'ai_running'}
+              <div key={item.id} draggable={item.status !== 'ai_running' && item.status !== 'pr'}
                 onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
                 onClick={() => onSelect(item.id)}
                 className={`cursor-pointer rounded-lg border border-l-2 p-2 text-sm transition-colors duration-150 hover:border-y-border-strong hover:border-r-border-strong ${TYPE_CARD[item.type]} ${STATUS_EDGE[item.status]}`}>
@@ -72,6 +75,10 @@ export function Kanban({ items, onSelect }: { items: BoardItem[]; onSelect: (id:
                   <span className={`font-mono ${PRIORITY_COLOR[item.priority]}`}>{item.priority}</span>
                 </div>
                 <div className={`mt-0.5 ${item.type === 'bug' ? 'text-danger' : 'text-text-primary'}`}>{item.title}</div>
+                {item.pr && (
+                  <a href={item.pr} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
+                    className="mt-1 inline-block font-mono text-[10px] text-pr hover:underline">🔗 PR</a>
+                )}
                 <div className="mt-1 flex items-center justify-between">
                   <span className="text-xs text-text-muted">{item.component}</span>
                   <span className="flex gap-1">
