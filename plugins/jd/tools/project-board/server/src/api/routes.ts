@@ -10,10 +10,10 @@ import { parseRequirementsDir } from '../jobs/requirements.js'
 import { parseStatusDoc, buildCandidates, dedupeCandidates } from '../jobs/candidates.js'
 
 interface CreateBody { type?: ItemType; title?: string; component?: string; priority?: Priority; body?: string }
-interface PatchBody { title?: string; status?: ItemStatus; priority?: Priority; component?: string; body?: string }
+interface PatchBody { title?: string; status?: ItemStatus; priority?: Priority; component?: string; body?: string; requiresShaping?: boolean; plan?: string }
 
 // Patchable user-supplied fields; id/created/type are immutable after creation.
-const PATCH_WHITELIST = ['title', 'status', 'priority', 'component', 'body'] as const
+const PATCH_WHITELIST = ['title', 'status', 'priority', 'component', 'body', 'requiresShaping', 'plan'] as const
 
 // Statuses settable by users; ai_running and pr are system-managed.
 const USER_STATUSES: ItemStatus[] = ['backlog', 'ready', 'review', 'done']
@@ -44,7 +44,8 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     if (req.body?.status === 'ai_running') {
       return reply.code(400).send({ error: 'ai_running is system-managed; use dispatch' })
     }
-    if (!store.getItem(req.params.id)) return reply.code(404).send({ error: 'not found' })
+    const current = store.getItem(req.params.id)
+    if (!current) return reply.code(404).send({ error: 'not found' })
 
     const raw = req.body ?? {}
     const patch: Partial<Record<(typeof PATCH_WHITELIST)[number], unknown>> = {}
@@ -61,6 +62,22 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     }
     if (patch.priority !== undefined && !PRIORITIES.includes(patch.priority as Priority)) {
       return reply.code(400).send({ error: `invalid priority: ${patch.priority}` })
+    }
+    if (patch.requiresShaping !== undefined && typeof patch.requiresShaping !== 'boolean') {
+      return reply.code(400).send({ error: 'requiresShaping must be a boolean' })
+    }
+    if (patch.plan !== undefined && typeof patch.plan !== 'string') {
+      return reply.code(400).send({ error: 'plan must be a string' })
+    }
+    // Gate: a task flagged for shaping cannot reach 'ready' without an attached plan.
+    // Evaluate effective values so a single patch may set requiresShaping/plan alongside status.
+    if (patch.status === 'ready') {
+      const requiresShaping = 'requiresShaping' in patch ? Boolean(patch.requiresShaping) : Boolean(current.requiresShaping)
+      const planRaw = 'plan' in patch ? patch.plan : current.plan
+      const plan = typeof planRaw === 'string' ? planRaw.trim() : ''
+      if (requiresShaping && !plan) {
+        return reply.code(409).send({ error: 'Task cần brainstorm + đính plan trước khi sang Ready' })
+      }
     }
 
     const item = store.updateItem(req.params.id, patch as Parameters<typeof store.updateItem>[1])
@@ -237,7 +254,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     return deps.runner.setAuto({ enabled, maxAuto })
   })
 
-  app.post<{ Body: { items?: { type?: ItemType; title?: string; component?: string; priority?: Priority; body?: string }[] } }>(
+  app.post<{ Body: { items?: { type?: ItemType; title?: string; component?: string; priority?: Priority; body?: string; requiresShaping?: boolean }[] } }>(
     '/api/tasks/bulk', (req, reply) => {
       const items = req.body?.items
       if (!Array.isArray(items) || items.length === 0) return reply.code(400).send({ error: 'items required' })
@@ -252,7 +269,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
           rejected.push({ index, error: `invalid priority: ${it.priority}` })
           return
         }
-        created.push(store.createItem({ type: it.type, title: it.title.trim(), component: it.component.trim(), priority: it.priority, body: it.body }).id)
+        created.push(store.createItem({ type: it.type, title: it.title.trim(), component: it.component.trim(), priority: it.priority, body: it.body, requiresShaping: it.requiresShaping === true }).id)
       })
       if (created.length > 0) hub.broadcast({ type: 'board_update' })
       return { created, rejected }
