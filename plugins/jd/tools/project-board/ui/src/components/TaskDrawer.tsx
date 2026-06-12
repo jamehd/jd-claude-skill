@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
 import type { BoardItem, ComponentStatus, Priority } from '../types.js'
+import { DiffModal } from './DiffModal.js'
 import { DiffView } from './DiffView.js'
 
 const PRIORITIES: Priority[] = ['P0', 'P1', 'P2', 'P3']
@@ -18,6 +19,7 @@ export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
   const [priority, setPriority] = useState<Priority>(item.priority)
   const [component, setComponent] = useState(item.component)
   const [diff, setDiff] = useState<string | null>(null)
+  const [diffOpen, setDiffOpen] = useState(false)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -39,10 +41,11 @@ export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
   }, [item.id, item.status])
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    // When the diff modal is open it owns Escape; don't also close the drawer underneath.
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape' && !diffOpen) onClose() }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  }, [onClose, diffOpen])
 
   const dirty = title !== item.title || description !== item.body.trim() || priority !== item.priority || component !== item.component
   const canSave = dirty && title.trim() && description.trim()
@@ -168,7 +171,11 @@ export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
 
         {diff !== null && (
           <>
-            <h3 className="text-xs font-semibold uppercase text-text-muted">Diff (main…board/{item.id})</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-semibold uppercase text-text-muted">Diff (main…board/{item.id})</h3>
+              <button onClick={() => setDiffOpen(true)}
+                className="rounded border border-border px-2 py-0.5 text-xs text-text-secondary transition-colors duration-150 hover:bg-raised">⤢ Mở rộng</button>
+            </div>
             <DiffView diff={diff} />
           </>
         )}
@@ -190,6 +197,7 @@ export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
           )}
         </div>
       </div>
+      {diffOpen && diff && <DiffModal id={item.id} diff={diff} onClose={() => setDiffOpen(false)} />}
     </div>
   )
 }
