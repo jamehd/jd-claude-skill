@@ -25,7 +25,7 @@ Set up the Project Board dashboard (ships with this plugin) for any git reposito
 2. **Prepare the TARGET repo** (these are committed to the target's git):
    ```bash
    mkdir -p <target>/project-board/data/{tasks,status,jobs}
-   printf 'jobs/\n' > <target>/project-board/data/.gitignore
+   printf 'jobs/\nauto.json\n' > <target>/project-board/data/.gitignore
    grep -qx '.board-worktrees/' <target>/.gitignore || echo '.board-worktrees/' >> <target>/.gitignore
    ```
 

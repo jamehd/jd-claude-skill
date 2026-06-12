@@ -227,6 +227,16 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     return { candidates: dedupeCandidates(buildCandidates(reqIndex, docs), store.scan().items) }
   })
 
+  app.get('/api/auto', () => deps.runner.getAuto())
+
+  app.post<{ Body: { enabled?: boolean; maxAuto?: number } }>('/api/auto', (req, reply) => {
+    const { enabled, maxAuto } = req.body ?? {}
+    if (maxAuto !== undefined && (typeof maxAuto !== 'number' || maxAuto < 1)) {
+      return reply.code(400).send({ error: 'maxAuto must be a positive number' })
+    }
+    return deps.runner.setAuto({ enabled, maxAuto })
+  })
+
   app.post<{ Body: { items?: { type?: ItemType; title?: string; component?: string; priority?: Priority; body?: string }[] } }>(
     '/api/tasks/bulk', (req, reply) => {
       const items = req.body?.items

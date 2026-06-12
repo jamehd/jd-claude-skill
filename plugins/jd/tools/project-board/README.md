@@ -48,6 +48,7 @@ Add these lines to the target repo's `.gitignore`:
 ```
 .board-worktrees/
 project-board/data/jobs/
+project-board/data/auto.json
 ```
 
 ## Dev mode

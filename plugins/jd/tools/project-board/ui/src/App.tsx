@@ -7,6 +7,7 @@ import { QuickAdd } from './components/QuickAdd.js'
 import { ActivityPanel } from './components/ActivityPanel.js'
 import { TaskDrawer } from './components/TaskDrawer.js'
 import { ConsoleView } from './components/ConsoleView.js'
+import { AutoControl } from './components/AutoControl.js'
 import { useBoard } from './useBoard.js'
 
 export default function App() {
@@ -30,6 +31,7 @@ export default function App() {
     <div className="flex h-screen flex-col gap-3 p-3">
       <div className="flex items-start gap-3">
         <KpiStrip snapshot={snapshot} />
+        <AutoControl refreshKey={snapshot.jobs.length} />
         <button onClick={() => setAdding(true)}
           className="rounded-lg bg-gradient-to-r from-accent-strong to-accent-deep px-4 py-3 font-medium text-[#e6fbff] shadow-[0_0_18px_rgba(67,217,232,.18)] transition-colors duration-150 hover:brightness-110">⊕ Thêm task / bug</button>
       </div>

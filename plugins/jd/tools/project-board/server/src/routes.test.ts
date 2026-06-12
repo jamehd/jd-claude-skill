@@ -336,6 +336,43 @@ describe('bulk + candidates', () => {
   })
 })
 
+describe('auto routes', () => {
+  it('GET /api/auto returns the disabled default shape', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/auto', cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body).toMatchObject({ enabled: false, paused: false, dispatched: 0 })
+    expect(typeof body.maxAuto).toBe('number')
+    expect(typeof body.maxConcurrent).toBe('number')
+  })
+
+  it('POST /api/auto enables and sets maxAuto; subsequent GET reflects change', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/auto', cookies: cookie,
+      payload: { enabled: true, maxAuto: 5 },
+    })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toMatchObject({ enabled: true, maxAuto: 5 })
+    const get = await app.inject({ method: 'GET', url: '/api/auto', cookies: cookie })
+    expect(get.json().enabled).toBe(true)
+  })
+
+  it('POST /api/auto can disable after enabling', async () => {
+    await app.inject({ method: 'POST', url: '/api/auto', cookies: cookie, payload: { enabled: true } })
+    const res = await app.inject({ method: 'POST', url: '/api/auto', cookies: cookie, payload: { enabled: false } })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().enabled).toBe(false)
+  })
+
+  it('POST /api/auto rejects a non-positive maxAuto', async () => {
+    const res = await app.inject({
+      method: 'POST', url: '/api/auto', cookies: cookie,
+      payload: { maxAuto: 0 },
+    })
+    expect(res.statusCode).toBe(400)
+  })
+})
+
 describe('cache headers', () => {
   it('serves html with no-cache and hashed assets as immutable', async () => {
     const root = await app.inject({ method: 'GET', url: '/' })

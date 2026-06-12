@@ -419,6 +419,158 @@ describe('JobRunner', () => {
     expect(t.store.getItem(t.item.id)?.status).toBe('ai_running')
   })
 
+  // Creates a ready task and returns its id. Used by the auto-dispatch suite.
+  function ready(t: ReturnType<typeof setup>, title: string, priority: string = 'P2'): string {
+    const item = t.store.createItem({ type: 'task', title, component: 'infra' })
+    t.store.updateItem(item.id, { status: 'ready', priority: priority as never })
+    return item.id
+  }
+
+  // Drives the job at process index `i` to a successful terminal commit (exit 0 + changed files).
+  async function complete(t: ReturnType<typeof setup>, i: number): Promise<void> {
+    await vi.waitFor(() => expect(t.procs[i]).toBeDefined())
+    t.procs[i].stdout.emit('data', Buffer.from(JSON.stringify({ type: 'system', subtype: 'init', session_id: `sess-${i}` }) + '\n'))
+    t.procs[i].emit('exit', 0)
+  }
+
+  describe('auto-dispatch', () => {
+    // Park the harness default ready task so only explicitly created tasks are candidates.
+    function fresh() {
+      const t = setup()
+      t.store.updateItem(t.item.id, { status: 'backlog' })
+      return t
+    }
+
+    it('is off by default', () => {
+      const t = fresh()
+      expect(t.runner.getAuto().enabled).toBe(false)
+    })
+
+    it('enabling dispatches the highest-priority ready task', () => {
+      const t = fresh()
+      ready(t, 'low', 'P3')
+      const hi = ready(t, 'high', 'P0')
+      t.runner.setAuto({ enabled: true })
+      expect(t.store.getItem(hi)?.status).toBe('ai_running')
+      expect(t.runner.getAuto().dispatched).toBe(1)
+    })
+
+    it('picks the next ready task on job completion', async () => {
+      const t = fresh()
+      ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+      const first = ready(t, 'first', 'P1')
+      const second = ready(t, 'second', 'P2')
+      t.runner.setAuto({ enabled: true })
+      expect(t.store.getItem(first)?.status).toBe('ai_running')
+      await complete(t, 0)
+      await vi.waitFor(() => expect(t.store.getItem(first)?.status).toBe('review'))
+      await vi.waitFor(() => expect(t.store.getItem(second)?.status).toBe('ai_running'))
+    })
+
+    it('never auto-dispatches a backlog task', () => {
+      const t = fresh()
+      const item = t.store.createItem({ type: 'task', title: 'backlog one', component: 'infra' })
+      t.store.updateItem(item.id, { status: 'backlog', priority: 'P0' })
+      t.runner.setAuto({ enabled: true })
+      expect(t.store.getItem(item.id)?.status).toBe('backlog')
+      expect(t.runner.getAuto().dispatched).toBe(0)
+    })
+
+    it('stops at maxAuto', async () => {
+      const t = fresh()
+      ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+      ready(t, 'one', 'P1')
+      ready(t, 'two', 'P1')
+      ready(t, 'three', 'P1')
+      t.runner.setAuto({ enabled: true, maxAuto: 2 })
+      await complete(t, 0)
+      await vi.waitFor(() => expect(t.procs).toHaveLength(2))
+      await complete(t, 1)
+      // Give any erroneous third dispatch a chance to spawn before asserting it did not.
+      await vi.waitFor(() => expect(t.runner.getAuto().dispatched).toBe(2))
+      expect(t.spawnCalls).toHaveLength(2)
+    })
+
+    it('pauses after 3 consecutive auto-failures', async () => {
+      const t = fresh()
+      // Default changedFiles returns [] -> exit 0 with no commit -> FAILED.
+      ready(t, 'one', 'P1')
+      ready(t, 'two', 'P1')
+      ready(t, 'three', 'P1')
+      t.runner.setAuto({ enabled: true, maxAuto: 99 })
+      await complete(t, 0)
+      await vi.waitFor(() => expect(t.procs).toHaveLength(2))
+      await complete(t, 1)
+      await vi.waitFor(() => expect(t.procs).toHaveLength(3))
+      await complete(t, 2)
+      await vi.waitFor(() => expect(t.runner.getAuto().paused).toBe(true))
+      expect(t.runner.getAuto().pauseReason).toMatch(/fail/i)
+    })
+
+    it('resets consecutiveFailures after a success', async () => {
+      const t = fresh()
+      const changed = t.git.changedFiles as ReturnType<typeof vi.fn>
+      changed.mockReturnValue([]) // first job fails (no commit)
+      ready(t, 'one', 'P1')
+      ready(t, 'two', 'P1')
+      t.runner.setAuto({ enabled: true, maxAuto: 99 })
+      await complete(t, 0)
+      await vi.waitFor(() => expect(t.runner.getAuto().consecutiveFailures).toBe(1))
+      changed.mockReturnValue(['a.ts']) // second job succeeds
+      await vi.waitFor(() => expect(t.procs).toHaveLength(2))
+      await complete(t, 1)
+      await vi.waitFor(() => expect(t.runner.getAuto().consecutiveFailures).toBe(0))
+    })
+
+    it('disabling stops further dispatch', async () => {
+      const t = fresh()
+      ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+      ready(t, 'one', 'P1')
+      ready(t, 'two', 'P1')
+      const first = t.runner.setAuto({ enabled: true })
+      expect(first.dispatched).toBe(1)
+      expect(t.spawnCalls).toHaveLength(1)
+      t.runner.setAuto({ enabled: false })
+      // Complete the in-flight job; with auto disabled no second task may be dispatched.
+      const jobId = t.runner.listJobs()[0].id
+      await complete(t, 0)
+      await vi.waitFor(() => expect(t.runner.getJob(jobId)?.state).toBe('succeeded'))
+      expect(t.runner.getAuto().enabled).toBe(false)
+      expect(t.spawnCalls).toHaveLength(1)
+    })
+
+    it('a failed auto task is not re-picked; auto advances to the next ready task', async () => {
+      const t = fresh()
+      // Default changedFiles returns [] -> exit 0 with no commit -> the first job FAILS.
+      // A is created first so it sorts ahead of B (same created date, lower id).
+      const a = ready(t, 'A', 'P1')
+      const b = ready(t, 'B', 'P1')
+      t.runner.setAuto({ enabled: true, maxAuto: 99 })
+      expect(t.store.getItem(a)?.status).toBe('ai_running')
+      await complete(t, 0) // A fails -> back to ready, but excluded from re-selection
+      await vi.waitFor(() => expect(t.store.getItem(b)?.status).toBe('ai_running'))
+      expect(t.store.getItem(a)?.status).toBe('ready')
+    })
+
+    it('re-enabling clears the failed set so a previously-failed task can run again', async () => {
+      const t = fresh()
+      const a = ready(t, 'A', 'P1')
+      const b = ready(t, 'B', 'P1')
+      t.runner.setAuto({ enabled: true, maxAuto: 99 })
+      await complete(t, 0) // A fails and is excluded
+      await vi.waitFor(() => expect(t.store.getItem(b)?.status).toBe('ai_running'))
+      // Finish B's job to free the single concurrency slot (it fails back to ready),
+      // then take B out of contention so A is the only eligible task once the set clears.
+      const bJob = t.runner.listJobs().find((j) => j.taskId === b)!.id
+      await complete(t, 1)
+      await vi.waitFor(() => expect(t.runner.getJob(bJob)?.state).toBe('failed'))
+      t.store.updateItem(b, { status: 'backlog' })
+      t.runner.setAuto({ enabled: false })
+      t.runner.setAuto({ enabled: true, maxAuto: 99 })
+      await vi.waitFor(() => expect(t.store.getItem(a)?.status).toBe('ai_running'))
+    })
+  })
+
   it('clearFinished removes finished jobs + files, keeps active ones', async () => {
     const t = setup()
     // job 1: succeeds
