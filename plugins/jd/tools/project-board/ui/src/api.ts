@@ -1,4 +1,4 @@
-import type { AutoState, BoardItem, BoardSnapshot, Candidate, ConsoleEvent, Job } from './types.js'
+import type { AutoState, BoardItem, BoardSnapshot, Candidate, ConsoleEvent, Job, UsageReport } from './types.js'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -41,4 +41,5 @@ export const api = {
   getAuto: () => request<AutoState>('/api/auto'),
   setAuto: (patch: { enabled?: boolean; maxAuto?: number; maxConcurrent?: number; failureThreshold?: number }) =>
     request<AutoState>('/api/auto', { method: 'POST', body: JSON.stringify(patch) }),
+  getUsage: () => request<UsageReport>('/api/usage'),
 }
