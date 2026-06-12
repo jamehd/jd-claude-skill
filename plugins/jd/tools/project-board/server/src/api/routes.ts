@@ -4,6 +4,7 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import type { ServerDeps } from '../server.js'
 import type { ItemStatus, ItemType, Priority } from '../../../ui/src/types.js'
 import { PRIORITIES } from '../markdown.js'
+import { gatedReadyStatus } from '../store.js'
 import { SAFE_ID } from '../jobs/git.js'
 import { normalizeLine } from '../jobs/events.js'
 import { parseRequirementsDir } from '../jobs/requirements.js'
@@ -88,7 +89,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
   app.post<{ Params: { id: string } }>('/api/tasks/:id/dispatch', (req, reply) => {
     const item = store.getItem(req.params.id)
     if (!item) return reply.code(404).send({ error: 'not found' })
-    if (!['backlog', 'ready', 'failed'].includes(item.status)) {
+    if (!['backlog', 'ready'].includes(item.status)) {
       return reply.code(409).send({ error: `cannot dispatch a task in '${item.status}'` })
     }
     try {
@@ -230,7 +231,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     if (!item) return reply
     deps.git.removeWorktree(item.id)
     store.appendToBody(item.id, `Branch board/${item.id} discarded on ${new Date().toISOString().slice(0, 10)}.`)
-    const updated = store.updateItem(item.id, { status: 'ready' })
+    const updated = store.updateItem(item.id, { status: gatedReadyStatus(item) })
     hub.broadcast({ type: 'board_update' })
     return updated
   })

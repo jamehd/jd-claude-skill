@@ -419,6 +419,25 @@ describe('JobRunner', () => {
     expect(t.store.getItem(t.item.id)?.status).toBe('ai_running')
   })
 
+  it('a failed manually-dispatched un-shaped task lands in backlog, not ready', async () => {
+    const t = setup()
+    const id = t.store.createItem({ type: 'task', title: 'x', component: 'infra', requiresShaping: true }).id
+    // Manual dispatch is intentionally ungated; the job then fails (exit 0, no commits).
+    const job = t.runner.dispatchTask(id)
+    t.procs.at(-1)!.emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'))
+    // Bouncing it to ready would let auto-dispatch run an unshaped task headless.
+    expect(t.store.getItem(id)?.status).toBe('backlog')
+  })
+
+  it('reconcileOrphanedTasks sends an orphaned un-shaped task to backlog', () => {
+    const t = setup()
+    const id = t.store.createItem({ type: 'task', title: 'x', component: 'infra', requiresShaping: true }).id
+    t.store.updateItem(id, { status: 'ai_running' }) // orphaned: no live job
+    t.runner.reconcileOrphanedTasks()
+    expect(t.store.getItem(id)?.status).toBe('backlog')
+  })
+
   // Creates a ready task and returns its id. Used by the auto-dispatch suite.
   function ready(t: ReturnType<typeof setup>, title: string, priority: string = 'P2'): string {
     const item = t.store.createItem({ type: 'task', title, component: 'infra' })
@@ -474,6 +493,19 @@ describe('JobRunner', () => {
       t.runner.setAuto({ enabled: true })
       expect(t.store.getItem(item.id)?.status).toBe('backlog')
       expect(t.runner.getAuto().dispatched).toBe(0)
+    })
+
+    it('never auto-picks a gated no-plan task even if it is sitting in ready', () => {
+      const t = fresh()
+      // Defense in depth: a gated task should never be auto-dispatched even if some
+      // other path wrongly parked it in ready.
+      const gated = t.store.createItem({ type: 'task', title: 'gated', component: 'infra', requiresShaping: true }).id
+      t.store.updateItem(gated, { status: 'ready', priority: 'P0' })
+      const trivial = ready(t, 'trivial', 'P2')
+      t.runner.setAuto({ enabled: true })
+      expect(t.store.getItem(gated)?.status).toBe('ready') // untouched, not picked
+      expect(t.store.getItem(trivial)?.status).toBe('ai_running') // sibling IS picked
+      expect(t.runner.getAuto().dispatched).toBe(1)
     })
 
     it('stops at maxAuto', async () => {

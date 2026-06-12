@@ -2,7 +2,13 @@ import { readdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs'
 import path from 'node:path'
 import chokidar, { type FSWatcher } from 'chokidar'
 import { parseItem, serializeItem, parseComponentStatus } from './markdown.js'
-import type { BoardItem, ComponentStatus, ItemType, Priority } from '../../ui/src/types.js'
+import type { BoardItem, ComponentStatus, ItemStatus, ItemType, Priority } from '../../ui/src/types.js'
+
+// A task that still requires shaping (no plan attached) must never land in `ready`,
+// where auto-dispatch would pick it up — keep it in `backlog` until it is shaped.
+export function gatedReadyStatus(item: Pick<BoardItem, 'requiresShaping' | 'plan'>): ItemStatus {
+  return item.requiresShaping && !item.plan?.trim() ? 'backlog' : 'ready'
+}
 
 export interface CreateItemInput {
   type: ItemType
