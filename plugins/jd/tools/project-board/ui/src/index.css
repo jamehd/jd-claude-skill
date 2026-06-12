@@ -32,6 +32,9 @@
   --color-danger: #e87a7a;
   --color-danger-bg: #2b1212;
   --color-danger-border: #552222;
+  --color-pr: #8b9cf7;
+  --color-pr-bg: #181a2e;
+  --color-pr-border: #2e3360;
 
   --color-diff-add: #56c98e;
   --color-diff-del: #e8754f;

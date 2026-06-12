@@ -109,6 +109,18 @@ export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
                 className="flex-1 rounded-md border border-danger-border bg-danger-bg py-2 text-sm font-medium text-danger transition-colors duration-150 hover:brightness-110 disabled:opacity-50">Hủy bỏ</button>
             </div>
           )}
+          {item.status === 'pr' && (
+            <div className="mt-2">
+              {item.pr && (
+                <a href={item.pr} target="_blank" rel="noreferrer"
+                  className="mb-2 block font-mono text-xs text-pr hover:underline">🔗 {item.pr}</a>
+              )}
+              <button disabled={busy} onClick={() => void act(() => api.finalizePr(item.id))}
+                className="w-full rounded-md border border-pr-border bg-pr-bg py-2 text-sm font-medium text-pr transition-colors duration-150 hover:brightness-110 disabled:opacity-50">
+                PR đã merge → dọn
+              </button>
+            </div>
+          )}
         </div>
 
         {diff !== null && (

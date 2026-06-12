@@ -59,11 +59,16 @@ recipe) — never the fg color on raw `--color-surface`.
 | `ready` | `#e8b54f` | `#241c0e` | `#4a3a1a` |
 | `ai_running` | `#43d9e8` | `#0d2b33` | `#155e6b` |
 | `review` | `#56c98e` | `#0e2418` | `#1d4a30` |
+| `pr` | `#8b9cf7` | `#181a2e` | `#2e3360` |
 | `done` | `#56c98e` | `#0e2418` | `#1d4a30` |
 | `failed` / error | `#e87a7a` | `#2b1212` | `#552222` |
 | warn | `#e8b54f` | — | — |
 
 Priority text colors: P0 `#e87a7a` · P1 `#e8b54f` · P2 `#8fa3b8` · P3 `#5d7290`.
+
+The `pr` status uses a distinct indigo token (`--color-pr` / `-bg` / `-border`),
+separate from accent/ready/ok/running/danger — it marks the "PR mở" interim state
+for the `pr` edge + pill.
 
 ### Item type (task vs bug)
 
@@ -124,7 +129,9 @@ must render correctly on an offline LAN.
   color + a status pill. Both signals coexist. Row 1: mono ID (muted) + priority
   (priority color); row 2: title in `text-primary` (bug titles in failed-fg); row
   3: component muted + the type/status badges. Hover: raised recipe, but keep the
-  status left edge (`hover:border-y/-r-border-strong`, not all sides).
+  status left edge (`hover:border-y/-r-border-strong`, not all sides). A card in
+  the `pr` status carries a small mono "🔗 PR" link (`text-pr`) that opens the open
+  pull request in a new tab (the link `stopPropagation`s so it doesn't open the drawer).
 - **Kanban column** — `--color-sunken` at 10px radius, uppercase label with
   count; `ai_running` column header carries an accent `◉`.
 - **Status pill** — mono 10px, fg/bg/border triple, radius 999px, padding
@@ -141,7 +148,10 @@ must render correctly on an offline LAN.
   required fields (title + description) are non-blank; saving keeps the panel
   open. Below a hairline, an **action row**: Execute (⚡ primary, for
   backlog/ready/failed) / Mở console (when a job exists) / review actions
-  (Merge ok-tint / Tạo PR neutral / Hủy bỏ danger-tint). Diff/log render in
+  (Merge ok-tint / Tạo PR neutral / Hủy bỏ danger-tint). For a `pr`-status item
+  the action row instead shows the "🔗 {pr-url}" link plus a pr-tinted "PR đã
+  merge → dọn" finalize button (`api.finalizePr`; surfaces the 409 not-merged
+  error inline). Diff/log render in
   sunken wells. A **Delete** affordance pins to the bottom with an inline
   danger confirm.
 - **Confirm (inline)** — prefer an in-place confirm over a separate modal: a
