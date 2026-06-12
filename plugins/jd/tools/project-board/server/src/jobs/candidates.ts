@@ -63,8 +63,26 @@ function itemKind(item: BoardItem): 'implement' | 'test' | null {
   return null
 }
 
-export function dedupeCandidates(candidates: Candidate[], existing: BoardItem[]): Candidate[] {
+function coversReq(item: BoardItem, reqId: string): boolean {
+  return item.body.split('\n').some((l) => l.trim() === `Req: ${reqId}`)
+}
+
+export function dedupeCandidates(
+  candidates: Candidate[],
+  existing: BoardItem[],
+  lastScanned?: Record<string, string>,
+): Candidate[] {
   const live = existing.filter((i) => i.status !== 'done')
-  return candidates.filter((c) =>
-    !live.some((i) => itemKind(i) === c.kind && i.body.split('\n').some((l) => l.trim() === `Req: ${c.reqId}`)))
+  const done = existing.filter((i) => i.status === 'done')
+  return candidates.filter((c) => {
+    // An active (non-done) task already covering this req+kind suppresses the candidate.
+    if (live.some((i) => itemKind(i) === c.kind && coversReq(i, c.reqId))) return false
+    // A done task finished AFTER the component's last scan is work not yet re-verified —
+    // don't re-propose it until the next Re-scan reconciles status (which resurfaces it if
+    // the requirement is still incomplete). Done tasks at/before the last scan do NOT suppress,
+    // so a verified-still-incomplete requirement keeps surfacing.
+    const scanned = lastScanned?.[c.component]
+    if (scanned && done.some((i) => itemKind(i) === c.kind && coversReq(i, c.reqId) && i.updated > scanned)) return false
+    return true
+  })
 }

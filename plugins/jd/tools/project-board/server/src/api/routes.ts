@@ -243,7 +243,8 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
       try { docs.push(parseStatusDoc(readFileSync(path.join(store.statusDir, f), 'utf8'))) } catch { /* skip unparseable */ }
     }
     const reqIndex = parseRequirementsDir(deps.config.repoRoot)
-    return { candidates: dedupeCandidates(buildCandidates(reqIndex, docs), store.scan().items) }
+    const lastScanned = Object.fromEntries(store.componentStatuses().map((s) => [s.component, s.last_scanned]))
+    return { candidates: dedupeCandidates(buildCandidates(reqIndex, docs), store.scan().items, lastScanned) }
   })
 
   app.get<{ Params: { id: string } }>('/api/tasks/:id/brainstorm-prompt', (req, reply) => {

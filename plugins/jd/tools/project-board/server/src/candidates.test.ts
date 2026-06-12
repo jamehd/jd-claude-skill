@@ -117,4 +117,36 @@ tested: 82
     }]
     expect(dedupeCandidates(cands, existing).find((c) => c.reqId === 'CAFE-R10')).toBeDefined()
   })
+
+  it('suppresses a candidate whose done task finished AFTER the last scan (pending re-verification)', () => {
+    const existing: BoardItem[] = [{
+      id: 'TASK-001', type: 'task', title: 'Complete CAFE-R4: Manifest v2 + delta', status: 'done',
+      priority: 'P2', component: 'cafe-service', created: '2026-06-11', updated: '2026-06-12',
+      body: 'Req: CAFE-R4',
+    }]
+    const out = dedupeCandidates(cands, existing, { 'cafe-service': '2026-06-11' })
+    // implement candidate is hidden — the work was just done, the scan hasn't re-verified yet
+    expect(out.find((c) => c.reqId === 'CAFE-R4' && c.kind === 'implement')).toBeUndefined()
+    // the test candidate (no done test task) is still proposed
+    expect(out.find((c) => c.reqId === 'CAFE-R4' && c.kind === 'test')).toBeDefined()
+  })
+
+  it('does NOT suppress when the done task is at/before the last scan (scan re-verified the gap)', () => {
+    const existing: BoardItem[] = [{
+      id: 'TASK-001', type: 'task', title: 'Complete CAFE-R4: Manifest v2 + delta', status: 'done',
+      priority: 'P2', component: 'cafe-service', created: '2026-06-09', updated: '2026-06-10',
+      body: 'Req: CAFE-R4',
+    }]
+    const out = dedupeCandidates(cands, existing, { 'cafe-service': '2026-06-11' })
+    expect(out.find((c) => c.reqId === 'CAFE-R4' && c.kind === 'implement')).toBeDefined()
+  })
+
+  it('without lastScanned, a done task never suppresses (back-compat)', () => {
+    const existing: BoardItem[] = [{
+      id: 'TASK-001', type: 'task', title: 'Complete CAFE-R4: Manifest v2 + delta', status: 'done',
+      priority: 'P2', component: 'cafe-service', created: '2026-06-11', updated: '2026-06-12',
+      body: 'Req: CAFE-R4',
+    }]
+    expect(dedupeCandidates(cands, existing).find((c) => c.reqId === 'CAFE-R4' && c.kind === 'implement')).toBeDefined()
+  })
 })
