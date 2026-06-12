@@ -577,3 +577,26 @@ describe('crud + lifecycle', () => {
     expect(res.json()).toHaveProperty('cleared')
   })
 })
+
+describe('resolve route', () => {
+  it('202 for a review task with an existing worktree', async () => {
+    const id = await makeReviewTask()
+    ;(deps.git.hasWorktree as ReturnType<typeof vi.fn>).mockReturnValue(true)
+    const res = await app.inject({ method: 'POST', url: `/api/tasks/${id}/resolve`, cookies: cookie })
+    expect(res.statusCode).toBe(202)
+  })
+
+  it('409 for a non-review (backlog) task', async () => {
+    await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
+      payload: { type: 'task', title: 'Fresh', component: 'infra', body: 'detail' } })
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/TASK-001/resolve', cookies: cookie })
+    expect(res.statusCode).toBe(409)
+  })
+
+  it('409 when hasWorktree returns false for a review task', async () => {
+    const id = await makeReviewTask()
+    ;(deps.git.hasWorktree as ReturnType<typeof vi.fn>).mockReturnValue(false)
+    const res = await app.inject({ method: 'POST', url: `/api/tasks/${id}/resolve`, cookies: cookie })
+    expect(res.statusCode).toBe(409)
+  })
+})
