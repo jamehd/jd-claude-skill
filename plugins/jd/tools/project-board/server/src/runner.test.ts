@@ -538,6 +538,37 @@ describe('JobRunner', () => {
       expect(t.runner.getAuto().enabled).toBe(false)
       expect(t.spawnCalls).toHaveLength(1)
     })
+
+    it('a failed auto task is not re-picked; auto advances to the next ready task', async () => {
+      const t = fresh()
+      // Default changedFiles returns [] -> exit 0 with no commit -> the first job FAILS.
+      // A is created first so it sorts ahead of B (same created date, lower id).
+      const a = ready(t, 'A', 'P1')
+      const b = ready(t, 'B', 'P1')
+      t.runner.setAuto({ enabled: true, maxAuto: 99 })
+      expect(t.store.getItem(a)?.status).toBe('ai_running')
+      await complete(t, 0) // A fails -> back to ready, but excluded from re-selection
+      await vi.waitFor(() => expect(t.store.getItem(b)?.status).toBe('ai_running'))
+      expect(t.store.getItem(a)?.status).toBe('ready')
+    })
+
+    it('re-enabling clears the failed set so a previously-failed task can run again', async () => {
+      const t = fresh()
+      const a = ready(t, 'A', 'P1')
+      const b = ready(t, 'B', 'P1')
+      t.runner.setAuto({ enabled: true, maxAuto: 99 })
+      await complete(t, 0) // A fails and is excluded
+      await vi.waitFor(() => expect(t.store.getItem(b)?.status).toBe('ai_running'))
+      // Finish B's job to free the single concurrency slot (it fails back to ready),
+      // then take B out of contention so A is the only eligible task once the set clears.
+      const bJob = t.runner.listJobs().find((j) => j.taskId === b)!.id
+      await complete(t, 1)
+      await vi.waitFor(() => expect(t.runner.getJob(bJob)?.state).toBe('failed'))
+      t.store.updateItem(b, { status: 'backlog' })
+      t.runner.setAuto({ enabled: false })
+      t.runner.setAuto({ enabled: true, maxAuto: 99 })
+      await vi.waitFor(() => expect(t.store.getItem(a)?.status).toBe('ai_running'))
+    })
   })
 
   it('clearFinished removes finished jobs + files, keeps active ones', async () => {

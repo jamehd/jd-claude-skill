@@ -53,9 +53,14 @@ export class JobRunner {
   private porcelainSnapshots = new Map<string, Set<string>>()
   private spawnFn: SpawnFn
 
+  private static readonly AUTO_TICK_MS = 8000
+  private static readonly DEFAULT_MAX_AUTO = 10
+  private static readonly DEFAULT_FAILURE_THRESHOLD = 3
+
   private auto = { enabled: false, paused: false, pauseReason: undefined as string | undefined,
-    maxAuto: 10, failureThreshold: 3, dispatched: 0, consecutiveFailures: 0 }
+    maxAuto: JobRunner.DEFAULT_MAX_AUTO, failureThreshold: JobRunner.DEFAULT_FAILURE_THRESHOLD, dispatched: 0, consecutiveFailures: 0 }
   private autoJobs = new Set<string>()
+  private autoFailedTasks = new Set<string>()
   private autoTimer?: NodeJS.Timeout
   private shuttingDown = false
 
@@ -65,7 +70,7 @@ export class JobRunner {
       this.recoverInterrupted()
       this.reconcileOrphanedTasks()
       this.loadAuto()
-      if (this.auto.enabled) this.startAutoInterval()
+      if (this.auto.enabled) { this.startAutoInterval(); this.autoTick() }
     }
   }
 
@@ -209,6 +214,7 @@ export class JobRunner {
       this.auto.consecutiveFailures = 0
       this.auto.paused = false
       this.auto.pauseReason = undefined
+      this.autoFailedTasks.clear()
     } else if (patch.maxAuto !== undefined) {
       // Raising the cap can lift a cap-induced stall.
       this.auto.dispatched = 0
@@ -238,14 +244,14 @@ export class JobRunner {
   private nextReadyTask(): string | undefined {
     const order: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3 }
     const ready = this.deps!.store.scan().items
-      .filter((i) => i.status === 'ready' && !this.hasActiveJob((j) => j.kind === 'task' && j.taskId === i.id))
+      .filter((i) => i.status === 'ready' && !this.autoFailedTasks.has(i.id) && !this.hasActiveJob((j) => j.kind === 'task' && j.taskId === i.id))
       .sort((a, b) => (order[a.priority] - order[b.priority]) || a.created.localeCompare(b.created) || a.id.localeCompare(b.id))
     return ready[0]?.id
   }
 
   private startAutoInterval(): void {
     if (this.autoTimer) return
-    this.autoTimer = setInterval(() => this.autoTick(), 8000)
+    this.autoTimer = setInterval(() => this.autoTick(), JobRunner.AUTO_TICK_MS)
     this.autoTimer.unref?.()
   }
 
@@ -565,6 +571,9 @@ export class JobRunner {
     this.persist(job)
     if (this.autoJobs.has(job.id)) {
       if (job.state === 'failed') {
+        // Exclude this task from re-selection so auto advances to siblings instead of
+        // re-picking a deterministically-failing task until the threshold pause fires.
+        if (job.taskId) this.autoFailedTasks.add(job.taskId)
         this.auto.consecutiveFailures++
         if (this.auto.consecutiveFailures >= this.auto.failureThreshold) {
           this.auto.paused = true
@@ -573,6 +582,7 @@ export class JobRunner {
       } else if (job.state === 'succeeded') {
         this.auto.consecutiveFailures = 0
       }
+      this.autoJobs.delete(job.id)
     }
     this.deps?.hub.broadcast({ type: 'board_update' })
     this.autoTick()
