@@ -19,8 +19,9 @@ export const api = {
   board: () => request<BoardSnapshot>('/api/board'),
   createTask: (input: { type: string; title: string; component: string; priority?: string; body?: string }) =>
     request<BoardItem>('/api/tasks', { method: 'POST', body: JSON.stringify(input) }),
-  patchTask: (id: string, patch: Record<string, string>) =>
+  patchTask: (id: string, patch: Record<string, unknown>) =>
     request<BoardItem>(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
+  getBrainstormPrompt: (id: string) => request<{ prompt: string }>(`/api/tasks/${id}/brainstorm-prompt`),
   dispatch: (id: string) => request<Job>(`/api/tasks/${id}/dispatch`, { method: 'POST' }),
   rescan: () => request<Job>('/api/rescan', { method: 'POST' }),
   cancelJob: (id: string) => request<{ ok: boolean }>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
@@ -35,7 +36,7 @@ export const api = {
   deleteTask: (id: string) => request<{ ok: boolean }>(`/api/tasks/${id}`, { method: 'DELETE' }),
   clearFinishedJobs: () => request<{ cleared: number }>('/api/jobs/clear-finished', { method: 'POST' }),
   scanCandidates: () => request<{ candidates: Candidate[] }>('/api/scan-candidates'),
-  bulkCreate: (items: { type: string; title: string; component: string; priority: string; body: string }[]) =>
+  bulkCreate: (items: { type: string; title: string; component: string; priority: string; body: string; requiresShaping?: boolean }[]) =>
     request<{ created: string[]; rejected: { index: number; error: string }[] }>('/api/tasks/bulk', { method: 'POST', body: JSON.stringify({ items }) }),
   getAuto: () => request<AutoState>('/api/auto'),
   setAuto: (patch: { enabled?: boolean; maxAuto?: number }) =>

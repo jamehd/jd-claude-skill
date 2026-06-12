@@ -130,3 +130,35 @@ body here
     expect(item.extra).toBeUndefined()
   })
 })
+
+describe('shaping fields', () => {
+  const base = ['---', 'id: TASK-001', 'type: task', 'title: A task', 'status: backlog', 'priority: P2', 'component: infra', 'created: 2026-06-12', 'updated: 2026-06-12']
+
+  it('parses requiresShaping and plan when present', () => {
+    const raw = [...base, 'requiresShaping: true', 'plan: docs/plans/x.md', '---', '', 'body'].join('\n')
+    const item = parseItem(raw)
+    expect(item.requiresShaping).toBe(true)
+    expect(item.plan).toBe('docs/plans/x.md')
+  })
+
+  it('leaves requiresShaping and plan undefined when absent (backward compatible)', () => {
+    const raw = [...base, '---', '', 'body'].join('\n')
+    const item = parseItem(raw)
+    expect(item.requiresShaping).toBeUndefined()
+    expect(item.plan).toBeUndefined()
+  })
+
+  it('does not sweep requiresShaping or plan into extra', () => {
+    const raw = [...base, 'requiresShaping: true', 'plan: docs/plans/x.md', '---', '', 'body'].join('\n')
+    const item = parseItem(raw)
+    expect(item.extra).toBeUndefined()
+  })
+
+  it('round-trips both fields through serialize → parse', () => {
+    const raw = [...base, 'requiresShaping: true', 'plan: docs/plans/x.md', '---', '', 'body'].join('\n')
+    const item = parseItem(raw)
+    const again = parseItem(serializeItem(parseItem(serializeItem(item))))
+    expect(again.requiresShaping).toBe(true)
+    expect(again.plan).toBe('docs/plans/x.md')
+  })
+})

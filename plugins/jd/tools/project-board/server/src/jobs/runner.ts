@@ -1,7 +1,7 @@
 import { appendFileSync, writeFileSync, readdirSync, readFileSync, renameSync, unlinkSync, statSync } from 'node:fs'
 import path from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
-import type { BoardStore } from '../store.js'
+import { gatedReadyStatus, type BoardStore } from '../store.js'
 import type { WsHub } from '../ws.js'
 import type { AutoState, ConsoleEvent, Job, JobKind, NoteType } from '../../../ui/src/types.js'
 import { buildTaskPrompt, buildRescanPrompt } from './prompt.js'
@@ -86,7 +86,7 @@ export class JobRunner {
     for (const item of this.deps.store.scan().items) {
       if (item.status !== 'ai_running') continue
       if (hasLiveJob(item.id)) continue
-      this.deps.store.updateItem(item.id, { status: 'ready' })
+      this.deps.store.updateItem(item.id, { status: gatedReadyStatus(item) })
       this.deps.store.appendToBody(item.id, 'Reset to ready: was ai_running with no live job (orphaned).')
       resets++
     }
@@ -244,7 +244,7 @@ export class JobRunner {
   private nextReadyTask(): string | undefined {
     const order: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3 }
     const ready = this.deps!.store.scan().items
-      .filter((i) => i.status === 'ready' && !this.autoFailedTasks.has(i.id) && !this.hasActiveJob((j) => j.kind === 'task' && j.taskId === i.id))
+      .filter((i) => i.status === 'ready' && !(i.requiresShaping && !i.plan?.trim()) && !this.autoFailedTasks.has(i.id) && !this.hasActiveJob((j) => j.kind === 'task' && j.taskId === i.id))
       .sort((a, b) => (order[a.priority] - order[b.priority]) || a.created.localeCompare(b.created) || a.id.localeCompare(b.id))
     return ready[0]?.id
   }
@@ -355,7 +355,7 @@ export class JobRunner {
         return
       }
       store.updateItem(item.id, { status: 'ai_running', job: job.id })
-      prompt = buildTaskPrompt(item, parseRequirementsDir(this.deps!.repoRoot))
+      prompt = buildTaskPrompt(item, parseRequirementsDir(this.deps!.repoRoot), this.deps!.repoRoot)
     } else {
       // Rescan writes status files directly to disk in the live repo; no worktree.
       cwd = this.deps!.repoRoot
@@ -555,7 +555,8 @@ export class JobRunner {
     const { store } = this.deps!
     if (job.kind !== 'task') return
     try {
-      store.updateItem(job.taskId!, { status: 'ready' })
+      const t = store.getItem(job.taskId!)
+      store.updateItem(job.taskId!, { status: t ? gatedReadyStatus(t) : 'backlog' })
       store.appendToBody(job.taskId!, `## AI result\nJob ${job.id} failed: ${reason}\nWorktree/branch kept for inspection: board/${job.taskId}`)
     } catch { /* task file may be unparseable after a bad edit; job error is still recorded */ }
   }
@@ -619,8 +620,9 @@ export class JobRunner {
       if (job.state === 'running' || job.state === 'queued') {
         job.state = 'interrupted'
         job.error = 'server restarted mid-job; worktree kept for inspection'
-        if (job.kind === 'task' && job.taskId && store.getItem(job.taskId)?.status === 'ai_running') {
-          store.updateItem(job.taskId, { status: 'ready' })
+        if (job.kind === 'task' && job.taskId) {
+          const t = store.getItem(job.taskId)
+          if (t?.status === 'ai_running') store.updateItem(job.taskId, { status: gatedReadyStatus(t) })
         }
         this.persist(job)
       }

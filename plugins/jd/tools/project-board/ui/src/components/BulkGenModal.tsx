@@ -27,7 +27,7 @@ export function BulkGenModal({ onClose }: { onClose: () => void }) {
     if (checked.length === 0) return
     setBusy(true); setError('')
     try {
-      const res = await api.bulkCreate(checked.map((r) => ({ type: r.type, title: r.title, component: r.component, priority: r.priority, body: r.body })))
+      const res = await api.bulkCreate(checked.map((r) => ({ type: r.type, title: r.title, component: r.component, priority: r.priority, body: r.body, requiresShaping: r.kind === 'implement' })))
       if (res.rejected.length > 0) { setError(`${res.rejected.length} mục bị từ chối`); return }
       onClose()
     } catch (e) { setError(e instanceof Error ? e.message : String(e)) }

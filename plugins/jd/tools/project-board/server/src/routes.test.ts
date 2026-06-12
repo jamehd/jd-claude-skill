@@ -336,6 +336,84 @@ describe('bulk + candidates', () => {
   })
 })
 
+describe('shaping gate', () => {
+  // Creates TASK-001 and optionally applies an extra PATCH (e.g. {requiresShaping:true}).
+  async function makeTask(extra?: Record<string, unknown>): Promise<string> {
+    await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
+      payload: { type: 'task', title: 'Work', component: 'infra', body: 'detail' } })
+    if (extra) await app.inject({ method: 'PATCH', url: '/api/tasks/TASK-001', cookies: cookie, payload: extra })
+    return 'TASK-001'
+  }
+
+  it('blocks →ready when requiresShaping and no plan', async () => {
+    const id = await makeTask({ requiresShaping: true })
+    const res = await app.inject({ method: 'PATCH', url: `/api/tasks/${id}`, cookies: cookie, payload: { status: 'ready' } })
+    expect(res.statusCode).toBe(409)
+    expect(res.json().error).toMatch(/brainstorm|plan/i)
+  })
+
+  it('allows →ready once a plan is attached', async () => {
+    const id = await makeTask({ requiresShaping: true })
+    await app.inject({ method: 'PATCH', url: `/api/tasks/${id}`, cookies: cookie, payload: { plan: 'docs/plans/x.md' } })
+    const res = await app.inject({ method: 'PATCH', url: `/api/tasks/${id}`, cookies: cookie, payload: { status: 'ready' } })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('ready')
+  })
+
+  it('allows →ready freely when not requiresShaping', async () => {
+    const id = await makeTask()
+    const res = await app.inject({ method: 'PATCH', url: `/api/tasks/${id}`, cookies: cookie, payload: { status: 'ready' } })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('ready')
+  })
+
+  it('allows requiresShaping task to go ready when plan+status set in the SAME patch', async () => {
+    const id = await makeTask({ requiresShaping: true })
+    const res = await app.inject({ method: 'PATCH', url: `/api/tasks/${id}`, cookies: cookie, payload: { plan: 'p', status: 'ready' } })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('ready')
+  })
+
+  it('rejects a non-boolean requiresShaping', async () => {
+    const id = await makeTask()
+    const res = await app.inject({ method: 'PATCH', url: `/api/tasks/${id}`, cookies: cookie, payload: { requiresShaping: 'yes' } })
+    expect(res.statusCode).toBe(400)
+  })
+
+  it('bulk-create defaults requiresShaping from the per-item flag', async () => {
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/bulk', cookies: cookie, payload: {
+      items: [
+        { type: 'task', title: 'Needs shaping', component: 'infra', body: 'shape me', requiresShaping: true },
+        { type: 'task', title: 'Plain', component: 'infra', body: 'no shaping' },
+      ],
+    }})
+    expect(res.statusCode).toBe(200)
+    expect(res.json().created).toHaveLength(2)
+    const board = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
+    const items = board.json().items as { id: string; requiresShaping?: boolean }[]
+    const first = items.find((i) => i.id === 'TASK-001')!
+    const second = items.find((i) => i.id === 'TASK-002')!
+    expect(first.requiresShaping).toBe(true)
+    expect(second.requiresShaping).toBeUndefined()
+  })
+})
+
+describe('brainstorm-prompt route', () => {
+  it('GET /api/tasks/:id/brainstorm-prompt returns a prompt', async () => {
+    const c = await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
+      payload: { type: 'task', title: 'Shape me', component: 'infra', body: 'details' } })
+    const id = c.json().id
+    const res = await app.inject({ method: 'GET', url: `/api/tasks/${id}/brainstorm-prompt`, cookies: cookie })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().prompt).toContain('Shape me')
+  })
+
+  it('returns 404 for an unknown task id', async () => {
+    const res = await app.inject({ method: 'GET', url: '/api/tasks/TASK-999/brainstorm-prompt', cookies: cookie })
+    expect(res.statusCode).toBe(404)
+  })
+})
+
 describe('auto routes', () => {
   it('GET /api/auto returns the disabled default shape', async () => {
     const res = await app.inject({ method: 'GET', url: '/api/auto', cookies: cookie })

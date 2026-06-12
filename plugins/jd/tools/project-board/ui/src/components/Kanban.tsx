@@ -50,6 +50,13 @@ export function Kanban({ items, onSelect }: { items: BoardItem[]; onSelect: (id:
     const id = e.dataTransfer.getData('text/plain')
     if (!id) return
     setError('')
+    if (status === 'ready') {
+      const it = items.find((i) => i.id === id)
+      if (it?.requiresShaping && !it.plan?.trim()) {
+        setError('Task cần brainstorm + đính plan trước khi sang Ready')
+        return
+      }
+    }
     try { await api.patchTask(id, { status }) } catch (err) { setError(err instanceof Error ? err.message : String(err)) }
   }
 
@@ -82,6 +89,12 @@ export function Kanban({ items, onSelect }: { items: BoardItem[]; onSelect: (id:
                 <div className="mt-1 flex items-center justify-between">
                   <span className="text-xs text-text-muted">{item.component}</span>
                   <span className="flex gap-1">
+                    {item.requiresShaping && !item.plan?.trim() && (
+                      <span className="rounded-full border border-shape-border px-1.5 py-0.5 font-mono text-[9px] uppercase text-shape">⚙ nắn</span>
+                    )}
+                    {item.plan?.trim() && (
+                      <span className="rounded-full border border-ok-border px-1.5 py-0.5 font-mono text-[9px] uppercase text-ok">✓ nắn</span>
+                    )}
                     <span className={`rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase ${TYPE_BADGE[item.type]} border-current`}>{item.type}</span>
                     <span className={`rounded-full border px-1.5 py-0.5 font-mono text-[9px] ${STATUS_PILL[item.status]}`}>{col.label}</span>
                   </span>

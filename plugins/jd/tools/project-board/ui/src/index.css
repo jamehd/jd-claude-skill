@@ -36,6 +36,9 @@
   --color-pr-bg: #181a2e;
   --color-pr-border: #2e3360;
 
+  --color-shape: #d8a657;
+  --color-shape-border: #5a3f18;
+
   --color-diff-add: #56c98e;
   --color-diff-del: #e8754f;
   --color-diff-hunk: #7f93a8;

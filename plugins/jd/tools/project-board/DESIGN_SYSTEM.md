@@ -70,6 +70,16 @@ The `pr` status uses a distinct indigo token (`--color-pr` / `-bg` / `-border`),
 separate from accent/ready/ok/running/danger — it marks the "PR mở" interim state
 for the `pr` edge + pill.
 
+### Shaping
+
+| Token | Value | Use |
+|---|---|---|
+| `--color-shape` | `#d8a657` | Warm amber; "needs brainstorm" badge fg |
+| `--color-shape-border` | `#5a3f18` | Border for the `⚙ nắn` badge |
+
+The `--color-shape` token is intentionally distinct from `ready` (`#e8b54f`) —
+warmer/darker so the two badges don't read as duplicates side-by-side.
+
 ### Item type (task vs bug)
 
 Type tints the card surface; status owns the left edge + pill (the two signals coexist).
@@ -168,6 +178,21 @@ must render correctly on an offline LAN.
 - **Modal (QuickAdd) / Login** — surface panel on `rgba(8,13,20,.7)` backdrop,
   inputs: sunken bg, border, focus ring `--color-accent-border` →
   `--color-accent` border.
+- **Shaping badges (Kanban card)** — two optional pills prepended to the card's
+  type/status badge row. `⚙ nắn` (`text-shape border-shape`) = `requiresShaping`
+  is set but no plan yet; `✓ nắn` (`text-ok border-ok-border`) = plan is attached
+  (regardless of `requiresShaping`). Both are mono 9px uppercased pills.
+- **Shaping section (TaskDrawer)** — rendered for `backlog`/`ready` items only.
+  A sunken rounded card contains: status label; toggle button (`Đánh dấu cần nắn`
+  / `Bỏ yêu cầu nắn`, calls `PATCH requiresShaping`); when `requiresShaping` is
+  true: a "Brainstorm → copy prompt" button that fetches `GET
+  .../brainstorm-prompt` and copies to clipboard; a read-only `<textarea>` showing
+  the prompt (auto-selects on focus for manual copy on HTTP LAN); a writable
+  `<textarea>` for the plan (markdown or path); a "Lưu plan" / "Plan đã lưu"
+  button (disabled when unchanged, calls `PATCH plan`).
+- **Drag guard (Kanban)** — dropping a card onto the `ready` column is blocked
+  client-side if `requiresShaping && !plan?.trim()`; a danger message appears
+  above the board.
 - **Console** — header strip on surface (mono ids, state pill); stream area on
   base with reading-baseline assistant text; tool cards are surface `<details>`
   with a mono summary and a sunken result well (danger fg on errors); system
