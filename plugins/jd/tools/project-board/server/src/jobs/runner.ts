@@ -4,7 +4,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { gatedReadyStatus, type BoardStore } from '../store.js'
 import type { WsHub } from '../ws.js'
 import type { AutoState, ConsoleEvent, Job, JobKind, NoteType, RateLimitSnapshot, UsageReport, UsageBucket, JobUsage } from '../../../ui/src/types.js'
-import { buildTaskPrompt, buildRescanPrompt } from './prompt.js'
+import { buildTaskPrompt, buildRescanPrompt, buildResolvePrompt } from './prompt.js'
 import { parseRequirementsDir } from './requirements.js'
 import { normalizeLine } from './events.js'
 
@@ -131,6 +131,10 @@ export class JobRunner {
     return this.enqueue('task', taskId)
   }
 
+  dispatchResolve(taskId: string): Job {
+    return this.enqueue('resolve', taskId)
+  }
+
   dispatchRescan(): Job {
     if (this.hasActiveJob((j) => j.kind === 'rescan')) {
       throw new Error('rescan already running')
@@ -161,14 +165,14 @@ export class JobRunner {
 
     // succeeded | failed | interrupted -> continue-after-finish
     if (!job.sessionId) throw new Error('no session recorded for this job')
-    if (job.kind === 'task' && !this.deps!.git.hasWorktree(job.taskId!)) {
+    if (job.kind !== 'rescan' && !this.deps!.git.hasWorktree(job.taskId!)) {
       throw new Error('worktree no longer exists; session is read-only')
     }
     job.state = 'running'
     job.error = undefined
     job.endedAt = undefined
     this.persist(job)
-    if (job.kind === 'task') {
+    if (job.kind !== 'rescan') {
       const item = this.deps!.store.getItem(job.taskId!)
       if (item && item.status !== 'ai_running') {
         this.deps!.store.updateItem(item.id, { status: 'ai_running', job: job.id })
@@ -179,7 +183,7 @@ export class JobRunner {
       this.porcelainSnapshots.set(job.id, new Set(this.deps!.git.porcelain()))
     }
     if (!this.cwds.has(job.id)) {
-      this.cwds.set(job.id, job.kind === 'task' ? this.deps!.git.worktreePath(job.taskId!) : this.deps!.repoRoot)
+      this.cwds.set(job.id, job.kind !== 'rescan' ? this.deps!.git.worktreePath(job.taskId!) : this.deps!.repoRoot)
     }
     this.note(job, 'user_message', text)
     this.armTimer(job)
@@ -420,6 +424,21 @@ export class JobRunner {
       }
       store.updateItem(item.id, { status: 'ai_running', job: job.id })
       prompt = buildTaskPrompt(item, parseRequirementsDir(this.deps!.repoRoot), this.deps!.repoRoot)
+    } else if (job.kind === 'resolve') {
+      job.branch = `board/${job.taskId!}`
+      // Resolve reuses the task's EXISTING worktree (recreating it would wipe the work).
+      if (!git.hasWorktree(job.taskId!)) {
+        this.finish(job, 'failed', 'worktree missing; re-run the task instead')
+        return
+      }
+      const item = store.getItem(job.taskId!)
+      if (!item) {
+        this.finish(job, 'failed', `task not found: ${job.taskId}`)
+        return
+      }
+      cwd = git.worktreePath(job.taskId!)
+      store.updateItem(item.id, { status: 'ai_running', job: job.id })
+      prompt = buildResolvePrompt(item, parseRequirementsDir(this.deps!.repoRoot))
     } else {
       // Rescan writes status files directly to disk in the live repo; no worktree.
       cwd = this.deps!.repoRoot
@@ -540,7 +559,7 @@ export class JobRunner {
     }
     this.clearTimer(job.id)
     if (this.completedSuccessfully(job)) {
-      if (job.kind === 'task') {
+      if (job.kind !== 'rescan') {
         this.afterSuccess(job)
         this.finish(job, 'succeeded')
       } else {
@@ -552,7 +571,7 @@ export class JobRunner {
         }
       }
     } else {
-      const reason = job.kind === 'task'
+      const reason = job.kind !== 'rescan'
         ? 'process exited 0 but no commits found on the branch'
         : 'process exited 0 but no files under project-board/data/status changed'
       this.afterFailure(job, reason)
@@ -583,7 +602,7 @@ export class JobRunner {
   }
 
   private completedSuccessfully(job: Job): boolean {
-    if (job.kind === 'task') {
+    if (job.kind !== 'rescan') {
       return this.deps!.git.changedFiles(job.taskId!).length > 0
     }
     // Rescan succeeds iff a status .md is new or newer than the pre-run snapshot.
@@ -629,11 +648,15 @@ export class JobRunner {
   }
 
   private afterFailure(job: Job, reason: string): void {
+    if (job.kind === 'rescan') return
     const { store } = this.deps!
-    if (job.kind !== 'task') return
     try {
       const t = store.getItem(job.taskId!)
-      store.updateItem(job.taskId!, { status: t ? gatedReadyStatus(t) : 'backlog' })
+      // A failed resolve returns the task to review (its branch work is intact — retry or
+      // merge manually); a failed task goes back to ready/backlog per the shaping gate.
+      // Either way the task must leave ai_running so it is never stuck.
+      const next = job.kind === 'resolve' ? 'review' : (t ? gatedReadyStatus(t) : 'backlog')
+      store.updateItem(job.taskId!, { status: next })
       store.appendToBody(job.taskId!, `## AI result\nJob ${job.id} failed: ${reason}\nWorktree/branch kept for inspection: board/${job.taskId}`)
     } catch { /* task file may be unparseable after a bad edit; job error is still recorded */ }
   }

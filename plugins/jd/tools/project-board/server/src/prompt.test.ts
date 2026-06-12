@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
-import { buildTaskPrompt, buildRescanPrompt, buildBrainstormPrompt } from './jobs/prompt.js'
+import { buildTaskPrompt, buildRescanPrompt, buildBrainstormPrompt, buildResolvePrompt } from './jobs/prompt.js'
 import type { Requirement } from './jobs/requirements.js'
 import type { BoardItem } from '../../ui/src/types.js'
 
@@ -101,5 +101,21 @@ describe('buildTaskPrompt plan injection', () => {
     const p = buildTaskPrompt(itemFull({ plan: rel }), undefined, root)
     expect(p).not.toContain('TOP SECRET CONTENT')
     expect(p).toContain(rel) // the escaping path is kept as inline text, not read
+  })
+})
+
+describe('buildResolvePrompt', () => {
+  it('instructs merge-main + resolve + commit and includes the task title', () => {
+    const p = buildResolvePrompt(itemFull({ title: 'Add tests for X', body: 'do it\nReq: CAFE-R4' }))
+    expect(p).toMatch(/git merge main/)
+    expect(p).toMatch(/conflict/i)
+    expect(p).toContain('Add tests for X')
+    expect(p).toMatch(/do NOT push/i)
+  })
+  it('injects requirement context when resolvable', () => {
+    const reqs = new Map([['CAFE-R4', { id: 'CAFE-R4', title: 'Manifest', statement: 'Parses v2.', acceptance: ['delta only'] }]])
+    const p = buildResolvePrompt(itemFull({ body: 'x\nReq: CAFE-R4' }), reqs)
+    expect(p).toContain('CAFE-R4')
+    expect(p).toContain('delta only')
   })
 })

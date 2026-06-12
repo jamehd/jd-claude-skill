@@ -27,7 +27,7 @@ export function makeDeps(): ServerDeps {
     mergeBranch: () => {},
     createPr: () => 'https://github.com/example/pr/1',
     isPrMerged: vi.fn(() => true),
-    hasWorktree: () => true,
+    hasWorktree: vi.fn(() => true),
     worktreePath: () => dataDir,
     porcelain: () => [],
   }

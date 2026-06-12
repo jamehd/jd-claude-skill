@@ -25,11 +25,12 @@ export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [plan, setPlan] = useState(item.plan ?? '')
   const [brainstorm, setBrainstorm] = useState<string | null>(null)
+  const [mergeConflict, setMergeConflict] = useState(false)
 
   useEffect(() => {
     setTitle(item.title); setDescription(item.body.trim()); setPriority(item.priority)
     setComponent(item.component); setConfirmDelete(false); setError('')
-    setPlan(item.plan ?? ''); setBrainstorm(null)
+    setPlan(item.plan ?? ''); setBrainstorm(null); setMergeConflict(false)
   }, [item.id]) // seed only on item change, not on every board refresh
 
   useEffect(() => {
@@ -146,14 +147,29 @@ export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
               className="mt-2 w-full rounded-md border border-border py-2 text-sm text-text-secondary transition-colors duration-150 hover:bg-raised">Mở console</button>
           )}
           {item.status === 'review' && (
-            <div className="mt-2 flex gap-2">
-              <button disabled={busy} onClick={() => void act(() => api.merge(item.id))}
-                className="flex-1 rounded-md border border-ok-border bg-ok-bg py-2 text-sm font-medium text-ok transition-colors duration-150 hover:brightness-110 disabled:opacity-50">Merge</button>
-              <button disabled={busy} onClick={() => void act(() => api.pr(item.id))}
-                className="flex-1 rounded-md border border-border py-2 text-sm text-text-secondary transition-colors duration-150 hover:bg-raised disabled:opacity-50">Tạo PR</button>
-              <button disabled={busy} onClick={() => void act(() => api.discard(item.id))}
-                className="flex-1 rounded-md border border-danger-border bg-danger-bg py-2 text-sm font-medium text-danger transition-colors duration-150 hover:brightness-110 disabled:opacity-50">Hủy bỏ</button>
-            </div>
+            <>
+              <div className="mt-2 flex gap-2">
+                <button disabled={busy}
+                  onClick={() => {
+                    setMergeConflict(false)
+                    void act(async () => {
+                      try { await api.merge(item.id) }
+                      catch (e) { if (e instanceof Error && /conflict/i.test(e.message)) setMergeConflict(true); throw e }
+                    })
+                  }}
+                  className="flex-1 rounded-md border border-ok-border bg-ok-bg py-2 text-sm font-medium text-ok transition-colors duration-150 hover:brightness-110 disabled:opacity-50">Merge</button>
+                <button disabled={busy} onClick={() => void act(() => api.pr(item.id))}
+                  className="flex-1 rounded-md border border-border py-2 text-sm text-text-secondary transition-colors duration-150 hover:bg-raised disabled:opacity-50">Tạo PR</button>
+                <button disabled={busy} onClick={() => void act(() => api.discard(item.id))}
+                  className="flex-1 rounded-md border border-danger-border bg-danger-bg py-2 text-sm font-medium text-danger transition-colors duration-150 hover:brightness-110 disabled:opacity-50">Hủy bỏ</button>
+              </div>
+              {mergeConflict && (
+                <button disabled={busy} onClick={() => void act(() => api.resolve(item.id), false)}
+                  className="mt-2 w-full rounded-md border border-accent bg-raised py-2 text-sm font-medium text-accent transition-colors duration-150 hover:brightness-110 disabled:opacity-50">
+                  🤖 AI đồng bộ main + vá conflict
+                </button>
+              )}
+            </>
           )}
           {item.status === 'pr' && (
             <div className="mt-2">

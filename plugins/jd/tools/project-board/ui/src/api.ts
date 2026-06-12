@@ -30,6 +30,7 @@ export const api = {
     request<{ ok: boolean }>(`/api/jobs/${id}/message`, { method: 'POST', body: JSON.stringify({ text, mode }) }),
   diff: (id: string) => request<string>(`/api/tasks/${id}/diff`),
   merge: (id: string) => request<BoardItem>(`/api/tasks/${id}/merge`, { method: 'POST' }),
+  resolve: (id: string) => request<Job>(`/api/tasks/${id}/resolve`, { method: 'POST' }),
   pr: (id: string) => request<BoardItem>(`/api/tasks/${id}/pr`, { method: 'POST' }),
   finalizePr: (id: string) => request<BoardItem>(`/api/tasks/${id}/finalize-pr`, { method: 'POST' }),
   discard: (id: string) => request<BoardItem>(`/api/tasks/${id}/discard`, { method: 'POST' }),

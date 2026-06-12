@@ -743,3 +743,53 @@ describe('JobRunner', () => {
     })
   })
 })
+
+describe('AI resolve conflict', () => {
+  function reviewTask(t: ReturnType<typeof setup>) {
+    const id = t.store.createItem({ type: 'task', title: 'x', component: 'infra' }).id
+    t.store.updateItem(id, { status: 'review' })
+    return id
+  }
+
+  it('dispatchResolve runs in the existing worktree (does not recreate it)', () => {
+    const t = setup()
+    ;(t.git.hasWorktree as ReturnType<typeof vi.fn>).mockReturnValue(true)
+    const createSpy = t.git.createWorktree as ReturnType<typeof vi.fn>
+    const id = reviewTask(t)
+    const job = t.runner.dispatchResolve(id)
+    expect(job.kind).toBe('resolve')
+    expect(createSpy).not.toHaveBeenCalled()
+    expect(t.store.getItem(id)?.status).toBe('ai_running')
+  })
+
+  it('a successful resolve (changedFiles>0) returns the task to review', async () => {
+    const t = setup()
+    ;(t.git.hasWorktree as ReturnType<typeof vi.fn>).mockReturnValue(true)
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    const id = reviewTask(t)
+    t.runner.dispatchResolve(id)
+    t.sendInit(0)
+    t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.store.getItem(id)?.status).toBe('review'))
+  })
+
+  it('resolve with no worktree fails clearly', async () => {
+    const t = setup()
+    ;(t.git.hasWorktree as ReturnType<typeof vi.fn>).mockReturnValue(false)
+    const id = reviewTask(t)
+    const job = t.runner.dispatchResolve(id)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'))
+    expect(t.runner.getJob(job.id)?.error).toMatch(/worktree/i)
+  })
+
+  it('a FAILED resolve returns the task to review (never stuck in ai_running)', async () => {
+    const t = setup()
+    ;(t.git.hasWorktree as ReturnType<typeof vi.fn>).mockReturnValue(true)
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue([])  // exit 0 + no commits = failed
+    const id = reviewTask(t)
+    t.runner.dispatchResolve(id)
+    t.sendInit(0)
+    t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.store.getItem(id)?.status).toBe('review'))
+  })
+})

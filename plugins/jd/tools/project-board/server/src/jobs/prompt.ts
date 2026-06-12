@@ -54,6 +54,42 @@ export function buildTaskPrompt(item: BoardItem, requirements?: Map<string, Requ
   return lines.join('\n')
 }
 
+export function buildResolvePrompt(item: BoardItem, requirements?: Map<string, Requirement>): string {
+  const lines = [
+    `You are in a git worktree on branch board/${item.id} of the GameSync repo.`,
+    'main has advanced and this branch now CONFLICTS with it. Your job is to bring the',
+    'branch up to date with main and resolve the conflict — do NOT re-implement from scratch.',
+    '',
+    `Task: ${item.title}`,
+    '',
+    item.body.trim(),
+    '',
+    'Do ALL of the following:',
+    '1. Run `git merge main` to bring main\'s changes into this branch.',
+    '2. Resolve EVERY conflict, preserving BOTH this task\'s intent AND main\'s changes.',
+    '3. Run the tests relevant to the changed files and make them pass.',
+    '4. Commit the resolution (git add + git commit). Do NOT push, do NOT touch other branches,',
+    '   and do NOT modify anything under project-board/data/.',
+    '5. Verify `git diff main...HEAD` no longer reports conflicts.',
+    '6. End with a short summary of what conflicted and how you resolved it.',
+  ]
+  const ids = extractReqIds(item.body)
+  if (requirements && ids.length > 0) {
+    lines.push('', '--- REQUIREMENTS THIS TASK MUST STILL SATISFY ---')
+    for (const id of ids) {
+      const r = requirements.get(id)
+      if (r) {
+        lines.push(`${r.id} — ${r.title}: ${r.statement}`)
+        for (const ac of r.acceptance) lines.push(`  AC: ${ac}`)
+      } else {
+        lines.push(`${id}: not found in docs/requirements`)
+      }
+    }
+    lines.push('--- END REQUIREMENTS ---')
+  }
+  return lines.join('\n')
+}
+
 export function buildBrainstormPrompt(item: BoardItem, requirements?: Map<string, Requirement>): string {
   const lines = [
     `Brainstorm and shape board task ${item.id} for the GameSync project before it is executed.`,

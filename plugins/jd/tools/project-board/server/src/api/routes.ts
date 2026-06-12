@@ -183,6 +183,15 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     return reply.type('text/plain').send(deps.git.branchDiff(item.id))
   })
 
+  app.post<{ Params: { id: string } }>('/api/tasks/:id/resolve', (req, reply) => {
+    const item = requireReview(req.params.id, reply)
+    if (!item) return reply
+    if (!deps.git.hasWorktree(item.id)) {
+      return reply.code(409).send({ error: 'worktree đã mất — hãy chạy lại task' })
+    }
+    return reply.code(202).send(deps.runner.dispatchResolve(item.id))
+  })
+
   app.post<{ Params: { id: string } }>('/api/tasks/:id/merge', (req, reply) => {
     const item = requireReview(req.params.id, reply)
     if (!item) return reply
