@@ -3,7 +3,7 @@ import path from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { gatedReadyStatus, type BoardStore } from '../store.js'
 import type { WsHub } from '../ws.js'
-import type { AutoState, ConsoleEvent, Job, JobKind, NoteType } from '../../../ui/src/types.js'
+import type { AutoState, ConsoleEvent, Job, JobKind, NoteType, RateLimitSnapshot, UsageReport, UsageBucket, JobUsage } from '../../../ui/src/types.js'
 import { buildTaskPrompt, buildRescanPrompt } from './prompt.js'
 import { parseRequirementsDir } from './requirements.js'
 import { normalizeLine } from './events.js'
@@ -65,6 +65,7 @@ export class JobRunner {
   private shuttingDown = false
   // Runtime concurrency limit; seeded from deps then overridden by any persisted value.
   private maxConcurrent = 1
+  private lastRateLimit?: RateLimitSnapshot
 
   constructor(private deps?: RunnerDeps) {
     this.spawnFn = deps?.spawnFn ?? spawn
@@ -73,6 +74,7 @@ export class JobRunner {
       this.recoverInterrupted()
       this.reconcileOrphanedTasks()
       this.loadAuto()
+      this.loadUsage()
       if (this.auto.enabled) { this.startAutoInterval(); this.autoTick() }
     }
   }
@@ -293,6 +295,54 @@ export class JobRunner {
     return path.join(this.deps!.store.dataDir, 'auto.json')
   }
 
+  private usageFile(): string {
+    return path.join(this.deps!.store.dataDir, 'usage.json')
+  }
+
+  private loadUsage(): void {
+    try {
+      const raw = JSON.parse(readFileSync(this.usageFile(), 'utf8')) as Partial<RateLimitSnapshot>
+      if (raw && typeof raw.resetsAt === 'number') {
+        this.lastRateLimit = {
+          status: String(raw.status ?? 'unknown'), rateLimitType: String(raw.rateLimitType ?? ''),
+          resetsAt: raw.resetsAt, isUsingOverage: Boolean(raw.isUsingOverage),
+          capturedAt: String(raw.capturedAt ?? new Date(0).toISOString()),
+        }
+      }
+    } catch { /* missing/corrupt -> none */ }
+  }
+
+  private persistUsage(): void {
+    if (!this.deps || !this.lastRateLimit) return
+    try { writeFileSync(this.usageFile(), JSON.stringify(this.lastRateLimit, null, 2)) } catch { /* best-effort */ }
+  }
+
+  // Aggregates per-job usage into windowed buckets plus the latest rate-limit snapshot.
+  getUsage(): UsageReport {
+    const empty = (): UsageBucket => ({ inputTokens: 0, outputTokens: 0, cacheReadTokens: 0, cacheCreationTokens: 0, costUsd: 0, jobs: 0 })
+    const windows = { fiveHour: empty(), today: empty(), total: empty() }
+    const now = Date.now()
+    // Align the 5h window to the current rate-limit window when known, else last 5h from now.
+    const fiveHourStart = this.lastRateLimit?.resetsAt
+      ? this.lastRateLimit.resetsAt * 1000 - 5 * 60 * 60 * 1000
+      : now - 5 * 60 * 60 * 1000
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const add = (b: UsageBucket, u: JobUsage, cost: number) => {
+      b.inputTokens += u.inputTokens; b.outputTokens += u.outputTokens
+      b.cacheReadTokens += u.cacheReadTokens; b.cacheCreationTokens += u.cacheCreationTokens
+      b.costUsd += cost; b.jobs += 1
+    }
+    for (const job of this.jobs.values()) {
+      if (!job.usage) continue
+      const cost = job.costUsd ?? 0
+      add(windows.total, job.usage, cost)
+      const ended = job.endedAt ? Date.parse(job.endedAt) : 0
+      if (ended >= fiveHourStart) add(windows.fiveHour, job.usage, cost)
+      if (job.endedAt && job.endedAt.slice(0, 10) === todayStr) add(windows.today, job.usage, cost)
+    }
+    return { rateLimit: this.lastRateLimit ?? null, windows }
+  }
+
   shutdown(): void {
     this.shuttingDown = true
     this.stopAutoInterval()
@@ -427,6 +477,19 @@ export class JobRunner {
       if (event.kind === 'init' && !job.sessionId) {
         job.sessionId = event.sessionId
         this.persist(job)
+      }
+      if (event.kind === 'turn_result' && event.usage) {
+        job.usage = event.usage
+        if (typeof event.costUsd === 'number') job.costUsd = event.costUsd
+        this.persist(job)
+      }
+      if (event.kind === 'rate_limit') {
+        this.lastRateLimit = {
+          status: event.status, rateLimitType: event.rateLimitType,
+          resetsAt: event.resetsAt, isUsingOverage: event.isUsingOverage,
+          capturedAt: new Date().toISOString(),
+        }
+        this.persistUsage()
       }
       this.emit(job, event)
     }

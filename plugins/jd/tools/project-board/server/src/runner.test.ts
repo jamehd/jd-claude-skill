@@ -47,7 +47,10 @@ function setup() {
   })
   const sendInit = (i = 0, session = 'sess-1') =>
     procs[i].stdout.emit('data', Buffer.from(JSON.stringify({ type: 'system', subtype: 'init', session_id: session }) + '\n'))
-  return { store, runner, git, spawnFn, spawnCalls, item, procs, sendInit, dataDir }
+  // Feeds an arbitrary JSON line into a job's stdout the same way sendInit feeds the init line.
+  const feedLine = (i: number, obj: unknown) =>
+    procs[i].stdout.emit('data', Buffer.from(JSON.stringify(obj) + '\n'))
+  return { store, runner, git, spawnFn, spawnCalls, item, procs, sendInit, feedLine, dataDir }
 }
 
 describe('JobRunner', () => {
@@ -684,5 +687,57 @@ describe('JobRunner', () => {
     expect(t.runner.getJob(done.id)).toBeUndefined()
     expect(t.runner.getJob(live.id)).toBeDefined()
     expect(existsSync(path.join(t.dataDir, 'jobs', `${done.id}.json`))).toBe(false)
+  })
+
+  describe('usage capture + aggregation', () => {
+    it('captures per-job usage + cost from a result line', async () => {
+      const t = setup()
+      ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+      const job = t.runner.dispatchTask(t.item.id)
+      t.sendInit(0)
+      t.feedLine(0, {
+        type: 'result', total_cost_usd: 0.5,
+        usage: { input_tokens: 200, output_tokens: 80, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      })
+      t.procs[0].emit('exit', 0)
+      await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
+      expect(t.runner.getJob(job.id)?.usage?.inputTokens).toBe(200)
+      expect(t.runner.getJob(job.id)?.costUsd).toBe(0.5)
+    })
+
+    it('captures + persists the latest rate-limit snapshot', async () => {
+      const t = setup()
+      ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+      t.runner.dispatchTask(t.item.id)
+      t.sendInit(0)
+      t.feedLine(0, {
+        type: 'rate_limit_event',
+        rate_limit_info: { status: 'allowed', rateLimitType: 'five_hour', resetsAt: 1781265600, isUsingOverage: false },
+      })
+      await vi.waitFor(() =>
+        expect(t.runner.getUsage().rateLimit).toMatchObject({ status: 'allowed', rateLimitType: 'five_hour', resetsAt: 1781265600 }),
+      )
+      expect(JSON.parse(readFileSync(`${t.dataDir}/usage.json`, 'utf8')).resetsAt).toBe(1781265600)
+    })
+
+    it('aggregates total tokens across jobs', async () => {
+      const t = setup()
+      ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+      const job = t.runner.dispatchTask(t.item.id)
+      t.sendInit(0)
+      t.feedLine(0, {
+        type: 'result', total_cost_usd: 1,
+        usage: { input_tokens: 100, output_tokens: 100, cache_read_input_tokens: 0, cache_creation_input_tokens: 0 },
+      })
+      t.procs[0].emit('exit', 0)
+      await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
+      expect(t.runner.getUsage().windows.total).toMatchObject({ inputTokens: 100, outputTokens: 100, costUsd: 1, jobs: 1 })
+    })
+
+    it('reports empty usage with no data', () => {
+      const t = setup()
+      expect(t.runner.getUsage().rateLimit).toBe(null)
+      expect(t.runner.getUsage().windows.total.jobs).toBe(0)
+    })
   })
 })
