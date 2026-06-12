@@ -1,7 +1,7 @@
 {
   "name": "jd",
   "description": "Personal skill library by jamehd — design/scaffold (architect) and audit skills for UI, error handling, and databases, plus engineering workflows.",
-  "version": "0.21.1",
+  "version": "0.21.2",
   "author": {
     "name": "jamehd"
   },

@@ -35,7 +35,10 @@ export class BoardGit {
     this.removeWorktree(taskId)
     const wt = this.worktreePath(taskId)
     mkdirSync(path.dirname(wt), { recursive: true })
-    this.git(['worktree', 'add', '-b', this.branchName(taskId), wt, 'main'])
+    // -B (create-or-reset) so re-dispatch after an interrupted/failed/discarded run starts
+    // fresh from main even when the board/<id> branch still exists (removeWorktree drops the
+    // worktree but not the branch). -b would fail with "branch already exists".
+    this.git(['worktree', 'add', '-B', this.branchName(taskId), wt, 'main'])
     return wt
   }
 
