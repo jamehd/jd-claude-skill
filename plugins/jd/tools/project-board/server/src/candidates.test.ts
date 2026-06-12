@@ -43,21 +43,23 @@ describe('buildCandidates', () => {
     const c = cands.filter((x) => x.reqId === 'CAFE-R10')
     expect(c).toHaveLength(1)
     expect(c[0]).toMatchObject({ kind: 'implement', type: 'task', priority: 'P1', component: 'cafe-service' })
-    expect(c[0].title).toBe('Implement CAFE-R10: gRPC GetTheme')
+    expect(c[0].title).toBe('Hiện thực CAFE-R10: gRPC GetTheme')
+    expect(c[0].body).toContain('Scan phát hiện: CAFE-R10 chưa làm')
     expect(c[0].body).toContain('Req: CAFE-R10')
     expect(c[0].body).toContain('theme < 1s')
+    expect(c[0].body).toContain('Tiêu chí chấp nhận:')
   })
   it('partial -> complete P2 AND a test candidate (untested)', () => {
     const c = cands.filter((x) => x.reqId === 'CAFE-R4')
     expect(c.map((x) => x.kind).sort()).toEqual(['implement', 'test'])
-    expect(c.find((x) => x.kind === 'implement')!.title).toBe('Complete CAFE-R4: Manifest v2 + delta')
+    expect(c.find((x) => x.kind === 'implement')!.title).toBe('Hoàn thiện CAFE-R4: Manifest v2 + delta')
     expect(c.find((x) => x.kind === 'implement')!.priority).toBe('P2')
   })
   it('done+untested -> test candidate only', () => {
     const c = cands.filter((x) => x.reqId === 'CAFE-R9')
     expect(c).toHaveLength(1)
     expect(c[0]).toMatchObject({ kind: 'test', priority: 'P2' })
-    expect(c[0].title).toBe('Add tests for CAFE-R9: gRPC WatchUpdates')
+    expect(c[0].title).toBe('Thêm test cho CAFE-R9: gRPC WatchUpdates')
   })
   it('done+tested -> nothing', () => {
     expect(cands.filter((x) => x.reqId === 'CAFE-R3')).toHaveLength(0)
@@ -76,6 +78,17 @@ describe('dedupeCandidates', () => {
     expect(out.find((c) => c.reqId === 'CAFE-R10' && c.kind === 'implement')).toBeUndefined()
     // a test candidate for a different req is still present
     expect(out.find((c) => c.reqId === 'CAFE-R9' && c.kind === 'test')).toBeDefined()
+  })
+  it('Vietnamese title live item suppresses the matching candidate', () => {
+    const existing: BoardItem[] = [{
+      id: 'TASK-002', type: 'task', title: 'Thêm test cho CAFE-R9: gRPC WatchUpdates', status: 'ready',
+      priority: 'P2', component: 'cafe-service', created: '2026-06-11', updated: '2026-06-11',
+      body: 'do it\nReq: CAFE-R9',
+    }]
+    const out = dedupeCandidates(cands, existing)
+    expect(out.find((c) => c.reqId === 'CAFE-R9' && c.kind === 'test')).toBeUndefined()
+    // implement candidate for a different req is still present
+    expect(out.find((c) => c.reqId === 'CAFE-R10' && c.kind === 'implement')).toBeDefined()
   })
   it('CAFE-R12 live item does NOT suppress CAFE-R1 candidate (substring false-match regression)', () => {
     const STATUS_BOTH = `---

@@ -162,6 +162,7 @@ export function buildRescanPrompt(): string {
     '- State is one of done / partial / missing; Tested is yes / no.',
     '- built credits done as 1 and partial as 0.5 of a requirement.',
     '- tested counts only requirements whose Tested column is yes.',
+    '- Write the "Note" column text in Vietnamese (keep State/Tested values and the table structure in English).',
     '- Only write files under project-board/data/status/. Do NOT run git and do',
     '  NOT commit — the dashboard reads these files from disk.',
   ].join('\n')
