@@ -63,7 +63,7 @@ export function Kanban({ items, onSelect }: { items: BoardItem[]; onSelect: (id:
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       {error && <p className="mb-1 text-xs text-danger">{error}</p>}
-      <div className="grid flex-1 grid-cols-5 gap-2 overflow-y-auto">
+      <div className="grid flex-1 grid-cols-6 gap-2 overflow-y-auto">
         {COLUMNS.map((col) => (
           <div key={col.key} className="flex flex-col gap-2 rounded-[10px] bg-sunken p-2"
             onDragOver={(e) => { if (col.key !== 'ai_running' && col.key !== 'pr') e.preventDefault() }}
