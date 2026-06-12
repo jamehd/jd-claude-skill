@@ -19,6 +19,7 @@ const STATUS_EDGE: Record<ItemStatus, string> = {
   ready: 'border-l-ready',
   ai_running: 'border-l-running',
   review: 'border-l-ok',
+  pr: 'border-l-ok',
   done: 'border-l-ok',
 }
 
@@ -36,6 +37,7 @@ const STATUS_PILL: Record<ItemStatus, string> = {
   ready: 'text-ready border-ready-border',
   ai_running: 'text-running border-running-border',
   review: 'text-ok border-ok-border',
+  pr: 'text-ok border-ok-border',
   done: 'text-ok border-ok-border',
 }
 
