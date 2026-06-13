@@ -27,7 +27,7 @@ function FileBlock({ file, collapsed, onToggle, anchorRef }: {
         <span className="font-mono text-diff-del">−{file.deletions}</span>
       </button>
       {!collapsed && (
-        <pre className="overflow-x-auto px-3 py-2 font-mono text-[11.5px] leading-[1.55]">
+        <pre className="overflow-x-auto px-3 py-2 font-mono text-[13px] leading-[1.55]">
           {file.lines.length === 0
             ? <div className="text-text-muted">{file.status === 'binary' ? '(binary)' : '(không có thay đổi nội dung)'}</div>
             : file.lines.map((l: DiffLine, i) => <div key={i} className={LINE_CLASS[l.kind]}>{l.text || ' '}</div>)}
@@ -61,7 +61,7 @@ export function DiffView({ diff, wide = false }: { diff: string; wide?: boolean 
         {files.map((f) => (
           <li key={f.path}>
             <button onClick={() => jump(f.path)} className="flex w-full items-center gap-2 rounded px-1 py-0.5 text-left transition-colors duration-150 hover:bg-raised">
-              <span className={`font-mono text-[9px] uppercase ${STATUS_CLASS[f.status]}`}>●</span>
+              <span className={`font-mono text-[11px] uppercase ${STATUS_CLASS[f.status]}`}>●</span>
               <span className="flex-1 truncate font-mono text-text-secondary" title={f.path}>{f.path}</span>
               <span className="font-mono text-diff-add">+{f.additions}</span>
               <span className="font-mono text-diff-del">−{f.deletions}</span>

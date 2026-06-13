@@ -18,7 +18,7 @@ export function ComponentsPanel({ components }: { components: ComponentStatus[] 
   return (
     <aside className="flex w-64 shrink-0 flex-col gap-2 overflow-y-auto">
       <div className="flex items-center justify-between">
-        <h2 className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">Thành phần</h2>
+        <h2 className="text-[12px] font-semibold uppercase tracking-wider text-text-muted">Thành phần</h2>
         <div className="flex gap-1">
           <button
             onClick={() => setBulkOpen(true)}
@@ -42,20 +42,20 @@ export function ComponentsPanel({ components }: { components: ComponentStatus[] 
           onClick={() => setOpen(open === c.component ? null : c.component)}>
           <div className="flex justify-between text-sm text-text-primary">
             <span>{c.component}</span>
-            <span className="font-mono text-[10px] text-text-muted">
+            <span className="font-mono text-[12px] text-text-muted">
               <span className="text-accent">{c.built}%</span>
               {' · '}
               <span className="text-ok">{c.tested}%</span>
             </span>
           </div>
           <div className="mt-2 flex items-center gap-2">
-            <span className="w-12 shrink-0 text-[10px] uppercase tracking-wider text-text-muted">Đã làm</span>
+            <span className="w-12 shrink-0 text-[12px] uppercase tracking-wider text-text-muted">Đã làm</span>
             <div className="h-1.5 flex-1 rounded bg-raised">
               <div className="h-1.5 rounded bg-accent" style={{ width: `${c.built}%` }} />
             </div>
           </div>
           <div className="mt-1 flex items-center gap-2">
-            <span className="w-12 shrink-0 text-[10px] uppercase tracking-wider text-text-muted">Đã test</span>
+            <span className="w-12 shrink-0 text-[12px] uppercase tracking-wider text-text-muted">Đã test</span>
             <div className="h-1.5 flex-1 rounded bg-raised">
               <div className="h-1.5 rounded bg-ok" style={{ width: `${c.tested}%` }} />
             </div>

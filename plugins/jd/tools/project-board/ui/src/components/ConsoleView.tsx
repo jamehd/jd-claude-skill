@@ -91,12 +91,12 @@ export function ConsoleView({ job, subscribe, onClose, showOpenTab }: {
   return (
     <div className="flex h-full flex-col bg-base">
       <header className="flex items-center gap-3 border-b border-border bg-surface px-4 py-2">
-        <span className="font-mono text-[11px] text-text-muted">{job.id}</span>
+        <span className="font-mono text-[12px] text-text-muted">{job.id}</span>
         <span className="text-sm font-semibold text-text-primary">
           {job.kind === 'rescan' ? 'Re-scan dự án' : job.taskId}
         </span>
-        <span className="rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[10px] text-text-secondary">{job.state}</span>
-        {job.sessionId && <span className="font-mono text-[10px] text-text-muted">phiên {job.sessionId.slice(0, 8)} · khúc {job.segments ?? 1}</span>}
+        <span className="rounded-full border border-border bg-surface px-2 py-0.5 font-mono text-[12px] text-text-secondary">{job.state}</span>
+        {job.sessionId && <span className="font-mono text-[12px] text-text-muted">phiên {job.sessionId.slice(0, 8)} · khúc {job.segments ?? 1}</span>}
         <span className="flex-1" />
         {showOpenTab && (
           <a href={`/console/${job.id}`} target="_blank" rel="noreferrer"
@@ -112,16 +112,16 @@ export function ConsoleView({ job, subscribe, onClose, showOpenTab }: {
             <div key={i} className="whitespace-pre-wrap text-[14px] leading-[1.65] text-text-primary">{b.text}</div>
           ) : b.type === 'tool' ? (
             <details key={i} className="rounded-lg border border-border bg-surface">
-              <summary className="cursor-pointer px-3 py-2 font-mono text-[11px] text-text-secondary">
+              <summary className="cursor-pointer px-3 py-2 font-mono text-[12px] text-text-secondary">
                 <span className={b.isError ? 'text-danger' : 'text-accent'}>⚙ {b.tool}</span>
                 <span className="ml-2 text-text-muted">{b.inputPreview}</span>
               </summary>
               {b.output != null && (
-                <pre className={`max-h-64 overflow-auto border-t border-border bg-sunken p-3 font-mono text-[11.5px] leading-[1.55] ${b.isError ? 'text-danger' : 'text-text-secondary'}`}>{b.output}</pre>
+                <pre className={`max-h-64 overflow-auto border-t border-border bg-sunken p-3 font-mono text-[13px] leading-[1.55] ${b.isError ? 'text-danger' : 'text-text-secondary'}`}>{b.output}</pre>
               )}
             </details>
           ) : (
-            <div key={i} className={`font-mono text-[11px] ${b.tone === 'danger' ? 'text-danger' : b.tone === 'user' ? 'text-accent' : 'text-text-muted'}`}>{b.text}</div>
+            <div key={i} className={`font-mono text-[12px] ${b.tone === 'danger' ? 'text-danger' : b.tone === 'user' ? 'text-accent' : 'text-text-muted'}`}>{b.text}</div>
           ),
         )}
         {!pinned && (

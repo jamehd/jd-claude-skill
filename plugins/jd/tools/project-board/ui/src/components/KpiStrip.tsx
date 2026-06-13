@@ -20,7 +20,7 @@ export function KpiStrip({ snapshot }: { snapshot: BoardSnapshot }) {
       {cells.map(([label, value, color]) => (
         <div key={label} className="rounded-[10px] border border-border bg-surface p-4 text-center">
           <div className={`font-mono text-2xl font-semibold ${tone[color]}`}>{value}</div>
-          <div className="mt-1 text-[10px] uppercase tracking-wider text-text-muted">{label}</div>
+          <div className="mt-1 text-[12px] uppercase tracking-wider text-text-muted">{label}</div>
         </div>
       ))}
     </div>
