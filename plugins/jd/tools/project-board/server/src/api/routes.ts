@@ -236,6 +236,27 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     return updated
   })
 
+  app.post<{ Params: { id: string }; Body: { mode?: string } }>('/api/tasks/:id/abandon-pr', (req, reply) => {
+    const item = store.getItem(req.params.id)
+    if (!item) return reply.code(404).send({ error: 'not found' })
+    if (item.status !== 'pr') return reply.code(409).send({ error: `task is ${item.status}, not pr` })
+    const mode = req.body?.mode
+    if (mode !== 'reopen' && mode !== 'delete') {
+      return reply.code(400).send({ error: 'mode must be reopen or delete' })
+    }
+    try { deps.git.removeWorktree(item.id) } catch { /* best-effort */ }
+    let remote = 'ok'
+    try { deps.git.deleteRemoteBranch(item.id) } catch (e) { remote = e instanceof Error ? e.message.slice(0, 120) : 'failed' }
+    if (mode === 'delete') {
+      store.deleteItem(item.id)
+      hub.broadcast({ type: 'board_update' })
+      return reply.send({ ok: true, deleted: true, remote })
+    }
+    const updated = store.updateItem(item.id, { status: 'backlog', pr: '' })
+    hub.broadcast({ type: 'board_update' })
+    return reply.send({ ...updated, remote })
+  })
+
   app.post<{ Params: { id: string } }>('/api/tasks/:id/discard', (req, reply) => {
     const item = requireReview(req.params.id, reply)
     if (!item) return reply

@@ -26,6 +26,7 @@ export function makeDeps(): ServerDeps {
     branchDiff: () => 'diff --git a/x b/x',
     mergeBranch: () => {},
     createPr: () => 'https://github.com/example/pr/1',
+    deleteRemoteBranch: vi.fn(() => {}),
     isPrMerged: vi.fn(() => true),
     hasWorktree: vi.fn(() => true),
     worktreePath: () => dataDir,

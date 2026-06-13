@@ -33,6 +33,8 @@ export const api = {
   resolve: (id: string) => request<Job>(`/api/tasks/${id}/resolve`, { method: 'POST' }),
   pr: (id: string) => request<BoardItem>(`/api/tasks/${id}/pr`, { method: 'POST' }),
   finalizePr: (id: string) => request<BoardItem>(`/api/tasks/${id}/finalize-pr`, { method: 'POST' }),
+  abandonPr: (id: string, mode: 'reopen' | 'delete') =>
+    request<unknown>(`/api/tasks/${id}/abandon-pr`, { method: 'POST', body: JSON.stringify({ mode }) }),
   discard: (id: string) => request<BoardItem>(`/api/tasks/${id}/discard`, { method: 'POST' }),
   deleteTask: (id: string) => request<{ ok: boolean }>(`/api/tasks/${id}`, { method: 'DELETE' }),
   clearFinishedJobs: () => request<{ cleared: number }>('/api/jobs/clear-finished', { method: 'POST' }),

@@ -126,6 +126,18 @@ describe('BoardGit', () => {
     expect(() => git.branchDiff('NOPE')).toThrow(/fatal|unknown revision/i)
   })
 
+  it('deleteRemoteBranch removes the pushed board/<id> ref from origin', () => {
+    const bare = mkdtempSync(path.join(tmpdir(), 'board-remote-'))
+    sh(bare, 'init', '--bare', '-b', 'main')
+    sh(repo, 'remote', 'add', 'origin', bare)
+    git.createWorktree('TASK-200')
+    sh(repo, 'push', 'origin', 'board/TASK-200')
+    expect(sh(repo, 'ls-remote', '--heads', 'origin', 'board/TASK-200').trim()).not.toBe('')
+    git.deleteRemoteBranch('TASK-200')
+    expect(sh(repo, 'ls-remote', '--heads', 'origin', 'board/TASK-200').trim()).toBe('')
+    git.removeWorktree('TASK-200')
+  })
+
   it('on a squash conflict with main, throws and leaves main clean (no conflict markers)', () => {
     const wt = git.createWorktree('TASK-007')            // branched from main (a.txt = hello)
     writeFileSync(path.join(wt, 'a.txt'), 'branch change\n')
