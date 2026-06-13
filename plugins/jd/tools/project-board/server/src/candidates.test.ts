@@ -163,3 +163,53 @@ tested: 82
     expect(dedupeCandidates(cands, existing).find((c) => c.reqId === 'CAFE-R4' && c.kind === 'implement')).toBeDefined()
   })
 })
+
+describe('parseStatusDoc details (Vietnamese)', () => {
+  const DOC = `---
+component: cafe-service
+last_scanned: 2026-06-13
+built: 71
+tested: 82
+---
+
+| Req | State | Tested | Note |
+|-----|-------|--------|------|
+| CAFE-R4 | partial | no | ghi chú |
+
+## Chi tiết (Tiếng Việt)
+
+### CAFE-R4
+Mô tả: Phân tích manifest v2 và tải delta.
+Tiêu chí chấp nhận:
+- delta chỉ tải các chunk thay đổi
+- chữ ký được xác minh
+`
+  it('parses Vietnamese statement + AC per requirement', () => {
+    const doc = parseStatusDoc(DOC)
+    expect(doc.details?.['CAFE-R4']?.statement).toBe('Phân tích manifest v2 và tải delta.')
+    expect(doc.details?.['CAFE-R4']?.acceptance).toEqual(['delta chỉ tải các chunk thay đổi', 'chữ ký được xác minh'])
+  })
+  it('no detail section → details empty/undefined, rows intact', () => {
+    const doc = parseStatusDoc(`---\ncomponent: x\nlast_scanned: 2026-06-13\n---\n\n| Req | State | Tested | Note |\n|--|--|--|--|\n| CS-R1 | done | yes | ok |\n`)
+    expect(doc.rows).toHaveLength(1)
+    expect(doc.details?.['CS-R1']).toBeUndefined()
+  })
+})
+
+describe('buildCandidates uses Vietnamese details (fallback English)', () => {
+  const REQS = new Map([['CAFE-R4', { id: 'CAFE-R4', title: 'Manifest v2', statement: 'Parses manifest v2.', acceptance: ['delta only', 'sig verified'] }]])
+  it('prefers the status-doc Vietnamese statement/AC', () => {
+    const doc = parseStatusDoc(`---\ncomponent: cafe-service\nlast_scanned: 2026-06-13\n---\n\n| Req | State | Tested | Note |\n|--|--|--|--|\n| CAFE-R4 | partial | no | n |\n\n## Chi tiết (Tiếng Việt)\n\n### CAFE-R4\nMô tả: Phân tích manifest v2.\nTiêu chí chấp nhận:\n- chỉ tải chunk đổi\n`)
+    const c = buildCandidates(REQS, [doc]).find((x) => x.reqId === 'CAFE-R4' && x.kind === 'implement')!
+    expect(c.body).toContain('Phân tích manifest v2.')
+    expect(c.body).toContain('chỉ tải chunk đổi')
+    expect(c.body).not.toContain('Parses manifest v2.')   // English not used when VN present
+    expect(c.body).toContain('Req: CAFE-R4')
+  })
+  it('falls back to English reqIndex when no VN detail', () => {
+    const doc = parseStatusDoc(`---\ncomponent: cafe-service\nlast_scanned: 2026-06-13\n---\n\n| Req | State | Tested | Note |\n|--|--|--|--|\n| CAFE-R4 | partial | no | n |\n`)
+    const c = buildCandidates(REQS, [doc]).find((x) => x.reqId === 'CAFE-R4' && x.kind === 'implement')!
+    expect(c.body).toContain('Parses manifest v2.')
+    expect(c.body).toContain('delta only')
+  })
+})

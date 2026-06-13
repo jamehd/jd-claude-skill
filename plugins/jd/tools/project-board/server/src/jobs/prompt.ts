@@ -165,5 +165,17 @@ export function buildRescanPrompt(): string {
     '- Write the "Note" column text in Vietnamese (keep State/Tested values and the table structure in English).',
     '- Only write files under project-board/data/status/. Do NOT run git and do',
     '  NOT commit — the dashboard reads these files from disk.',
+    '',
+    'After the table and Drift, also write a Vietnamese detail section so the board reads in Vietnamese:',
+    '',
+    '## Chi tiết (Tiếng Việt)',
+    '',
+    'For EACH requirement <ID> in this component, a block:',
+    '### <ID>',
+    'Mô tả: <the requirement statement, translated to Vietnamese>',
+    'Tiêu chí chấp nhận:',
+    '- <each acceptance criterion, translated to Vietnamese>',
+    '',
+    'Keep code tokens, file paths, identifiers, and `backtick` snippets unchanged inside the Vietnamese text; translate only the natural-language prose.',
   ].join('\n')
 }
