@@ -600,3 +600,50 @@ describe('resolve route', () => {
     expect(res.statusCode).toBe(409)
   })
 })
+
+async function makePrTask(): Promise<string> {
+  await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
+    payload: { type: 'task', title: 'PR task', component: 'infra', body: 'detailed description' } })
+  await app.inject({ method: 'PATCH', url: '/api/tasks/TASK-001', cookies: cookie, payload: { status: 'review' } })
+  await app.inject({ method: 'POST', url: '/api/tasks/TASK-001/pr', cookies: cookie })
+  return 'TASK-001'
+}
+
+describe('abandon-pr (closed PR)', () => {
+  it('reopen: pr task -> backlog, pr cleared, worktree + remote branch cleaned', async () => {
+    const id = await makePrTask()
+    const res = await app.inject({ method: 'POST', url: `/api/tasks/${id}/abandon-pr`, cookies: cookie, payload: { mode: 'reopen' } })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().status).toBe('backlog')
+    const board = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
+    const t = board.json().items.find((i: { id: string }) => i.id === id)
+    expect(t.status).toBe('backlog')
+    expect(t.pr).toBeFalsy()
+    expect((deps.git.removeWorktree as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(id)
+    expect((deps.git.deleteRemoteBranch as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(id)
+  })
+
+  it('delete: pr task removed from board', async () => {
+    const id = await makePrTask()
+    const res = await app.inject({ method: 'POST', url: `/api/tasks/${id}/abandon-pr`, cookies: cookie, payload: { mode: 'delete' } })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().deleted).toBe(true)
+    const board = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
+    expect(board.json().items.find((i: { id: string }) => i.id === id)).toBeUndefined()
+  })
+
+  it('409 for a non-pr task', async () => {
+    await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
+      payload: { type: 'task', title: 'Fresh', component: 'infra', body: 'b' } })
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/TASK-001/abandon-pr', cookies: cookie, payload: { mode: 'reopen' } })
+    expect(res.statusCode).toBe(409)
+  })
+
+  it('400 for a bad mode', async () => {
+    const id = await makePrTask()
+    const bad = await app.inject({ method: 'POST', url: `/api/tasks/${id}/abandon-pr`, cookies: cookie, payload: { mode: 'obliterate' } })
+    expect(bad.statusCode).toBe(400)
+    const absent = await app.inject({ method: 'POST', url: `/api/tasks/${id}/abandon-pr`, cookies: cookie, payload: {} })
+    expect(absent.statusCode).toBe(400)
+  })
+})
