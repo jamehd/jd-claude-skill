@@ -97,6 +97,12 @@ export class BoardGit {
     return this.git(['status', '--porcelain']).split('\n').filter(Boolean)
   }
 
+  // Deletes the remote branch (e.g. after a PR was closed without merging).
+  deleteRemoteBranch(taskId: string): void {
+    this.assertSafeId(taskId)
+    this.git(['push', 'origin', '--delete', this.branchName(taskId)])
+  }
+
   // Pushes the branch and opens a GitHub PR; requires `gh` CLI and a configured remote.
   createPr(taskId: string, title: string, body: string): string {
     this.assertSafeId(taskId)
