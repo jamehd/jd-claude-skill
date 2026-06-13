@@ -181,6 +181,19 @@ export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
                 className="w-full rounded-md border border-pr-border bg-pr-bg py-2 text-sm font-medium text-pr transition-colors duration-150 hover:brightness-110 disabled:opacity-50">
                 PR đã merge → dọn
               </button>
+              <div className="mt-2 border-t border-border pt-2">
+                <p className="mb-1 text-xs text-text-muted">PR bị đóng (không merge)?</p>
+                <div className="flex gap-2">
+                  <button disabled={busy} onClick={() => void act(() => api.abandonPr(item.id, 'reopen'))}
+                    className="flex-1 rounded-md border border-border py-2 text-sm text-text-secondary transition-colors duration-150 hover:bg-raised disabled:opacity-50">
+                    Làm lại (→ backlog)
+                  </button>
+                  <button disabled={busy} onClick={() => { if (confirm(`Bỏ hẳn ${item.id}? Xóa task + branch (local + GitHub).`)) void act(() => api.abandonPr(item.id, 'delete')) }}
+                    className="flex-1 rounded-md border border-danger-border bg-danger-bg py-2 text-sm font-medium text-danger transition-colors duration-150 hover:brightness-110 disabled:opacity-50">
+                    Bỏ hẳn
+                  </button>
+                </div>
+              </div>
             </div>
           )}
         </div>
