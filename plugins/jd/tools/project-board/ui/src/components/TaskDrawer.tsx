@@ -120,7 +120,7 @@ export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
                 </button>
                 {brainstorm !== null && (
                   <textarea readOnly value={brainstorm} rows={4} onFocus={(e) => e.currentTarget.select()}
-                    className="mt-2 w-full resize-none rounded border border-border bg-base px-2 py-1 font-mono text-[11px] text-text-secondary outline-none" />
+                    className="mt-2 w-full resize-none rounded border border-border bg-base px-2 py-1 font-mono text-[12px] text-text-secondary outline-none" />
                 )}
                 <textarea value={plan} onChange={(e) => setPlan(e.target.value)} rows={3}
                   placeholder="Dán plan (markdown) hoặc đường dẫn docs/plans/….md"

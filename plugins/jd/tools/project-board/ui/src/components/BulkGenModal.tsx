@@ -51,7 +51,7 @@ export function BulkGenModal({ onClose }: { onClose: () => void }) {
             {rows.map((r, i) => (
               <div key={i} className="flex items-center gap-2 rounded-md border border-border bg-sunken px-2 py-1.5">
                 <input type="checkbox" checked={r.checked} onChange={(e) => patch(i, { checked: e.target.checked })} />
-                <span className="w-32 shrink-0 truncate font-mono text-[10px] text-text-muted" title={r.component}>{r.component}</span>
+                <span className="w-32 shrink-0 truncate font-mono text-[12px] text-text-muted" title={r.component}>{r.component}</span>
                 <input value={r.title} onChange={(e) => patch(i, { title: e.target.value })}
                   className="min-w-0 flex-1 rounded border border-border bg-base px-2 py-1 text-sm text-text-primary outline-none transition-colors duration-150 focus:border-accent" />
                 <select value={r.type} onChange={(e) => patch(i, { type: e.target.value as ItemType })}

@@ -68,7 +68,7 @@ export function Kanban({ items, onSelect }: { items: BoardItem[]; onSelect: (id:
           <div key={col.key} className="flex flex-col gap-2 rounded-[10px] bg-sunken p-2"
             onDragOver={(e) => { if (col.key !== 'ai_running' && col.key !== 'pr') e.preventDefault() }}
             onDrop={(e) => void drop(e, col.key)}>
-            <h3 className="px-1 text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+            <h3 className="px-1 text-[12px] font-semibold uppercase tracking-wider text-text-muted">
               {col.key === 'ai_running' && <span className="text-accent">◉ </span>}
               {col.label} · {items.filter((i) => i.status === col.key).length}
             </h3>
@@ -84,19 +84,19 @@ export function Kanban({ items, onSelect }: { items: BoardItem[]; onSelect: (id:
                 <div className={`mt-0.5 ${item.type === 'bug' ? 'text-danger' : 'text-text-primary'}`}>{item.title}</div>
                 {item.pr && (
                   <a href={item.pr} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
-                    className="mt-1 inline-block font-mono text-[10px] text-pr hover:underline">🔗 PR</a>
+                    className="mt-1 inline-block font-mono text-[12px] text-pr hover:underline">🔗 PR</a>
                 )}
                 <div className="mt-1 flex items-center justify-between">
                   <span className="text-xs text-text-muted">{item.component}</span>
                   <span className="flex gap-1">
                     {item.requiresShaping && !item.plan?.trim() && (
-                      <span className="rounded-full border border-shape-border px-1.5 py-0.5 font-mono text-[9px] uppercase text-shape">⚙ nắn</span>
+                      <span className="rounded-full border border-shape-border px-1.5 py-0.5 font-mono text-[11px] uppercase text-shape">⚙ nắn</span>
                     )}
                     {item.plan?.trim() && (
-                      <span className="rounded-full border border-ok-border px-1.5 py-0.5 font-mono text-[9px] uppercase text-ok">✓ nắn</span>
+                      <span className="rounded-full border border-ok-border px-1.5 py-0.5 font-mono text-[11px] uppercase text-ok">✓ nắn</span>
                     )}
-                    <span className={`rounded-full border px-1.5 py-0.5 font-mono text-[9px] uppercase ${TYPE_BADGE[item.type]} border-current`}>{item.type}</span>
-                    <span className={`rounded-full border px-1.5 py-0.5 font-mono text-[9px] ${STATUS_PILL[item.status]}`}>{col.label}</span>
+                    <span className={`rounded-full border px-1.5 py-0.5 font-mono text-[11px] uppercase ${TYPE_BADGE[item.type]} border-current`}>{item.type}</span>
+                    <span className={`rounded-full border px-1.5 py-0.5 font-mono text-[11px] ${STATUS_PILL[item.status]}`}>{col.label}</span>
                   </span>
                 </div>
               </div>
