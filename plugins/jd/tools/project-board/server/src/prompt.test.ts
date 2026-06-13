@@ -131,3 +131,12 @@ describe('buildTaskPrompt skill-driven', () => {
     expect(p).not.toMatch(/subagent-driven-development/)
   })
 })
+
+describe('buildRescanPrompt Vietnamese detail', () => {
+  it('instructs a Vietnamese detail section per requirement', () => {
+    const p = buildRescanPrompt()
+    expect(p).toContain('## Chi tiết (Tiếng Việt)')
+    expect(p).toMatch(/Mô tả:/)
+    expect(p).toMatch(/Tiêu chí chấp nhận:/)
+  })
+})
