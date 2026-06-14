@@ -83,8 +83,7 @@ export function Kanban(
                 className={`cursor-pointer rounded-lg border border-l-2 p-2 text-sm transition-colors duration-150 hover:border-y-border-strong hover:border-r-border-strong ${TYPE_CARD[item.type]} ${STATUS_EDGE[item.status]}`}>
                 {selectMode && (
                   <input type="checkbox" checked={selected.has(item.id)} readOnly
-                    className="mb-1 accent-accent" onClick={(e) => e.stopPropagation()}
-                    onChange={() => onToggle(item.id)} />
+                    className="mb-1 accent-accent pointer-events-none" />
                 )}
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-mono text-text-muted">{item.id}</span>
