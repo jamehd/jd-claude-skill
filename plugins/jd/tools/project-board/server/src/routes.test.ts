@@ -648,3 +648,105 @@ describe('abandon-pr (closed PR)', () => {
     expect(absent.statusCode).toBe(400)
   })
 })
+
+describe('batch actions', () => {
+  async function makeTask(title: string): Promise<string> {
+    const res = await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
+      payload: { type: 'task', title, component: 'infra', body: 'detailed description' } })
+    return res.json().id as string
+  }
+
+  it('400 on empty ids or bad action', async () => {
+    expect((await app.inject({ method: 'POST', url: '/api/tasks/batch', cookies: cookie,
+      payload: { ids: [], action: 'delete' } })).statusCode).toBe(400)
+    const id = await makeTask('x')
+    expect((await app.inject({ method: 'POST', url: '/api/tasks/batch', cookies: cookie,
+      payload: { ids: [id], action: 'nope' } })).statusCode).toBe(400)
+  })
+
+  it('400 when status/priority value is missing or invalid', async () => {
+    const id = await makeTask('x')
+    expect((await app.inject({ method: 'POST', url: '/api/tasks/batch', cookies: cookie,
+      payload: { ids: [id], action: 'status', value: 'ai_running' } })).statusCode).toBe(400)
+    expect((await app.inject({ method: 'POST', url: '/api/tasks/batch', cookies: cookie,
+      payload: { ids: [id], action: 'priority', value: 'P9' } })).statusCode).toBe(400)
+  })
+
+  it('batch priority applies to all and counts results', async () => {
+    const a = await makeTask('a'); const b = await makeTask('b')
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/batch', cookies: cookie,
+      payload: { ids: [a, b, 'TASK-999'], action: 'priority', value: 'P0' } })
+    expect(res.statusCode).toBe(200)
+    const body = res.json()
+    expect(body.applied).toBe(2)
+    expect(body.failed).toBe(1)
+    expect(body.results.find((r: { id: string }) => r.id === 'TASK-999').ok).toBe(false)
+    const board = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
+    expect(board.json().items.find((i: { id: string }) => i.id === a).priority).toBe('P0')
+  })
+
+  it('batch status applies the ready-shaping gate per id', async () => {
+    const shaped = await makeTask('shaped')
+    await app.inject({ method: 'PATCH', url: `/api/tasks/${shaped}`, cookies: cookie,
+      payload: { requiresShaping: true, plan: 'a real plan' } })
+    const unshaped = await makeTask('unshaped')
+    await app.inject({ method: 'PATCH', url: `/api/tasks/${unshaped}`, cookies: cookie,
+      payload: { requiresShaping: true } })
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/batch', cookies: cookie,
+      payload: { ids: [shaped, unshaped], action: 'status', value: 'ready' } })
+    const body = res.json()
+    expect(body.results.find((r: { id: string }) => r.id === shaped).ok).toBe(true)
+    expect(body.results.find((r: { id: string }) => r.id === unshaped).ok).toBe(false)
+  })
+
+  it('batch dispatch starts jobs for ready items, errors otherwise', async () => {
+    const ready = await makeTask('ready')
+    await app.inject({ method: 'PATCH', url: `/api/tasks/${ready}`, cookies: cookie, payload: { status: 'ready' } })
+    const done = await makeTask('done')
+    await app.inject({ method: 'PATCH', url: `/api/tasks/${done}`, cookies: cookie, payload: { status: 'done' } })
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/batch', cookies: cookie,
+      payload: { ids: [ready, done], action: 'dispatch' } })
+    const body = res.json()
+    expect(body.results.find((r: { id: string }) => r.id === ready).ok).toBe(true)
+    expect(body.results.find((r: { id: string }) => r.id === done).ok).toBe(false)
+    expect(deps.runner.listJobs().some((j) => j.taskId === ready)).toBe(true)
+  })
+
+  it('batch delete removes items and calls removeWorktree', async () => {
+    const a = await makeTask('a')
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/batch', cookies: cookie,
+      payload: { ids: [a], action: 'delete' } })
+    expect(res.json().applied).toBe(1)
+    expect((deps.git.removeWorktree as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(a)
+    const board = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
+    expect(board.json().items.find((i: { id: string }) => i.id === a)).toBeUndefined()
+  })
+
+  it('batch component sets component on the item and 400s on empty value', async () => {
+    const id = await makeTask('comp-test')
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/batch', cookies: cookie,
+      payload: { ids: [id], action: 'component', value: 'idc-backend' } })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().applied).toBe(1)
+    const board = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
+    expect(board.json().items.find((i: { id: string }) => i.id === id).component).toBe('idc-backend')
+
+    const bad = await app.inject({ method: 'POST', url: '/api/tasks/batch', cookies: cookie,
+      payload: { ids: [id], action: 'component', value: '   ' } })
+    expect(bad.statusCode).toBe(400)
+  })
+
+  it('batch delete returns per-id error when a live job targets the task', async () => {
+    const id = await makeTask('live-job-target')
+    await app.inject({ method: 'PATCH', url: `/api/tasks/${id}`, cookies: cookie, payload: { status: 'ready' } })
+    await app.inject({ method: 'POST', url: `/api/tasks/${id}/dispatch`, cookies: cookie })  // -> ai_running, live job
+    expect(deps.runner.listJobs().some((j) => j.taskId === id)).toBe(true)
+
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/batch', cookies: cookie,
+      payload: { ids: [id], action: 'delete' } })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().results.find((r: { id: string }) => r.id === id).ok).toBe(false)
+    const board = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
+    expect(board.json().items.find((i: { id: string }) => i.id === id)).toBeDefined()
+  })
+})

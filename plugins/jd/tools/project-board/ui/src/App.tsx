@@ -10,6 +10,9 @@ import { ConsoleView } from './components/ConsoleView.js'
 import { AutoControl } from './components/AutoControl.js'
 import { SettingsPanel } from './components/SettingsPanel.js'
 import { UsagePanel } from './components/UsagePanel.js'
+import { FilterBar } from './components/FilterBar.js'
+import { BulkBar } from './components/BulkBar.js'
+import { applyFilters, EMPTY_FILTER, type BoardFilter } from './filters.js'
 import { useBoard } from './useBoard.js'
 
 export default function App() {
@@ -17,6 +20,9 @@ export default function App() {
   const [adding, setAdding] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [consoleJob, setConsoleJob] = useState<string | null>(null)
+  const [filter, setFilter] = useState<BoardFilter>(EMPTY_FILTER)
+  const [selectMode, setSelectMode] = useState(false)
+  const [bulkSelected, setBulkSelected] = useState<Set<string>>(new Set())
   const { snapshot, previews, subscribe, refresh } = useBoard(() => setAuthed(false))
 
   useEffect(() => {
@@ -47,7 +53,29 @@ export default function App() {
       )}
       <div className="flex min-h-0 flex-1 gap-3">
         <ComponentsPanel components={snapshot.components} />
-        <Kanban items={snapshot.items} onSelect={setSelected} />
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <FilterBar components={snapshot.components.map((c) => c.component)} filter={filter}
+              onChange={(f) => { setFilter(f); setBulkSelected(new Set()) }} />
+            <button onClick={() => { setSelectMode((v) => !v); setBulkSelected(new Set()) }}
+              className="rounded-md border border-border px-2 py-1.5 text-sm text-text-secondary transition-colors duration-150 hover:bg-raised">
+              {selectMode ? 'Xong' : 'Chọn'}
+            </button>
+            {selectMode && (
+              <button onClick={() => setBulkSelected(new Set(applyFilters(snapshot.items, filter).map((i) => i.id)))}
+                className="rounded-md border border-border px-2 py-1.5 text-sm text-text-secondary transition-colors duration-150 hover:bg-raised">
+                Chọn tất cả (đang lọc)
+              </button>
+            )}
+          </div>
+          {selectMode && bulkSelected.size > 0 && (
+            <BulkBar ids={[...bulkSelected]} onClear={() => setBulkSelected(new Set())}
+              onDone={(failedIds) => { setBulkSelected(new Set(failedIds)); void refresh() }} />
+          )}
+          <Kanban items={applyFilters(snapshot.items, filter)} onSelect={setSelected}
+            selectMode={selectMode} selected={bulkSelected}
+            onToggle={(id) => setBulkSelected((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })} />
+        </div>
         <ActivityPanel jobs={snapshot.jobs} previews={previews} onOpenConsole={setConsoleJob} />
       </div>
       {adding && <QuickAdd components={snapshot.components} onClose={() => setAdding(false)} />}

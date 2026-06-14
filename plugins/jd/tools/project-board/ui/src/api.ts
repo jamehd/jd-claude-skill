@@ -23,6 +23,9 @@ export const api = {
     request<BoardItem>(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   getBrainstormPrompt: (id: string) => request<{ prompt: string }>(`/api/tasks/${id}/brainstorm-prompt`),
   dispatch: (id: string) => request<Job>(`/api/tasks/${id}/dispatch`, { method: 'POST' }),
+  batch: (ids: string[], action: string, value?: string) =>
+    request<{ applied: number; failed: number; results: { id: string; ok: boolean; error?: string }[] }>(
+      '/api/tasks/batch', { method: 'POST', body: JSON.stringify({ ids, action, value }) }),
   rescan: () => request<Job>('/api/rescan', { method: 'POST' }),
   cancelJob: (id: string) => request<{ ok: boolean }>(`/api/jobs/${id}/cancel`, { method: 'POST' }),
   jobEvents: (id: string) => request<ConsoleEvent[]>(`/api/jobs/${id}/events`),
