@@ -721,4 +721,32 @@ describe('batch actions', () => {
     const board = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
     expect(board.json().items.find((i: { id: string }) => i.id === a)).toBeUndefined()
   })
+
+  it('batch component sets component on the item and 400s on empty value', async () => {
+    const id = await makeTask('comp-test')
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/batch', cookies: cookie,
+      payload: { ids: [id], action: 'component', value: 'idc-backend' } })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().applied).toBe(1)
+    const board = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
+    expect(board.json().items.find((i: { id: string }) => i.id === id).component).toBe('idc-backend')
+
+    const bad = await app.inject({ method: 'POST', url: '/api/tasks/batch', cookies: cookie,
+      payload: { ids: [id], action: 'component', value: '   ' } })
+    expect(bad.statusCode).toBe(400)
+  })
+
+  it('batch delete returns per-id error when a live job targets the task', async () => {
+    const id = await makeTask('live-job-target')
+    await app.inject({ method: 'PATCH', url: `/api/tasks/${id}`, cookies: cookie, payload: { status: 'ready' } })
+    await app.inject({ method: 'POST', url: `/api/tasks/${id}/dispatch`, cookies: cookie })  // -> ai_running, live job
+    expect(deps.runner.listJobs().some((j) => j.taskId === id)).toBe(true)
+
+    const res = await app.inject({ method: 'POST', url: '/api/tasks/batch', cookies: cookie,
+      payload: { ids: [id], action: 'delete' } })
+    expect(res.statusCode).toBe(200)
+    expect(res.json().results.find((r: { id: string }) => r.id === id).ok).toBe(false)
+    const board = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
+    expect(board.json().items.find((i: { id: string }) => i.id === id)).toBeDefined()
+  })
 })
