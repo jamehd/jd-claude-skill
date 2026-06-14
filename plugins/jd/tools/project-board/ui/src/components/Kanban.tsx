@@ -42,7 +42,11 @@ const STATUS_PILL: Record<ItemStatus, string> = {
   done: 'text-ok border-ok-border',
 }
 
-export function Kanban({ items, onSelect }: { items: BoardItem[]; onSelect: (id: string) => void }) {
+export function Kanban(
+  { items, onSelect, selectMode, selected, onToggle }:
+  { items: BoardItem[]; onSelect: (id: string) => void; selectMode: boolean;
+    selected: Set<string>; onToggle: (id: string) => void },
+) {
   const [error, setError] = useState('')
 
   async function drop(e: React.DragEvent, status: ItemStatus) {
@@ -75,8 +79,13 @@ export function Kanban({ items, onSelect }: { items: BoardItem[]; onSelect: (id:
             {items.filter((i) => i.status === col.key).map((item) => (
               <div key={item.id} draggable={item.status !== 'ai_running' && item.status !== 'pr'}
                 onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
-                onClick={() => onSelect(item.id)}
+                onClick={() => { if (selectMode) onToggle(item.id); else onSelect(item.id) }}
                 className={`cursor-pointer rounded-lg border border-l-2 p-2 text-sm transition-colors duration-150 hover:border-y-border-strong hover:border-r-border-strong ${TYPE_CARD[item.type]} ${STATUS_EDGE[item.status]}`}>
+                {selectMode && (
+                  <input type="checkbox" checked={selected.has(item.id)} readOnly
+                    className="mb-1 accent-accent" onClick={(e) => e.stopPropagation()}
+                    onChange={() => onToggle(item.id)} />
+                )}
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-mono text-text-muted">{item.id}</span>
                   <span className={`font-mono ${PRIORITY_COLOR[item.priority]}`}>{item.priority}</span>
