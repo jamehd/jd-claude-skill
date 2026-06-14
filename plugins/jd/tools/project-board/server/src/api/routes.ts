@@ -22,6 +22,8 @@ const PATCH_WHITELIST = ['title', 'status', 'priority', 'component', 'body', 're
 // Statuses settable by users; ai_running and pr are system-managed.
 const USER_STATUSES: ItemStatus[] = ['backlog', 'ready', 'review', 'done']
 
+const BATCH_ACTIONS: BatchAction[] = ['delete', 'dispatch', 'status', 'priority', 'component']
+
 export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
   const { store, hub } = deps
 
@@ -171,8 +173,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     if (!Array.isArray(ids) || ids.length === 0 || !ids.every((x) => typeof x === 'string' && SAFE_ID.test(x))) {
       return reply.code(400).send({ error: 'ids must be a non-empty array of valid task ids' })
     }
-    const ACTIONS: BatchAction[] = ['delete', 'dispatch', 'status', 'priority', 'component']
-    if (typeof action !== 'string' || !ACTIONS.includes(action as BatchAction)) {
+    if (typeof action !== 'string' || !BATCH_ACTIONS.includes(action as BatchAction)) {
       return reply.code(400).send({ error: `invalid action: ${String(action)}` })
     }
     if (action === 'status' && !USER_STATUSES.includes(value as ItemStatus)) {
@@ -207,7 +208,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
           }
           case 'status': {
             if (value === 'ready' && item.requiresShaping && !item.plan?.trim()) {
-              return { id, ok: false, error: 'cần brainstorm + plan trước khi sang Ready' }
+              return { id, ok: false, error: 'Task cần brainstorm + đính plan trước khi sang Ready' }
             }
             store.updateItem(id, { status: value as ItemStatus })
             return { id, ok: true }
