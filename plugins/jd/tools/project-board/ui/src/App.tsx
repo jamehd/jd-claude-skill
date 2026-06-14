@@ -10,6 +10,8 @@ import { ConsoleView } from './components/ConsoleView.js'
 import { AutoControl } from './components/AutoControl.js'
 import { SettingsPanel } from './components/SettingsPanel.js'
 import { UsagePanel } from './components/UsagePanel.js'
+import { FilterBar } from './components/FilterBar.js'
+import { applyFilters, EMPTY_FILTER, type BoardFilter } from './filters.js'
 import { useBoard } from './useBoard.js'
 
 export default function App() {
@@ -17,6 +19,7 @@ export default function App() {
   const [adding, setAdding] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [consoleJob, setConsoleJob] = useState<string | null>(null)
+  const [filter, setFilter] = useState<BoardFilter>(EMPTY_FILTER)
   const { snapshot, previews, subscribe, refresh } = useBoard(() => setAuthed(false))
 
   useEffect(() => {
@@ -47,7 +50,10 @@ export default function App() {
       )}
       <div className="flex min-h-0 flex-1 gap-3">
         <ComponentsPanel components={snapshot.components} />
-        <Kanban items={snapshot.items} onSelect={setSelected} />
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          <FilterBar components={snapshot.components.map((c) => c.component)} filter={filter} onChange={setFilter} />
+          <Kanban items={applyFilters(snapshot.items, filter)} onSelect={setSelected} />
+        </div>
         <ActivityPanel jobs={snapshot.jobs} previews={previews} onOpenConsole={setConsoleJob} />
       </div>
       {adding && <QuickAdd components={snapshot.components} onClose={() => setAdding(false)} />}
