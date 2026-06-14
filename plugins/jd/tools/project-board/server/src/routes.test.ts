@@ -204,6 +204,7 @@ describe('pr lifecycle routes', () => {
     expect(res.statusCode).toBe(200)
     expect(res.json().status).toBe('done')
     expect((deps.git.removeWorktree as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(id)
+    expect((deps.git.deleteRemoteBranch as ReturnType<typeof vi.fn>)).toHaveBeenCalledWith(id)
   })
 
   it('finalize-pr 409s when the PR is not merged', async () => {

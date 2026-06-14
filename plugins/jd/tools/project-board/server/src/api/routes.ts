@@ -231,9 +231,14 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     }
     if (!merged) return reply.code(409).send({ error: 'PR chưa được merge' })
     deps.git.removeWorktree(item.id)
+    // Best-effort remote cleanup: GitHub may already have auto-deleted the head
+    // branch on merge, in which case the delete fails harmlessly — never block
+    // marking the task done over a dangling remote branch.
+    let remote = 'ok'
+    try { deps.git.deleteRemoteBranch(item.id) } catch (e) { remote = e instanceof Error ? e.message.slice(0, 120) : 'failed' }
     const updated = store.updateItem(item.id, { status: 'done' })
     hub.broadcast({ type: 'board_update' })
-    return updated
+    return reply.send({ ...updated, remote })
   })
 
   app.post<{ Params: { id: string }; Body: { mode?: string } }>('/api/tasks/:id/abandon-pr', (req, reply) => {
