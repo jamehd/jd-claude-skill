@@ -13,6 +13,8 @@ import { parseStatusDoc, buildCandidates, dedupeCandidates } from '../jobs/candi
 
 interface CreateBody { type?: ItemType; title?: string; component?: string; priority?: Priority; body?: string }
 interface PatchBody { title?: string; status?: ItemStatus; priority?: Priority; component?: string; body?: string; requiresShaping?: boolean; plan?: string }
+type BatchAction = 'delete' | 'dispatch' | 'status' | 'priority' | 'component'
+interface BatchBody { ids?: unknown; action?: unknown; value?: unknown }
 
 // Patchable user-supplied fields; id/created/type are immutable after creation.
 const PATCH_WHITELIST = ['title', 'status', 'priority', 'component', 'body', 'requiresShaping', 'plan'] as const
@@ -162,6 +164,71 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     try { deps.git.removeWorktree(item.id) } catch { /* best-effort */ }
     hub.broadcast({ type: 'board_update' })
     return { ok: true }
+  })
+
+  app.post<{ Body: BatchBody }>('/api/tasks/batch', (req, reply) => {
+    const { ids, action, value } = req.body ?? {}
+    if (!Array.isArray(ids) || ids.length === 0 || !ids.every((x) => typeof x === 'string' && SAFE_ID.test(x))) {
+      return reply.code(400).send({ error: 'ids must be a non-empty array of valid task ids' })
+    }
+    const ACTIONS: BatchAction[] = ['delete', 'dispatch', 'status', 'priority', 'component']
+    if (typeof action !== 'string' || !ACTIONS.includes(action as BatchAction)) {
+      return reply.code(400).send({ error: `invalid action: ${String(action)}` })
+    }
+    if (action === 'status' && !USER_STATUSES.includes(value as ItemStatus)) {
+      return reply.code(400).send({ error: `invalid status: ${String(value)}` })
+    }
+    if (action === 'priority' && !PRIORITIES.includes(value as Priority)) {
+      return reply.code(400).send({ error: `invalid priority: ${String(value)}` })
+    }
+    if (action === 'component' && (typeof value !== 'string' || !value.trim())) {
+      return reply.code(400).send({ error: 'component value is required' })
+    }
+
+    const results = (ids as string[]).map((id) => {
+      const item = store.getItem(id)
+      if (!item) return { id, ok: false, error: 'not found' }
+      try {
+        switch (action) {
+          case 'delete': {
+            const liveJob = deps.runner.listJobs().some(
+              (j) => (j.state === 'running' || j.state === 'queued') && j.taskId === id)
+            if (liveJob) return { id, ok: false, error: 'a job is running; cancel it first' }
+            store.deleteItem(id)
+            try { deps.git.removeWorktree(id) } catch { /* best-effort */ }
+            return { id, ok: true }
+          }
+          case 'dispatch': {
+            if (!['backlog', 'ready'].includes(item.status)) {
+              return { id, ok: false, error: `cannot dispatch a task in '${item.status}'` }
+            }
+            deps.runner.dispatchTask(id)
+            return { id, ok: true }
+          }
+          case 'status': {
+            if (value === 'ready' && item.requiresShaping && !item.plan?.trim()) {
+              return { id, ok: false, error: 'cần brainstorm + plan trước khi sang Ready' }
+            }
+            store.updateItem(id, { status: value as ItemStatus })
+            return { id, ok: true }
+          }
+          case 'priority':
+            store.updateItem(id, { priority: value as Priority })
+            return { id, ok: true }
+          case 'component':
+            store.updateItem(id, { component: (value as string).trim() })
+            return { id, ok: true }
+          default:
+            return { id, ok: false, error: `unhandled action` }
+        }
+      } catch (err) {
+        return { id, ok: false, error: err instanceof Error ? err.message : String(err) }
+      }
+    })
+
+    const applied = results.filter((r) => r.ok).length
+    if (applied > 0) hub.broadcast({ type: 'board_update' })
+    return reply.send({ applied, failed: results.length - applied, results })
   })
 
   app.post('/api/jobs/clear-finished', (_req, reply) => {
