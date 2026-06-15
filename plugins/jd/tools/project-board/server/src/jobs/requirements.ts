@@ -10,7 +10,7 @@ export interface Requirement {
 }
 
 const REQ_ID = /\b[A-Z]{2,6}-R\d+\b/g
-const HEADING = /^##\s+([A-Z]{1,6}-R\d+):\s*(.+)$/
+const HEADING = /^##\s+([A-Z]{2,6}-R\d+):\s*(.+)$/
 const AC = /^\s*-\s*AC:\s*(.+)$/
 
 export function extractReqIds(text: string): string[] {

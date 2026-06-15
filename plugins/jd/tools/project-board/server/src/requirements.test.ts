@@ -50,14 +50,15 @@ The server endpoint has been removed; do not reuse.
 ## CAFE-R4: Manifest v2 + differential update
 Parses manifest v2 and applies chunk deltas.
 
-## X-R1: Handle removed files
+## UI-R1: Handle removed files
 Cleans up files the manifest no longer lists.
 `
   it('flags a requirement whose title ends with REMOVED as removed', () => {
     const byId = Object.fromEntries(parseRequirementDoc(DOC).map((r) => [r.id, r]))
     expect(byId['IDC-R7'].removed).toBe(true)
     expect(byId['CAFE-R4'].removed).toBe(false)
-    expect(byId['X-R1'].removed).toBe(false)
+    // end-anchored + word-boundary: "removed" mid-title is NOT a tombstone
+    expect(byId['UI-R1'].removed).toBe(false)
   })
 })
 
