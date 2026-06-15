@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyFilters, isShaped, isFilterActive, EMPTY_FILTER } from './filters.js'
+import { applyFilters, isShaped, isFilterActive, EMPTY_FILTER, applyCandidateFilter, isCandidateFilterActive, EMPTY_CANDIDATE_FILTER } from './filters.js'
 import type { BoardItem } from './types.js'
 
 function item(p: Partial<BoardItem>): BoardItem {
@@ -43,5 +43,34 @@ describe('applyFilters', () => {
   })
   it('filters by type and priority, AND-composed', () => {
     expect(applyFilters(items, { ...EMPTY_FILTER, type: 'bug', priority: 'P0' }).map((i) => i.id)).toEqual(['C'])
+  })
+})
+
+describe('candidate filters', () => {
+  type C = { component: string; kind: 'implement' | 'test'; priority: 'P0' | 'P1' | 'P2' | 'P3'; type: 'task' | 'bug' }
+  const rows: C[] = [
+    { component: 'cafe-service', kind: 'implement', priority: 'P1', type: 'task' },
+    { component: 'idc-backend', kind: 'test', priority: 'P2', type: 'task' },
+    { component: 'cafe-service', kind: 'test', priority: 'P0', type: 'bug' },
+  ]
+
+  it('isCandidateFilterActive is false only for the empty filter', () => {
+    expect(isCandidateFilterActive(EMPTY_CANDIDATE_FILTER)).toBe(false)
+    expect(isCandidateFilterActive({ ...EMPTY_CANDIDATE_FILTER, kind: 'test' })).toBe(true)
+    expect(isCandidateFilterActive({ ...EMPTY_CANDIDATE_FILTER, component: 'idc-backend' })).toBe(true)
+  })
+
+  it('empty filter returns all rows', () => {
+    expect(applyCandidateFilter(rows, EMPTY_CANDIDATE_FILTER)).toHaveLength(3)
+  })
+
+  it('filters by component, kind, priority, type and AND-composes', () => {
+    expect(applyCandidateFilter(rows, { ...EMPTY_CANDIDATE_FILTER, component: 'cafe-service' })).toHaveLength(2)
+    expect(applyCandidateFilter(rows, { ...EMPTY_CANDIDATE_FILTER, kind: 'test' })).toHaveLength(2)
+    expect(applyCandidateFilter(rows, { ...EMPTY_CANDIDATE_FILTER, priority: 'P0' })).toHaveLength(1)
+    expect(applyCandidateFilter(rows, { ...EMPTY_CANDIDATE_FILTER, type: 'bug' })).toHaveLength(1)
+    const both = applyCandidateFilter(rows, { ...EMPTY_CANDIDATE_FILTER, component: 'cafe-service', kind: 'test' })
+    expect(both).toHaveLength(1)
+    expect(both[0].priority).toBe('P0')
   })
 })

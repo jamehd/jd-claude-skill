@@ -27,3 +27,29 @@ export function applyFilters(items: BoardItem[], f: BoardFilter): BoardItem[] {
     return true
   })
 }
+
+export interface CandidateFilter {
+  component: string // 'all' or a component name
+  kind: 'all' | 'implement' | 'test'
+  priority: 'all' | Priority
+  type: 'all' | 'task' | 'bug'
+}
+
+export const EMPTY_CANDIDATE_FILTER: CandidateFilter =
+  Object.freeze({ component: 'all', kind: 'all', priority: 'all', type: 'all' })
+
+type CandidateFilterable = { component: string; kind: 'implement' | 'test'; priority: Priority; type: 'task' | 'bug' }
+
+export function isCandidateFilterActive(f: CandidateFilter): boolean {
+  return f.component !== 'all' || f.kind !== 'all' || f.priority !== 'all' || f.type !== 'all'
+}
+
+export function applyCandidateFilter<T extends CandidateFilterable>(rows: T[], f: CandidateFilter): T[] {
+  return rows.filter((r) => {
+    if (f.component !== 'all' && r.component !== f.component) return false
+    if (f.kind !== 'all' && r.kind !== f.kind) return false
+    if (f.priority !== 'all' && r.priority !== f.priority) return false
+    if (f.type !== 'all' && r.type !== f.type) return false
+    return true
+  })
+}
