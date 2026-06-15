@@ -64,6 +64,16 @@ export class BoardGit {
       .split('\n').filter(Boolean)
   }
 
+  // Raw commit messages for commits on the task branch but not on main (NUL-delimited
+  // so multi-line bodies stay separable). Feeds formatRequirementsTouched.
+  commitMessages(taskId: string): string[] {
+    this.assertSafeId(taskId)
+    return this.git(['log', `main..${this.branchName(taskId)}`, '--format=%B%x00'])
+      .split('\0')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  }
+
   mergeBranch(taskId: string, message: string): void {
     this.assertSafeId(taskId)
     // Ignore untracked files (e.g. .board-worktrees/) — only staged/modified tracked files block the merge

@@ -23,6 +23,7 @@ export function makeDeps(): ServerDeps {
     createWorktree: () => dataDir,
     removeWorktree: vi.fn(() => {}),
     changedFiles: () => [],
+    commitMessages: () => [],
     branchDiff: () => 'diff --git a/x b/x',
     mergeBranch: () => {},
     createPr: () => 'https://github.com/example/pr/1',

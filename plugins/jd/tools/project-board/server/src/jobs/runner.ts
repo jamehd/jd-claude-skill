@@ -6,6 +6,7 @@ import type { WsHub } from '../ws.js'
 import type { AutoState, ConsoleEvent, Job, JobKind, NoteType, RateLimitSnapshot, UsageReport, UsageBucket, JobUsage } from '../../../ui/src/types.js'
 import { buildTaskPrompt, buildRescanPrompt, buildResolvePrompt } from './prompt.js'
 import { parseRequirementsDir } from './requirements.js'
+import { formatRequirementsTouched } from './requirements-touched.js'
 import { normalizeLine } from './events.js'
 
 export type SpawnFn = (bin: string, args: string[], opts: { cwd: string }) => ChildProcess
@@ -14,6 +15,7 @@ export interface GitOps {
   createWorktree(taskId: string): string
   removeWorktree(taskId: string): void
   changedFiles(taskId: string): string[]
+  commitMessages(taskId: string): string[]
   branchDiff(taskId: string): string
   mergeBranch(taskId: string, message: string): void
   createPr(taskId: string, title: string, body: string): string
@@ -699,8 +701,10 @@ export class JobRunner {
     const { store, git } = this.deps!
     try {
       store.updateItem(job.taskId!, { status: 'review' })
+      let touched = 'none'
+      try { touched = formatRequirementsTouched(git.commitMessages(job.taskId!)) } catch { /* git hiccup: keep 'none' */ }
       store.appendToBody(job.taskId!,
-        `## AI result\nJob ${job.id} succeeded on branch board/${job.taskId}.\nChanged files:\n${git.changedFiles(job.taskId!).map((f) => `- ${f}`).join('\n')}\nFull output: data/jobs/${job.id}.log`)
+        `## AI result\nJob ${job.id} succeeded on branch board/${job.taskId}.\nRequirements touched: ${touched}\nChanged files:\n${git.changedFiles(job.taskId!).map((f) => `- ${f}`).join('\n')}\nFull output: data/jobs/${job.id}.log`)
     } catch (err) {
       job.error = `task file could not be updated: ${err instanceof Error ? err.message : err}`
     }
