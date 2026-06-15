@@ -38,9 +38,9 @@ function newRepo() {
 function runCli(args, cwd) {
   try {
     const stdout = execFileSync('node', [CLI, ...args], { cwd, encoding: 'utf8' })
-    return { code: 0, stdout }
+    return { code: 0, stdout, stderr: '' }
   } catch (e) {
-    return { code: e.status, stdout: `${e.stdout ?? ''}${e.stderr ?? ''}` }
+    return { code: e.status, stdout: e.stdout ?? '', stderr: e.stderr ?? '' }
   }
 }
 
@@ -51,7 +51,7 @@ test('range mode fails when component code changed without a Req trailer', () =>
   sh('git', ['commit', '-qm', 'feat: add api'], root)
   const r = runCli(['--range', 'HEAD~1..HEAD'], root)
   assert.equal(r.code, 1)
-  assert.match(r.stdout, /missing Req anchor for cafe-service\.md/)
+  assert.match(r.stderr, /missing Req anchor for cafe-service\.md/)
 })
 
 test('range mode passes when a defined Req trailer is present', () => {
@@ -70,7 +70,7 @@ test('range mode fails when the referenced id is undefined', () => {
   sh('git', ['commit', '-qm', 'feat: add api\n\nReq: CAFE-R9'], root)
   const r = runCli(['--range', 'HEAD~1..HEAD'], root)
   assert.equal(r.code, 1)
-  assert.match(r.stdout, /CAFE-R9 referenced but not defined/)
+  assert.match(r.stderr, /CAFE-R9 referenced but not defined/)
 })
 
 test('exits 0 silently when there is no component map', () => {
@@ -81,7 +81,10 @@ test('exits 0 silently when there is no component map', () => {
   writeFileSync(path.join(root, 'a.txt'), 'x\n')
   sh('git', ['add', '-A'], root)
   sh('git', ['commit', '-qm', 'init'], root)
-  const r = runCli(['--range', 'HEAD~0..HEAD'], root)
+  writeFileSync(path.join(root, 'b.txt'), 'y\n')
+  sh('git', ['add', '-A'], root)
+  sh('git', ['commit', '-qm', 'change'], root)
+  const r = runCli(['--range', 'HEAD~1..HEAD'], root)
   assert.equal(r.code, 0)
 })
 

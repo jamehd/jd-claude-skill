@@ -14,7 +14,10 @@ import {
 function parseArgs(argv) {
   const args = { mode: null, range: null, advisory: false }
   for (let i = 0; i < argv.length; i++) {
-    if (argv[i] === '--range') { args.mode = 'range'; args.range = argv[++i] }
+    if (argv[i] === '--range') {
+      args.mode = 'range'; args.range = argv[++i]
+      if (!args.range) { console.error('--range requires a value'); process.exit(2) }
+    }
     else if (argv[i] === '--worktree') { args.mode = 'worktree' }
     else if (argv[i] === '--advisory') { args.advisory = true }
   }
@@ -24,7 +27,8 @@ function parseArgs(argv) {
 function main() {
   const args = parseArgs(process.argv.slice(2))
   const cwd = process.cwd()
-  const root = repoRoot(cwd)
+  let root
+  try { root = repoRoot(cwd) } catch { process.exit(0) } // not a git repo → no-op
   const mapPath = path.join(root, 'docs/requirements/.component-map.json')
   if (!existsSync(mapPath)) process.exit(0) // not a configured repo
   const map = loadMap(mapPath)
@@ -52,6 +56,7 @@ function main() {
     const { reminders } = evaluateWorktree({ touched, changedDocs })
     // Advisory output goes to stdout so the Stop hook surfaces it as context to
     // the model; only blocking failures (range mode) go to stderr.
+    // Worktree mode is always advisory (never blocks); --advisory is accepted for explicitness.
     if (reminders.length) console.log('⚠ requirements reminder:\n  - ' + reminders.join('\n  - '))
     process.exit(0) // advisory: never block
   }
