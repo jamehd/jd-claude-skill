@@ -6,6 +6,7 @@ export interface Requirement {
   title: string
   statement: string
   acceptance: string[]
+  removed?: boolean
 }
 
 const REQ_ID = /\b[A-Z]{2,6}-R\d+\b/g
@@ -24,7 +25,8 @@ export function parseRequirementDoc(markdown: string): Requirement[] {
     const h = line.match(HEADING)
     if (h) {
       if (cur) reqs.push(cur)
-      cur = { id: h[1], title: h[2].trim(), statement: '', acceptance: [] }
+      const title = h[2].trim()
+      cur = { id: h[1], title, statement: '', acceptance: [], removed: /\bREMOVED\s*$/i.test(title) }
       sawStatement = false
       continue
     }
