@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, beforeAll } from 'vitest'
 import * as tsResolver from './jobs/requirements.js'
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -19,19 +19,24 @@ const DOC = [
 ].join('\n')
 
 describe('resolver parity: board TS vs shared .mjs', () => {
-  it('extractReqIds agrees', async () => {
-    const shared: any = await import(/* @vite-ignore */ SHARED_SPEC)
+  let shared: any
+  beforeAll(async () => { shared = await import(/* @vite-ignore */ SHARED_SPEC) })
+
+  it('extractReqIds agrees', () => {
     const sample = 'touches CAFE-R3 and CAFE-R3 and DL-R5 but not RX-1'
     expect(shared.extractReqIds(sample)).toEqual(tsResolver.extractReqIds(sample))
   })
 
-  it('parseRequirementDoc agrees (ids, statement, acceptance, removed)', async () => {
-    const shared: any = await import(/* @vite-ignore */ SHARED_SPEC)
+  it('parseRequirementDoc agrees (ids, statement, acceptance, removed)', () => {
     expect(shared.parseRequirementDoc(DOC)).toEqual(tsResolver.parseRequirementDoc(DOC))
   })
 
-  it('parseRequirementsDir agrees', async () => {
-    const shared: any = await import(/* @vite-ignore */ SHARED_SPEC)
+  it('parseRequirementDoc agrees on CRLF input', () => {
+    const crlf = DOC.replace(/\n/g, '\r\n')
+    expect(shared.parseRequirementDoc(crlf)).toEqual(tsResolver.parseRequirementDoc(crlf))
+  })
+
+  it('parseRequirementsDir agrees', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'parity-'))
     mkdirSync(path.join(root, 'docs/requirements/components'), { recursive: true })
     writeFileSync(path.join(root, 'docs/requirements/components/cafe-service.md'), DOC)

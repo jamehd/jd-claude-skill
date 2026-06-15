@@ -22,4 +22,8 @@ describe('formatRequirementsTouched', () => {
   it('handles an empty list', () => {
     expect(formatRequirementsTouched([])).toBe('none')
   })
+
+  it('ignores an indented Req: line (gate anchors at column 0)', () => {
+    expect(formatRequirementsTouched(['feat: x\n\n  Req: CAFE-R3'])).toBe('none')
+  })
 })

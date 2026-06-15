@@ -702,7 +702,12 @@ export class JobRunner {
     try {
       store.updateItem(job.taskId!, { status: 'review' })
       let touched = 'none'
-      try { touched = formatRequirementsTouched(git.commitMessages(job.taskId!)) } catch { /* git hiccup: keep 'none' */ }
+      try {
+        touched = formatRequirementsTouched(git.commitMessages(job.taskId!))
+      } catch (e) {
+        touched = '(could not read commits)'
+        this.note(job, 'info', `requirements-touched: ${e instanceof Error ? e.message : e}`)
+      }
       store.appendToBody(job.taskId!,
         `## AI result\nJob ${job.id} succeeded on branch board/${job.taskId}.\nRequirements touched: ${touched}\nChanged files:\n${git.changedFiles(job.taskId!).map((f) => `- ${f}`).join('\n')}\nFull output: data/jobs/${job.id}.log`)
     } catch (err) {

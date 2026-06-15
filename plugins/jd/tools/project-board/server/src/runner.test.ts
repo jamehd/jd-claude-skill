@@ -71,6 +71,16 @@ describe('JobRunner', () => {
     expect(item.body).toContain('## AI result')
   })
 
+  it('appends Requirements touched with the req ids from a Req: trailer in a commit message', async () => {
+    const t = setup()
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['some/file.ts'])
+    ;(t.git.commitMessages as ReturnType<typeof vi.fn>).mockReturnValue(['feat: x\n\nReq: CAFE-R3'])
+    const job = t.runner.dispatchTask(t.item.id)
+    t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
+    expect(t.store.getItem(t.item.id)!.body).toContain('Requirements touched: CAFE-R3')
+  })
+
   it('marks job failed and resets task when exit is 0 but no commits on the branch', async () => {
     const t = setup()
     const job = t.runner.dispatchTask(t.item.id)

@@ -21,7 +21,7 @@ export function parseRequirementDoc(markdown: string): Requirement[] {
   const reqs: Requirement[] = []
   let cur: Requirement | null = null
   let sawStatement = false
-  for (const line of markdown.split('\n')) {
+  for (const line of markdown.replace(/\r\n?/g, '\n').split('\n')) {
     const h = line.match(HEADING)
     if (h) {
       if (cur) reqs.push(cur)
