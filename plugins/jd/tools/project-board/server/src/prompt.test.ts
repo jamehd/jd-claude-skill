@@ -140,3 +140,13 @@ describe('buildRescanPrompt Vietnamese detail', () => {
     expect(p).toMatch(/Tiêu chí chấp nhận:/)
   })
 })
+
+describe('buildTaskPrompt requirements-sync done-criteria', () => {
+  it('always instructs the agent to carry a Req: trailer and report Requirements touched', () => {
+    const p = buildTaskPrompt(item('just do the thing'))
+    expect(p).toContain('Req: <ID>')
+    expect(p).toContain('Req: none')
+    expect(p).toContain('Requirements touched:')
+    expect(p).toContain('docs/requirements/')
+  })
+})

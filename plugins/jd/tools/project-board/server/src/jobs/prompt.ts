@@ -31,6 +31,12 @@ export function buildTaskPrompt(item: BoardItem, requirements?: Map<string, Requ
     '3. End your final output with a short summary of what you did and the test results.',
     '4. Do NOT modify anything under project-board/data/ — task state is managed by the dashboard.',
     '5. Do not push, do not merge, do not touch branches other than the current one.',
+    '6. If your change adds or alters externally observable behavior, add or update the matching',
+    '   requirement under docs/requirements/ on this same branch, and end the relevant commit(s)',
+    '   with a "Req: <ID>" trailer (e.g. "Req: CAFE-R3"). Use "Req: none — <reason>" ONLY for a',
+    '   behavior-neutral change (refactor, comment, test-only).',
+    '7. End your final output with a line: "Requirements touched: <ID[, ID...] | none>" naming the',
+    '   requirement IDs your commits carry.',
   )
 
   const ids = extractReqIds(item.body)
