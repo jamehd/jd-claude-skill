@@ -62,6 +62,17 @@ test('an id for the wrong component does not satisfy a touched component', () =>
   assert.match(r.failures[0], /missing Req anchor for cafe-service\.md/)
 })
 
+test('reports only the undefined id when some matching ids are defined', () => {
+  const r = evaluateRange({
+    touched: [cafe],
+    trailers: { ids: ['CAFE-R3', 'CAFE-R9'], noneReasons: [] },
+    definedIds: new Set(['CAFE-R3']),
+  })
+  assert.equal(r.ok, false)
+  assert.equal(r.failures.length, 1)
+  assert.match(r.failures[0], /CAFE-R9 referenced but not defined/)
+})
+
 test('worktree mode reminds when component code changed but its doc did not', () => {
   const r = evaluateWorktree({ touched: [cafe], changedDocs: new Set() })
   assert.equal(r.reminders.length, 1)

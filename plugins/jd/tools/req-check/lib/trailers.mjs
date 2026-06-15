@@ -1,7 +1,7 @@
 import { extractReqIds } from '../../../shared/requirements.mjs'
 
 const REQ_LINE = /^Req:\s*(.+)$/gim
-const NONE = /^none\b\s*[—:-]?\s*(.+)?$/i
+const NONE = /^none\b\s*[—:-]\s*(.+)$/i
 
 export function parseTrailers(messages) {
   const ids = new Set()

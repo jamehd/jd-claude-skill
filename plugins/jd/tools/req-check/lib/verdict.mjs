@@ -1,5 +1,6 @@
 function prefixOf(id) {
-  return id.slice(0, id.indexOf('-R'))
+  const i = id.indexOf('-R')
+  return i === -1 ? id : id.slice(0, i)
 }
 
 export function evaluateRange({ touched, trailers, definedIds }) {

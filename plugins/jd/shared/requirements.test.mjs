@@ -27,6 +27,20 @@ test('parseRequirementDoc reads id, statement, acceptance', () => {
   assert.equal(reqs[0].acceptance.length, 2)
 })
 
+test('parseRequirementDoc tolerates CRLF line endings', () => {
+  const md = ['## CAFE-R3: GetTheme RPC', 'Serves branding.', '- AC: under 1s'].join('\r\n')
+  const [req] = parseRequirementDoc(md)
+  assert.equal(req.id, 'CAFE-R3')
+  assert.equal(req.title, 'GetTheme RPC')
+  assert.equal(req.acceptance.length, 1)
+})
+
+test('parseRequirementDoc marks REMOVED requirements', () => {
+  const [req] = parseRequirementDoc('## CAFE-R4: Old Feature REMOVED\nlegacy desc\n')
+  assert.equal(req.id, 'CAFE-R4')
+  assert.equal(req.removed, true)
+})
+
 test('parseRequirementsDir indexes components and capabilities', () => {
   const root = mkdtempSync(path.join(tmpdir(), 'reqdir-'))
   mkdirSync(path.join(root, 'docs/requirements/components'), { recursive: true })
