@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# Stop hook: advisory requirements-drift reminder. Never blocks.
+# No-ops in any repo without docs/requirements/.component-map.json (engine exits 0).
+set -euo pipefail
+HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CLI="$HOOK_DIR/../tools/req-check/cli.mjs"
+[ -f "$CLI" ] || exit 0
+node "$CLI" --worktree --advisory 2>&1 || true
+exit 0
