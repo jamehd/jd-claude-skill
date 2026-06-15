@@ -9,7 +9,7 @@ Every behavior-changing commit carries a git trailer:
 
 ```
 Req: CAFE-R3                              # touches an existing requirement
-Req: CAFE-R9                              # NEW requirement — must already exist in the doc
+Req: CAFE-R9                              # NEW requirement — add its heading to the doc in this same change
 Req: CAFE-R3, DL-R5                       # multiple
 Req: none — refactor, no behavior change  # explicit exemption, reason REQUIRED
 ```

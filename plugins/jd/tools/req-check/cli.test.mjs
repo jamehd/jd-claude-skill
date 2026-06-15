@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -94,4 +94,16 @@ test('worktree advisory mode reminds but exits 0', () => {
   const r = runCli(['--worktree', '--advisory'], root)
   assert.equal(r.code, 0)
   assert.match(r.stdout, /cafe-service\.md/)
+})
+
+test('range mode passes when a new requirement heading and its code land in the same range', () => {
+  const root = newRepo()
+  // add code + a brand-new requirement heading in one commit
+  writeFileSync(path.join(root, 'cafe-service/new.go'), 'package main\n')
+  const doc = path.join(root, 'docs/requirements/components/cafe-service.md')
+  writeFileSync(doc, readFileSync(doc, 'utf8') + '\n## CAFE-R7: New thing\nDoes a new thing.\n- AC: works\n')
+  sh('git', ['add', '-A'], root)
+  sh('git', ['commit', '-qm', 'feat: new thing\n\nReq: CAFE-R7'], root)
+  const r = runCli(['--range', 'HEAD~1..HEAD'], root)
+  assert.equal(r.code, 0)
 })

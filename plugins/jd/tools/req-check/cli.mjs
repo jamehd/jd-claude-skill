@@ -34,9 +34,16 @@ function main() {
   const map = loadMap(mapPath)
 
   if (args.mode === 'range') {
-    const touched = classifyChanges(changedFilesInRange(args.range, root), map)
-    if (touched.length === 0) process.exit(0)
-    const trailers = parseTrailers(commitMessagesInRange(args.range, root))
+    let touched, trailers
+    try {
+      touched = classifyChanges(changedFilesInRange(args.range, root), map)
+      if (touched.length === 0) process.exit(0)
+      trailers = parseTrailers(commitMessagesInRange(args.range, root))
+    } catch (e) {
+      const msg = (e && e.message ? e.message : String(e)).split('\n')[0]
+      console.error(`req-check: could not evaluate range "${args.range}" (${msg}); skipping`)
+      process.exit(0)
+    }
     const definedIds = new Set(parseRequirementsDir(root).keys())
     const { ok, failures } = evaluateRange({ touched, trailers, definedIds })
     if (!ok) {
