@@ -61,6 +61,7 @@ export function buildCandidates(reqIndex: Map<string, Requirement>, docs: Status
   for (const doc of docs) {
     for (const row of doc.rows) {
       const req = reqIndex.get(row.id)
+      if (req?.removed) continue // tombstone: removed requirement never generates candidates
       const detail = doc.details?.[row.id]
       const title = req?.title ?? row.id
       if (row.state === 'missing') {

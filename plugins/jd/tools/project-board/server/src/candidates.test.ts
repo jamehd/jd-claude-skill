@@ -164,6 +164,38 @@ tested: 82
   })
 })
 
+describe('buildCandidates skips removed (tombstone) requirements', () => {
+  const STATUS = `---
+component: idc-backend
+last_scanned: 2026-06-15
+---
+
+| Req | State | Tested | Note |
+|--|--|--|--|
+| IDC-R7 | done | no | tombstone: endpoint removed |
+| IDC-R8 | done | no | still real, just untested |
+`
+  it('emits no candidate for a removed req, but still does for a normal one', () => {
+    const reqs = new Map<string, Requirement>([
+      ['IDC-R7', { id: 'IDC-R7', title: 'Manifest diff — REMOVED', statement: '', acceptance: [], removed: true }],
+      ['IDC-R8', { id: 'IDC-R8', title: 'Something real', statement: '', acceptance: [] }],
+    ])
+    const cands = buildCandidates(reqs, [parseStatusDoc(STATUS)])
+    expect(cands.some((c) => c.reqId === 'IDC-R7')).toBe(false)
+    expect(cands.some((c) => c.reqId === 'IDC-R8' && c.kind === 'test')).toBe(true)
+  })
+
+  it('skips a removed req regardless of state (missing/partial)', () => {
+    for (const state of ['missing', 'partial']) {
+      const status = `---\ncomponent: c\nlast_scanned: 2026-06-15\n---\n\n| Req | State | Tested | Note |\n|--|--|--|--|\n| Z-R1 | ${state} | no | x |\n`
+      const reqs = new Map<string, Requirement>([
+        ['Z-R1', { id: 'Z-R1', title: 'Gone — REMOVED', statement: '', acceptance: [], removed: true }],
+      ])
+      expect(buildCandidates(reqs, [parseStatusDoc(status)]).length).toBe(0)
+    }
+  })
+})
+
 describe('parseStatusDoc details (Vietnamese)', () => {
   const DOC = `---
 component: cafe-service
