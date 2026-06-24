@@ -145,17 +145,17 @@ export function TaskDrawer({ item, components, items, onClose, onOpenConsole }: 
             <div className="flex flex-col gap-1">
               {item.dependsOn.map((id) => {
                 const dep = byId.get(id)
-                const done = dep?.status === 'done'
+                const ready = dep ? ['review', 'pr', 'done'].includes(dep.status) : false
                 return (
                   <div key={id} className="flex items-center justify-between font-mono text-xs">
-                    <span className={done ? 'text-text-secondary' : 'text-shape'}>{done ? '✓' : '⛓'} {id}</span>
+                    <span className={ready ? 'text-text-secondary' : 'text-shape'}>{ready ? '✓' : '⛓'} {id}</span>
                     <span className="text-text-muted">{dep?.status ?? 'không tồn tại'}</span>
                   </div>
                 )
               })}
             </div>
             {blocked.length > 0 && (
-              <p className="mt-2 text-xs text-shape">Auto sẽ chờ tới khi các phụ thuộc trên `done`.</p>
+              <p className="mt-2 text-xs text-shape">Auto chờ tới khi phụ thuộc đạt review/pr/done; dependent sẽ stack trên branch của chúng.</p>
             )}
           </div>
         )}

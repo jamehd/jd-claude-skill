@@ -349,6 +349,8 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     deps.git.removeWorktree(item.id)
     store.appendToBody(item.id, `Branch board/${item.id} discarded on ${new Date().toISOString().slice(0, 10)}.`)
     const updated = store.updateItem(item.id, { status: gatedReadyStatus(item) })
+    // Discarding this branch invalidates anything stacked on it.
+    deps.runner.resetDependents(item.id)
     hub.broadcast({ type: 'board_update' })
     return updated
   })

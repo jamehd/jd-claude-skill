@@ -61,7 +61,7 @@ describe('JobRunner', () => {
     ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['some/file.ts'])
     const job = t.runner.dispatchTask(t.item.id)
     expect(job.state).toBe('running')
-    expect(t.git.createWorktree).toHaveBeenCalledWith(t.item.id)
+    expect(t.git.createWorktree).toHaveBeenCalledWith(t.item.id, []) // no deps → no stacked base branches
     expect(t.store.getItem(t.item.id)?.status).toBe('ai_running')
 
     t.procs[0].emit('exit', 0)

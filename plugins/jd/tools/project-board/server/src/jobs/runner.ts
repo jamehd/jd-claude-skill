@@ -4,7 +4,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { gatedReadyStatus, type BoardStore } from '../store.js'
 import type { WsHub } from '../ws.js'
 import type { AutoState, ConsoleEvent, Job, JobKind, NoteType, RateLimitSnapshot, UsageReport, UsageBucket, JobUsage } from '../../../ui/src/types.js'
-import { isBlocked, indexById } from '../../../ui/src/deps.js'
+import { isBlocked, indexById, unmergedDeps, transitiveDependents } from '../../../ui/src/deps.js'
 import { buildTaskPrompt, buildRescanPrompt, buildResolvePrompt } from './prompt.js'
 import { parseRequirementsDir } from './requirements.js'
 import { formatRequirementsTouched } from './requirements-touched.js'
@@ -13,7 +13,7 @@ import { normalizeLine } from './events.js'
 export type SpawnFn = (bin: string, args: string[], opts: { cwd: string }) => ChildProcess
 
 export interface GitOps {
-  createWorktree(taskId: string): string
+  createWorktree(taskId: string, baseBranches?: string[]): string
   removeWorktree(taskId: string): void
   changedFiles(taskId: string): string[]
   commitMessages(taskId: string): string[]
@@ -134,6 +134,31 @@ export class JobRunner {
       throw new Error(`task ${taskId} already has an active job`)
     }
     return this.enqueue('task', taskId)
+  }
+
+  // When a task's branch is rebuilt or removed (re-dispatch / discard), every task
+  // stacked on it is stale. Cancel/reset the transitive dependents that already ran
+  // so they re-run on the fresh base; ready/backlog dependents are left untouched
+  // (they have not built on the branch and will pick up the new base when dispatched).
+  resetDependents(taskId: string): void {
+    const { store, git, hub } = this.deps!
+    const dependents = transitiveDependents(taskId, store.scan().items)
+    let changed = false
+    for (const d of dependents) {
+      if (d.status === 'ai_running') {
+        const job = [...this.jobs.values()].find(
+          (j) => (j.state === 'running' || j.state === 'queued') && j.taskId === d.id)
+        if (job) this.cancel(job.id) // exit handler resets the task to ready + cleans its worktree
+        this.autoFailedTasks.delete(d.id)
+        changed = true
+      } else if (d.status === 'review' || d.status === 'pr') {
+        try { git.removeWorktree(d.id) } catch { /* best-effort */ }
+        store.updateItem(d.id, { status: 'ready' })
+        this.autoFailedTasks.delete(d.id)
+        changed = true
+      }
+    }
+    if (changed) hub.broadcast({ type: 'board_update' })
   }
 
   dispatchResolve(taskId: string): Job {
@@ -422,8 +447,16 @@ export class JobRunner {
     let prompt: string
     if (job.kind === 'task') {
       job.branch = `board/${job.taskId!}`
+      // Rebuilding board/<taskId> invalidates any dependent stacked on the old
+      // branch — reset them so they re-run on the fresh base.
+      this.resetDependents(job.taskId!)
+      // Stack unmerged dependency branches so this task builds on their work.
+      const depItem = store.getItem(job.taskId!)
+      const baseBranches = depItem
+        ? unmergedDeps(depItem, indexById(store.scan().items)).map((id) => `board/${id}`)
+        : []
       try {
-        cwd = git.createWorktree(job.taskId!)
+        cwd = git.createWorktree(job.taskId!, baseBranches)
       } catch (err) {
         this.finish(job, 'failed', `worktree: ${err instanceof Error ? err.message : err}`)
         return

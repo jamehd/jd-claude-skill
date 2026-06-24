@@ -101,8 +101,8 @@ export function Kanban(
             className="mt-1 inline-block font-mono text-[12px] text-pr hover:underline">🔗 PR</a>
         )}
         {blocked.length > 0 && (
-          <div className="mt-1 font-mono text-[11px] text-shape" title={`Blocked until done: ${blocked.join(', ')}`}>
-            ⛓ blocked: {blocked.join(', ')}
+          <div className="mt-1 font-mono text-[11px] text-shape" title={`Waiting until these reach review/pr/done: ${blocked.join(', ')}`}>
+            ⛓ waiting: {blocked.join(', ')}
           </div>
         )}
         <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">

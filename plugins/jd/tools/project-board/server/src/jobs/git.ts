@@ -29,7 +29,10 @@ export class BoardGit {
     return `board/${taskId}`
   }
 
-  createWorktree(taskId: string): string {
+  // baseBranches stacks unmerged dependency branches into the new worktree so a
+  // dependent builds on top of its deps' work before they are merged. A merge
+  // conflict here throws — the caller fails the job and leaves it for the operator.
+  createWorktree(taskId: string, baseBranches: string[] = []): string {
     this.assertSafeId(taskId)
     // Always tear down leftovers so re-dispatch after a kept-for-inspection failure starts fresh
     this.removeWorktree(taskId)
@@ -39,6 +42,10 @@ export class BoardGit {
     // fresh from main even when the board/<id> branch still exists (removeWorktree drops the
     // worktree but not the branch). -b would fail with "branch already exists".
     this.git(['worktree', 'add', '-B', this.branchName(taskId), wt, 'main'])
+    for (const base of baseBranches) {
+      // Merge inside the worktree (it is checked out on board/<taskId>).
+      this.git(['-C', wt, 'merge', '--no-edit', base])
+    }
     return wt
   }
 
