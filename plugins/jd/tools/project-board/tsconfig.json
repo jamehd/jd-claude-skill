@@ -10,5 +10,5 @@
     "rootDir": ".",
     "types": ["node"]
   },
-  "include": ["server/src/**/*.ts", "ui/src/types.ts"]
+  "include": ["server/src/**/*.ts", "ui/src/types.ts", "ui/src/deps.ts"]
 }

@@ -81,6 +81,7 @@ export default function App() {
       {adding && <QuickAdd components={snapshot.components} onClose={() => setAdding(false)} />}
       {selected && snapshot.items.find((i) => i.id === selected) && (
         <TaskDrawer item={snapshot.items.find((i) => i.id === selected)!} components={snapshot.components}
+          items={snapshot.items}
           onClose={() => setSelected(null)} onOpenConsole={(jobId) => { setConsoleJob(jobId); setSelected(null) }} />
       )}
       {consoleJob && snapshot.jobs.find((j) => j.id === consoleJob) && (

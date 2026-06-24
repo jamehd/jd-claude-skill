@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { api } from '../api.js'
 import { epicOf, hasAnyEpic, groupByEpic } from '../filters.js'
+import { blockedBy, indexById } from '../deps.js'
 import type { BoardItem, ItemStatus } from '../types.js'
 
 const COLUMNS: { key: ItemStatus; label: string }[] = [
@@ -53,6 +54,7 @@ export function Kanban(
 ) {
   const [error, setError] = useState('')
   const [collapsed, setCollapsed] = useState<Set<string>>(() => new Set())
+  const byId = indexById(items)
 
   function toggleGroup(key: string) {
     setCollapsed((prev) => {
@@ -79,6 +81,7 @@ export function Kanban(
 
   function card(item: BoardItem, colLabel: string) {
     const epic = epicOf(item)
+    const blocked = item.status === 'ready' ? blockedBy(item, byId) : []
     return (
       <div key={item.id} draggable={item.status !== 'ai_running' && item.status !== 'pr'}
         onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
@@ -96,6 +99,11 @@ export function Kanban(
         {item.pr && (
           <a href={item.pr} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}
             className="mt-1 inline-block font-mono text-[12px] text-pr hover:underline">🔗 PR</a>
+        )}
+        {blocked.length > 0 && (
+          <div className="mt-1 font-mono text-[11px] text-shape" title={`Blocked until done: ${blocked.join(', ')}`}>
+            ⛓ blocked: {blocked.join(', ')}
+          </div>
         )}
         <div className="mt-1 flex items-center justify-between">
           <span className="text-xs text-text-muted">{item.component}</span>

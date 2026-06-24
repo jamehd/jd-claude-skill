@@ -5,6 +5,7 @@ import type { ServerDeps } from '../server.js'
 import type { ItemStatus, ItemType, Priority } from '../../../ui/src/types.js'
 import { PRIORITIES } from '../markdown.js'
 import { gatedReadyStatus } from '../store.js'
+import { blockedBy, indexById } from '../../../ui/src/deps.js'
 import { SAFE_ID } from '../jobs/git.js'
 import { normalizeLine } from '../jobs/events.js'
 import { parseRequirementsDir } from '../jobs/requirements.js'
@@ -91,11 +92,19 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     return item
   })
 
-  app.post<{ Params: { id: string } }>('/api/tasks/:id/dispatch', (req, reply) => {
+  app.post<{ Params: { id: string }; Body: { override?: boolean } }>('/api/tasks/:id/dispatch', (req, reply) => {
     const item = store.getItem(req.params.id)
     if (!item) return reply.code(404).send({ error: 'not found' })
     if (!['backlog', 'ready'].includes(item.status)) {
       return reply.code(409).send({ error: `cannot dispatch a task in '${item.status}'` })
+    }
+    // Manual dispatch is gated by dependencies too, but the operator may override
+    // (auto-dispatch never does — see runner.nextReadyTask).
+    if (!req.body?.override) {
+      const blocked = blockedBy(item, indexById(store.scan().items))
+      if (blocked.length > 0) {
+        return reply.code(409).send({ error: `blocked by: ${blocked.join(', ')}`, blockedBy: blocked })
+      }
     }
     try {
       return reply.code(202).send(deps.runner.dispatchTask(item.id))
@@ -202,6 +211,10 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
           case 'dispatch': {
             if (!['backlog', 'ready'].includes(item.status)) {
               return { id, ok: false, error: `cannot dispatch a task in '${item.status}'` }
+            }
+            const blocked = blockedBy(item, indexById(store.scan().items))
+            if (blocked.length > 0) {
+              return { id, ok: false, error: `blocked by: ${blocked.join(', ')}` }
             }
             deps.runner.dispatchTask(id)
             return { id, ok: true }

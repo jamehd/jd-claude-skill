@@ -22,7 +22,8 @@ export const api = {
   patchTask: (id: string, patch: Record<string, unknown>) =>
     request<BoardItem>(`/api/tasks/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }),
   getBrainstormPrompt: (id: string) => request<{ prompt: string }>(`/api/tasks/${id}/brainstorm-prompt`),
-  dispatch: (id: string) => request<Job>(`/api/tasks/${id}/dispatch`, { method: 'POST' }),
+  dispatch: (id: string, override?: boolean) =>
+    request<Job>(`/api/tasks/${id}/dispatch`, { method: 'POST', body: JSON.stringify({ override: override ?? false }) }),
   batch: (ids: string[], action: string, value?: string) =>
     request<{ applied: number; failed: number; results: { id: string; ok: boolean; error?: string }[] }>(
       '/api/tasks/batch', { method: 'POST', body: JSON.stringify({ ids, action, value }) }),

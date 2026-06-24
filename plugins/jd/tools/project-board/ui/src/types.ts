@@ -15,6 +15,7 @@ export interface BoardItem {
   pr?: string
   requiresShaping?: boolean
   plan?: string
+  dependsOn?: string[]
   extra?: Record<string, unknown>
   body: string
 }

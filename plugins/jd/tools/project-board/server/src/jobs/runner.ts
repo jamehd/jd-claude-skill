@@ -4,6 +4,7 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { gatedReadyStatus, type BoardStore } from '../store.js'
 import type { WsHub } from '../ws.js'
 import type { AutoState, ConsoleEvent, Job, JobKind, NoteType, RateLimitSnapshot, UsageReport, UsageBucket, JobUsage } from '../../../ui/src/types.js'
+import { isBlocked, indexById } from '../../../ui/src/deps.js'
 import { buildTaskPrompt, buildRescanPrompt, buildResolvePrompt } from './prompt.js'
 import { parseRequirementsDir } from './requirements.js'
 import { formatRequirementsTouched } from './requirements-touched.js'
@@ -268,8 +269,12 @@ export class JobRunner {
 
   private nextReadyTask(): string | undefined {
     const order: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3 }
-    const ready = this.deps!.store.scan().items
-      .filter((i) => i.status === 'ready' && !(i.requiresShaping && !i.plan?.trim()) && !this.autoFailedTasks.has(i.id) && !this.hasActiveJob((j) => j.kind === 'task' && j.taskId === i.id))
+    const items = this.deps!.store.scan().items
+    const byId = indexById(items)
+    const ready = items
+      // A task with unmet dependencies (a dep not yet `done`) stays in `ready` but
+      // is never auto-dispatched until its deps land on main.
+      .filter((i) => i.status === 'ready' && !(i.requiresShaping && !i.plan?.trim()) && !isBlocked(i, byId) && !this.autoFailedTasks.has(i.id) && !this.hasActiveJob((j) => j.kind === 'task' && j.taskId === i.id))
       .sort((a, b) => (order[a.priority] - order[b.priority]) || a.created.localeCompare(b.created) || a.id.localeCompare(b.id))
     return ready[0]?.id
   }

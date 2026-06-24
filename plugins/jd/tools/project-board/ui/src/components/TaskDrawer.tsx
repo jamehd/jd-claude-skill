@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '../api.js'
+import { blockedBy, indexById } from '../deps.js'
 import type { BoardItem, ComponentStatus, Priority } from '../types.js'
 import { DiffModal } from './DiffModal.js'
 import { DiffView } from './DiffView.js'
@@ -8,12 +9,15 @@ const PRIORITIES: Priority[] = ['P0', 'P1', 'P2', 'P3']
 const CAN_EXECUTE = ['backlog', 'ready']
 const SHAPEABLE: string[] = ['backlog', 'ready']
 
-export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
+export function TaskDrawer({ item, components, items, onClose, onOpenConsole }: {
   item: BoardItem
   components: ComponentStatus[]
+  items: BoardItem[]
   onClose: () => void
   onOpenConsole?: (jobId: string) => void
 }) {
+  const byId = indexById(items)
+  const blocked = blockedBy(item, byId)
   const [title, setTitle] = useState(item.title)
   const [description, setDescription] = useState(item.body.trim())
   const [priority, setPriority] = useState<Priority>(item.priority)
@@ -135,12 +139,41 @@ export function TaskDrawer({ item, components, onClose, onOpenConsole }: {
           </div>
         )}
 
+        {item.dependsOn && item.dependsOn.length > 0 && (
+          <div className="rounded-md border border-border bg-sunken p-3">
+            <div className="mb-1 text-xs font-semibold uppercase text-text-muted">Phụ thuộc</div>
+            <div className="flex flex-col gap-1">
+              {item.dependsOn.map((id) => {
+                const dep = byId.get(id)
+                const done = dep?.status === 'done'
+                return (
+                  <div key={id} className="flex items-center justify-between font-mono text-xs">
+                    <span className={done ? 'text-text-secondary' : 'text-shape'}>{done ? '✓' : '⛓'} {id}</span>
+                    <span className="text-text-muted">{dep?.status ?? 'không tồn tại'}</span>
+                  </div>
+                )
+              })}
+            </div>
+            {blocked.length > 0 && (
+              <p className="mt-2 text-xs text-shape">Auto sẽ chờ tới khi các phụ thuộc trên `done`.</p>
+            )}
+          </div>
+        )}
+
         <div className="border-t border-border pt-3">
           {CAN_EXECUTE.includes(item.status) && (
-            <button disabled={busy} onClick={() => void act(() => api.dispatch(item.id), false)}
-              className="w-full rounded-md bg-gradient-to-r from-accent-strong to-accent-deep py-2 font-semibold text-[#e6fbff] shadow-[0_0_18px_rgba(67,217,232,.18)] transition-colors duration-150 hover:brightness-110 disabled:opacity-50">
-              ⚡ Giao cho AI
-            </button>
+            blocked.length > 0 ? (
+              <button disabled={busy}
+                onClick={() => { if (confirm(`${item.id} đang bị chặn bởi: ${blocked.join(', ')}.\nGiao cho AI bất chấp phụ thuộc?`)) void act(() => api.dispatch(item.id, true), false) }}
+                className="w-full rounded-md border border-shape-border bg-sunken py-2 font-semibold text-shape transition-colors duration-150 hover:brightness-110 disabled:opacity-50">
+                ⚡ Giao cho AI (vượt phụ thuộc)
+              </button>
+            ) : (
+              <button disabled={busy} onClick={() => void act(() => api.dispatch(item.id), false)}
+                className="w-full rounded-md bg-gradient-to-r from-accent-strong to-accent-deep py-2 font-semibold text-[#e6fbff] shadow-[0_0_18px_rgba(67,217,232,.18)] transition-colors duration-150 hover:brightness-110 disabled:opacity-50">
+                ⚡ Giao cho AI
+              </button>
+            )
           )}
           {item.job && onOpenConsole && (
             <button onClick={() => onOpenConsole(item.job!)}
