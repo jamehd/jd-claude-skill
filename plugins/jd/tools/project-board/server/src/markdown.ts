@@ -1,7 +1,7 @@
 import matter from 'gray-matter'
 import type { BoardItem, ComponentStatus, ItemStatus, ItemType, Priority } from '../../ui/src/types.js'
 
-export const STATUSES: ItemStatus[] = ['backlog', 'ready', 'ai_running', 'review', 'pr', 'done']
+export const STATUSES: ItemStatus[] = ['backlog', 'ready', 'ai_running', 'review', 'pr', 'done', 'cancelled']
 export const TYPES: ItemType[] = ['task', 'bug']
 export const PRIORITIES: Priority[] = ['P0', 'P1', 'P2', 'P3']
 

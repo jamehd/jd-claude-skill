@@ -13,6 +13,37 @@ export function isShaped(item: BoardItem): boolean {
   return Boolean(item.plan?.trim())
 }
 
+/** The epic key a card belongs to (frontmatter `extra.epic`), or null when ungrouped. */
+export function epicOf(item: BoardItem): string | null {
+  const e = item.extra?.epic
+  return typeof e === 'string' && e.trim() ? e.trim() : null
+}
+
+export function hasAnyEpic(items: BoardItem[]): boolean {
+  return items.some((it) => epicOf(it) !== null)
+}
+
+export interface EpicGroup {
+  epic: string | null // null = the "no epic" group
+  items: BoardItem[]
+}
+
+/** Group cards by epic, epics sorted alphabetically with the no-epic group last. */
+export function groupByEpic(items: BoardItem[]): EpicGroup[] {
+  const byEpic = new Map<string, BoardItem[]>()
+  const noEpic: BoardItem[] = []
+  for (const it of items) {
+    const e = epicOf(it)
+    if (e === null) { noEpic.push(it); continue }
+    const arr = byEpic.get(e)
+    if (arr) arr.push(it)
+    else byEpic.set(e, [it])
+  }
+  const groups: EpicGroup[] = [...byEpic.keys()].sort().map((epic) => ({ epic, items: byEpic.get(epic)! }))
+  if (noEpic.length) groups.push({ epic: null, items: noEpic })
+  return groups
+}
+
 export function isFilterActive(f: BoardFilter): boolean {
   return f.component !== 'all' || f.shaped !== 'all' || f.type !== 'all' || f.priority !== 'all'
 }

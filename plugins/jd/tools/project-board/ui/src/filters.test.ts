@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { applyFilters, isShaped, isFilterActive, EMPTY_FILTER, applyCandidateFilter, isCandidateFilterActive, EMPTY_CANDIDATE_FILTER } from './filters.js'
+import { applyFilters, isShaped, isFilterActive, EMPTY_FILTER, applyCandidateFilter, isCandidateFilterActive, EMPTY_CANDIDATE_FILTER, epicOf, hasAnyEpic, groupByEpic } from './filters.js'
 import type { BoardItem } from './types.js'
 
 function item(p: Partial<BoardItem>): BoardItem {
@@ -14,6 +14,38 @@ describe('isShaped', () => {
     expect(isShaped(item({ plan: 'real plan' }))).toBe(true)
     expect(isShaped(item({ plan: '   ' }))).toBe(false)
     expect(isShaped(item({ plan: undefined }))).toBe(false)
+  })
+})
+
+describe('epicOf', () => {
+  it('reads a trimmed extra.epic, else null', () => {
+    expect(epicOf(item({ extra: { epic: 'GAME-LIFECYCLE' } }))).toBe('GAME-LIFECYCLE')
+    expect(epicOf(item({ extra: { epic: '  GAME-LIFECYCLE  ' } }))).toBe('GAME-LIFECYCLE')
+    expect(epicOf(item({ extra: { epic: '   ' } }))).toBeNull()
+    expect(epicOf(item({ extra: { epic: 42 } }))).toBeNull()
+    expect(epicOf(item({}))).toBeNull()
+  })
+})
+
+describe('groupByEpic', () => {
+  it('groups by epic, sorts epics, puts no-epic group last', () => {
+    const items = [
+      item({ id: 'A', extra: { epic: 'ZED' } }),
+      item({ id: 'B' }),
+      item({ id: 'C', extra: { epic: 'ALPHA' } }),
+      item({ id: 'D', extra: { epic: 'ZED' } }),
+    ]
+    const groups = groupByEpic(items)
+    expect(groups.map((g) => g.epic)).toEqual(['ALPHA', 'ZED', null])
+    expect(groups.map((g) => g.items.map((i) => i.id))).toEqual([['C'], ['A', 'D'], ['B']])
+  })
+  it('omits the no-epic group when every card has an epic', () => {
+    const groups = groupByEpic([item({ id: 'A', extra: { epic: 'X' } })])
+    expect(groups.map((g) => g.epic)).toEqual(['X'])
+  })
+  it('hasAnyEpic is false when no card carries an epic', () => {
+    expect(hasAnyEpic([item({}), item({ extra: { foo: 'bar' } })])).toBe(false)
+    expect(hasAnyEpic([item({}), item({ extra: { epic: 'X' } })])).toBe(true)
   })
 })
 

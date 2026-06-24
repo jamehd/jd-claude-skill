@@ -1,5 +1,5 @@
 export type ItemType = 'task' | 'bug'
-export type ItemStatus = 'backlog' | 'ready' | 'ai_running' | 'review' | 'pr' | 'done'
+export type ItemStatus = 'backlog' | 'ready' | 'ai_running' | 'review' | 'pr' | 'done' | 'cancelled'
 export type Priority = 'P0' | 'P1' | 'P2' | 'P3'
 
 export interface BoardItem {

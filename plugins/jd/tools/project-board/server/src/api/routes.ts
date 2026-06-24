@@ -20,7 +20,7 @@ interface BatchBody { ids?: unknown; action?: unknown; value?: unknown }
 const PATCH_WHITELIST = ['title', 'status', 'priority', 'component', 'body', 'requiresShaping', 'plan'] as const
 
 // Statuses settable by users; ai_running and pr are system-managed.
-const USER_STATUSES: ItemStatus[] = ['backlog', 'ready', 'review', 'done']
+const USER_STATUSES: ItemStatus[] = ['backlog', 'ready', 'review', 'done', 'cancelled']
 
 const BATCH_ACTIONS: BatchAction[] = ['delete', 'dispatch', 'status', 'priority', 'component']
 
