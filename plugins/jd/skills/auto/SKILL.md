@@ -32,6 +32,17 @@ Keep moving. When a decision has a reasonable default, pick it, record it as an 
    c. **Fix and verify** — Apply fixes per the **Fix policy** (below) through a subagent with TDD, re-run the affected tests, then Load superpowers:verification-before-completion and confirm output before claiming done.
 7. **Pull request** — Load superpowers:finishing-a-development-branch. Commit, push the branch, open the PR, report the link.
 
+## Board mode
+
+When the dispatch prompt declares **board mode** (the project-board runner sets this; it means a headless job is already running inside the board's worktree for a single task), the chain changes in four ways. Everything else — implement with TDD, review + domain audits, verification, tests, Req trailers — stays the same.
+
+- **Skip step 4 (Worktree).** You are already in `.board-worktrees/<id>` on branch `board/<id>`. Do NOT create another worktree and do NOT switch branches.
+- **Use the attached plan as spec+plan.** If the prompt carries an APPROVED PLAN / shaped task, treat it as the output of steps 1–3: implement from it directly, recording assumptions only for genuine gaps. Skip the self-brainstorm. A bare task with no plan falls back to the normal step 1–3 self-Q&A.
+- **Replace step 7 with commit-on-branch only.** Commit every change to the current branch with clear messages, then STOP. Do NOT push, do NOT open a PR, do NOT merge, do NOT touch other branches — the board owns review, PR, and merge. End with the assumptions report and, if the task is flagged `needsE2e`, a prominent final line: `MANUAL E2E REQUIRED` (the board surfaces it for the human's afternoon acceptance on cafe-win).
+- **Never touch `project-board/data/`.** Task state is owned by the dashboard.
+
+Board mode does not relax the STOP list or Escalation rule; a headless job cannot ask, so a genuine STOP-list hit means halt and report (leave the work on the branch), exactly as Escalation prescribes.
+
 ## STOP and ask — ONLY these
 
 Pause for input only when a decision is one of:
