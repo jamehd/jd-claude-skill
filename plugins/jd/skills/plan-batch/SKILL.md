@@ -14,7 +14,8 @@ every card must pre-answer everything `jd:auto` would otherwise stop on.
 
 **Core principle:** a card is "agent-ready" only when nothing is left for the
 overnight agent to guess. The output is a populated `ready` column — never code,
-never a dispatch. The operator reviews `ready` and starts the batch.
+never a dispatch. Discuss EVERY card with the operator and promote it to `ready`
+only on his explicit OK; never self-promote. The operator then starts the batch.
 
 ## When to Use
 
@@ -28,8 +29,10 @@ never a dispatch. The operator reviews `ready` and starts the batch.
 1. **Select** — read `backlog` from `project-board/data/tasks/`, take the day's
    intents, propose a prioritized shortlist (WIP ~3-5), assign `P0`-`P3`.
 2. **Shape each** — drive every candidate to agent-ready (see Ready-gate).
-3. **Ready-gate** — only cards passing ALL gate items get `status: ready`; the
-   rest get `status: backlog` with a note on what is missing.
+3. **Ready-gate** — passing ALL gate items is necessary but NOT sufficient:
+   discuss each candidate with the operator and only promote to `status: ready`
+   on his explicit per-card OK. Everything else stays `status: backlog` with a
+   note on what is missing or pending discussion.
 4. **Write** — serialize each card to `project-board/data/tasks/<id>-<slug>.md`.
 5. **Report** — list cards → ready, cards → backlog (why), the e2e-gated cards,
    independence/sequencing notes, and any card that needs a real brainstorm.
@@ -58,6 +61,9 @@ non-e2e fast path.
 
 ## Ready-gate — all must hold before `status: ready`
 
+- [ ] **Operator-approved** — this specific card was discussed with the operator
+      this session and he explicitly OK'd `ready`. Never self-promote, even when
+      every other gate item passes.
 - [ ] **Scope** stated: what's in, what's explicitly out.
 - [ ] **`needsE2e`** set true/false by the heuristic above.
 - [ ] **Req ID(s)** named — an existing `CAFE-R#`/`DL-R#`/`WEB-R#`/`PACK-R#`/
