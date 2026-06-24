@@ -121,14 +121,32 @@ describe('buildResolvePrompt', () => {
 })
 
 describe('buildTaskPrompt skill-driven', () => {
-  it('references subagent-driven-development when a plan is attached', () => {
+  it('drives delivery through the jd:auto skill in board mode', () => {
     const p = buildTaskPrompt(itemFull({ plan: 'Step 1. do it' }))
-    expect(p).toMatch(/subagent-driven-development/)
+    expect(p).toMatch(/jd:auto/)
+    expect(p).toMatch(/board mode/i)
     expect(p).toContain('APPROVED PLAN')
   })
-  it('does NOT reference the skill when there is no plan', () => {
+  it('references jd:auto even without a plan', () => {
     const p = buildTaskPrompt(itemFull())
-    expect(p).not.toMatch(/subagent-driven-development/)
+    expect(p).toMatch(/jd:auto/)
+  })
+  it('forbids the agent from pushing or opening a PR (board owns it)', () => {
+    const p = buildTaskPrompt(itemFull())
+    expect(p).toMatch(/do NOT push/i)
+    expect(p).toMatch(/do NOT open a PR/i)
+  })
+})
+
+describe('buildTaskPrompt e2e gating', () => {
+  it('instructs a MANUAL E2E REQUIRED footer when needsE2e is set', () => {
+    const p = buildTaskPrompt(itemFull({ extra: { needsE2e: true } }))
+    expect(p).toContain('MANUAL E2E REQUIRED')
+  })
+  it('tells the agent the board opens the PR when not e2e-gated', () => {
+    const p = buildTaskPrompt(itemFull())
+    expect(p).not.toContain('MANUAL E2E REQUIRED')
+    expect(p).toMatch(/board will open the PR/i)
   })
 })
 

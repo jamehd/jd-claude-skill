@@ -700,7 +700,7 @@ export class JobRunner {
   private afterSuccess(job: Job): void {
     const { store, git } = this.deps!
     try {
-      store.updateItem(job.taskId!, { status: 'review' })
+      const item = store.getItem(job.taskId!)
       let touched = 'none'
       try {
         touched = formatRequirementsTouched(git.commitMessages(job.taskId!))
@@ -708,8 +708,35 @@ export class JobRunner {
         touched = '(could not read commits)'
         this.note(job, 'info', `requirements-touched: ${e instanceof Error ? e.message : e}`)
       }
-      store.appendToBody(job.taskId!,
-        `## AI result\nJob ${job.id} succeeded on branch board/${job.taskId}.\nRequirements touched: ${touched}\nChanged files:\n${git.changedFiles(job.taskId!).map((f) => `- ${f}`).join('\n')}\nFull output: data/jobs/${job.id}.log`)
+      const summary = `Job ${job.id} succeeded on branch board/${job.taskId}.\nRequirements touched: ${touched}\nChanged files:\n${git.changedFiles(job.taskId!).map((f) => `- ${f}`).join('\n')}\nFull output: data/jobs/${job.id}.log`
+
+      // needsE2e routes the finished task. true → stop in review for the human's
+      // manual e2e on cafe-win. false → complete the cycle by opening a PR here.
+      // Absent (legacy/unshaped tasks) → conservative review, never an auto-PR.
+      const flag = item?.extra?.needsE2e
+      const needsE2e = flag === true || flag === 'true'
+      const noE2e = flag === false || flag === 'false'
+
+      if (needsE2e) {
+        store.updateItem(job.taskId!, { status: 'review' })
+        store.appendToBody(job.taskId!, `## AI result\n${summary}\n\nMANUAL E2E REQUIRED — run e2e on cafe-win and verify before merging.`)
+        return
+      }
+
+      if (noE2e && item) {
+        try {
+          const url = git.createPr(job.taskId!, `${item.id}: ${item.title}`, item.body)
+          store.updateItem(job.taskId!, { pr: url, status: 'pr' })
+          store.appendToBody(job.taskId!, `## AI result\n${summary}\n\nPR opened: ${url}`)
+        } catch (e) {
+          store.updateItem(job.taskId!, { status: 'review' })
+          store.appendToBody(job.taskId!, `## AI result\n${summary}\n\nPR auto-open failed: ${e instanceof Error ? e.message : e}\nLeft in review for a manual PR/merge.`)
+        }
+        return
+      }
+
+      store.updateItem(job.taskId!, { status: 'review' })
+      store.appendToBody(job.taskId!, `## AI result\n${summary}`)
     } catch (err) {
       job.error = `task file could not be updated: ${err instanceof Error ? err.message : err}`
     }

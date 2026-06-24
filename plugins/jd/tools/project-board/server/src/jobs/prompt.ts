@@ -5,23 +5,24 @@ import type { BoardItem } from '../../../ui/src/types.js'
 import { extractReqIds, type Requirement } from './requirements.js'
 
 export function buildTaskPrompt(item: BoardItem, requirements?: Map<string, Requirement>, repoRoot?: string): string {
+  const flag = item.extra?.needsE2e
+  const needsE2e = flag === true || flag === 'true'
+
   const lines = [
-    `You are working in a dedicated git worktree on branch board/${item.id} of the GameSync repo.`,
-    'Implement the following item. Follow the conventions in CLAUDE.md (English code/docs, error standard, tests).',
+    `You are running headless in a dedicated git worktree on branch board/${item.id} of the GameSync repo, dispatched by the project board.`,
+    'Deliver this task by running the `jd:auto` skill in BOARD MODE. Follow CLAUDE.md (English code/docs, error standard, tests).',
     '',
     '--- ITEM FILE ---',
     serializeItem(item),
     '--- END ITEM FILE ---',
+    '',
+    'BOARD MODE rules (these override jd:auto defaults):',
+    `- You are already in worktree board/${item.id}; do NOT create another worktree and do NOT switch branches.`,
+    "- If a plan is attached below, treat it as jd:auto's spec+plan and implement from it; otherwise self-brainstorm as usual.",
+    '- Run the full jd:auto chain: implement (TDD), then review + domain audits (error-audit always; ui-design-audit when the diff changes UI; never e2e), then verify.',
+    '- Commit on the CURRENT branch only. Do NOT push, do NOT open a PR, do NOT merge, do NOT touch other branches — the board owns review, PR, and merge.',
+    '- Do NOT modify anything under project-board/data/ — task state is managed by the dashboard.',
   ]
-
-  if (item.plan?.trim()) {
-    lines.push(
-      '',
-      'An approved implementation plan is provided below (APPROVED PLAN). Execute it using',
-      'the `superpowers:subagent-driven-development` skill: a fresh implementer per task (TDD),',
-      'then a spec-compliance review and a code-quality review, fixing issues before moving on.',
-    )
-  }
 
   lines.push(
     '',
@@ -29,15 +30,25 @@ export function buildTaskPrompt(item: BoardItem, requirements?: Map<string, Requ
     '1. Implement the item and run the tests relevant to your change.',
     '2. Commit every change to the current branch with clear conventional-commit messages.',
     '3. End your final output with a short summary of what you did and the test results.',
-    '4. Do NOT modify anything under project-board/data/ — task state is managed by the dashboard.',
-    '5. Do not push, do not merge, do not touch branches other than the current one.',
-    '6. If your change adds or alters externally observable behavior, add or update the matching',
+    '4. If your change adds or alters externally observable behavior, add or update the matching',
     '   requirement under docs/requirements/ on this same branch, and end the relevant commit(s)',
     '   with a "Req: <ID>" trailer (e.g. "Req: CAFE-R3"). Use "Req: none — <reason>" ONLY for a',
     '   behavior-neutral change (refactor, comment, test-only).',
-    '7. End your final output with a line: "Requirements touched: <ID[, ID...] | none>" naming the',
+    '5. End your final output with a line: "Requirements touched: <ID[, ID...] | none>" naming the',
     '   requirement IDs your commits carry.',
   )
+
+  if (needsE2e) {
+    lines.push(
+      '6. This task is flagged needsE2e and cannot be verified headless. End your final output with a',
+      '   line "MANUAL E2E REQUIRED" so the board holds it in review for manual e2e on cafe-win.',
+    )
+  } else {
+    lines.push(
+      '6. This task is not e2e-gated: once you finish and the tests pass, the board will open the PR',
+      '   automatically — do not open it yourself.',
+    )
+  }
 
   const ids = extractReqIds(item.body)
   if (requirements && ids.length > 0) {

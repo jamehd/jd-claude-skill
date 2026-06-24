@@ -873,3 +873,63 @@ describe('board test gate', () => {
     await vi.waitFor(() => expect(t.store.getItem(id)?.status).toBe('review'))
   })
 })
+
+describe('needsE2e PR routing', () => {
+  function readyTask(t: ReturnType<typeof setup>, extra?: Record<string, unknown>) {
+    const id = t.store.createItem({ type: 'task', title: 'x', component: 'infra' }).id
+    t.store.updateItem(id, { status: 'ready', ...(extra ? { extra } : {}) })
+    return id
+  }
+
+  it('needsE2e=false → board opens a PR and moves the task to pr', async () => {
+    const t = setup()
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    ;(t.git.createPr as ReturnType<typeof vi.fn>).mockReturnValue('https://gh/pr/1')
+    const id = readyTask(t, { needsE2e: false })
+    const job = t.runner.dispatchTask(id)
+    t.sendInit(0); t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
+    expect(t.git.createPr).toHaveBeenCalledWith(id, expect.stringContaining(id), expect.any(String))
+    const item = t.store.getItem(id)!
+    expect(item.status).toBe('pr')
+    expect(item.pr).toBe('https://gh/pr/1')
+    expect(item.body).toContain('PR opened: https://gh/pr/1')
+  })
+
+  it('needsE2e=true → stays in review with a MANUAL E2E REQUIRED marker, no PR', async () => {
+    const t = setup()
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    const id = readyTask(t, { needsE2e: true })
+    const job = t.runner.dispatchTask(id)
+    t.sendInit(0); t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
+    expect(t.git.createPr).not.toHaveBeenCalled()
+    const item = t.store.getItem(id)!
+    expect(item.status).toBe('review')
+    expect(item.body).toContain('MANUAL E2E REQUIRED')
+  })
+
+  it('needsE2e absent → conservative default (review, no PR)', async () => {
+    const t = setup()
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    const id = readyTask(t)
+    const job = t.runner.dispatchTask(id)
+    t.sendInit(0); t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
+    expect(t.git.createPr).not.toHaveBeenCalled()
+    expect(t.store.getItem(id)!.status).toBe('review')
+  })
+
+  it('needsE2e=false but PR creation fails → falls back to review, job still succeeds', async () => {
+    const t = setup()
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    ;(t.git.createPr as ReturnType<typeof vi.fn>).mockImplementation(() => { throw new Error('no gh remote') })
+    const id = readyTask(t, { needsE2e: false })
+    const job = t.runner.dispatchTask(id)
+    t.sendInit(0); t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('succeeded'))
+    const item = t.store.getItem(id)!
+    expect(item.status).toBe('review')
+    expect(item.body).toContain('PR auto-open failed')
+  })
+})
