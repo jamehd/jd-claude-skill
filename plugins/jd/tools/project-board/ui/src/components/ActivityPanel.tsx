@@ -16,7 +16,7 @@ export function ActivityPanel({ jobs, previews, onOpenConsole }: {
   onOpenConsole: (jobId: string) => void
 }) {
   return (
-    <aside className="flex w-72 shrink-0 flex-col gap-2 overflow-y-auto">
+    <aside className="flex w-full shrink-0 flex-col gap-2 overflow-y-auto lg:w-72 max-lg:max-h-[40vh]">
       <div className="flex items-center justify-between">
         <h2 className="text-[12px] font-semibold uppercase tracking-wider text-text-muted">Hoạt động AI</h2>
         <button onClick={() => void api.clearFinishedJobs()}

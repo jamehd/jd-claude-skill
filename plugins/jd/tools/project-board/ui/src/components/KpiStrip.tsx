@@ -16,7 +16,7 @@ export function KpiStrip({ snapshot }: { snapshot: BoardSnapshot }) {
   ]
   const tone = { accent: 'text-accent', ok: 'text-ok', plain: 'text-text-primary' }
   return (
-    <div className="grid flex-1 grid-cols-5 gap-3">
+    <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-5" style={{ minWidth: 'min(100%, 280px)' }}>
       {cells.map(([label, value, color]) => (
         <div key={label} className="rounded-[10px] border border-border bg-surface p-4 text-center">
           <div className={`font-mono text-2xl font-semibold ${tone[color]}`}>{value}</div>

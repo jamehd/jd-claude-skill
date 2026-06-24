@@ -105,11 +105,11 @@ export function Kanban(
             ⛓ blocked: {blocked.join(', ')}
           </div>
         )}
-        <div className="mt-1 flex items-center justify-between">
+        <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1">
           <span className="text-xs text-text-muted">{item.component}</span>
-          <span className="flex gap-1">
+          <span className="flex min-w-0 flex-wrap items-center justify-end gap-1">
             {epic && (
-              <span className="rounded-full border border-epic-border bg-epic-bg px-1.5 py-0.5 font-mono text-[11px] uppercase text-epic">🏷 {epic}</span>
+              <span className="whitespace-nowrap rounded-full border border-epic-border bg-epic-bg px-1.5 py-0.5 font-mono text-[11px] uppercase text-epic">🏷 {epic}</span>
             )}
             {item.requiresShaping && !item.plan?.trim() && (
               <span className="rounded-full border border-shape-border px-1.5 py-0.5 font-mono text-[11px] uppercase text-shape">⚙ nắn</span>
@@ -118,7 +118,7 @@ export function Kanban(
               <span className="rounded-full border border-ok-border px-1.5 py-0.5 font-mono text-[11px] uppercase text-ok">✓ nắn</span>
             )}
             <span className={`rounded-full border px-1.5 py-0.5 font-mono text-[11px] uppercase ${TYPE_BADGE[item.type]} border-current`}>{item.type}</span>
-            <span className={`rounded-full border px-1.5 py-0.5 font-mono text-[11px] ${STATUS_PILL[item.status]}`}>{colLabel}</span>
+            <span className={`whitespace-nowrap rounded-full border px-1.5 py-0.5 font-mono text-[11px] ${STATUS_PILL[item.status]}`}>{colLabel}</span>
           </span>
         </div>
       </div>
@@ -132,11 +132,12 @@ export function Kanban(
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       {error && <p className="mb-1 text-xs text-danger">{error}</p>}
-      <div className={`grid flex-1 ${hasCancelled ? 'grid-cols-7' : 'grid-cols-6'} gap-2 overflow-y-auto`}>
+      <div className="grid flex-1 gap-2 overflow-auto"
+        style={{ gridTemplateColumns: `repeat(${columns.length}, minmax(200px, 1fr))` }}>
         {columns.map((col) => {
           const colItems = items.filter((i) => i.status === col.key)
           return (
-            <div key={col.key} className="flex flex-col gap-2 rounded-[10px] bg-sunken p-2"
+            <div key={col.key} className="flex min-w-0 flex-col gap-2 rounded-[10px] bg-sunken p-2"
               onDragOver={(e) => { if (col.key !== 'ai_running' && col.key !== 'pr') e.preventDefault() }}
               onDrop={(e) => void drop(e, col.key)}>
               <h3 className="px-1 text-[12px] font-semibold uppercase tracking-wider text-text-muted">

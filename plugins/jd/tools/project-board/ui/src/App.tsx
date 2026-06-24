@@ -36,14 +36,14 @@ export default function App() {
   if (!snapshot) return <div className="p-8 text-text-secondary">Đang tải…</div>
 
   return (
-    <div className="flex h-screen flex-col gap-3 p-3">
-      <div className="flex items-start gap-3">
+    <div className="flex min-h-screen flex-col gap-3 p-3 lg:h-screen">
+      <div className="flex flex-wrap items-start gap-3">
         <KpiStrip snapshot={snapshot} />
         <AutoControl refreshKey={snapshot.jobs.length} />
         <SettingsPanel refreshKey={snapshot.jobs.length} />
         <UsagePanel refreshKey={snapshot.jobs.length} />
         <button onClick={() => setAdding(true)}
-          className="rounded-lg bg-gradient-to-r from-accent-strong to-accent-deep px-4 py-3 font-medium text-[#e6fbff] shadow-[0_0_18px_rgba(67,217,232,.18)] transition-colors duration-150 hover:brightness-110">⊕ Thêm task / bug</button>
+          className="shrink-0 rounded-lg bg-gradient-to-r from-accent-strong to-accent-deep px-4 py-3 font-medium text-[#e6fbff] shadow-[0_0_18px_rgba(67,217,232,.18)] transition-colors duration-150 hover:brightness-110">⊕ Thêm task / bug</button>
       </div>
       {snapshot.invalid.length > 0 && (
         <div className="rounded-lg border border-danger-border bg-danger-bg p-2 text-xs text-danger">
@@ -51,7 +51,7 @@ export default function App() {
           {snapshot.invalid.map((f) => `${f.file} (${f.error})`).join(' · ')}
         </div>
       )}
-      <div className="flex min-h-0 flex-1 gap-3">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-row">
         <ComponentsPanel components={snapshot.components} />
         <div className="flex min-w-0 flex-1 flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
