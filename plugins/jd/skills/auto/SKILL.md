@@ -78,9 +78,11 @@ In review step 6b, decide from the diff which domain audits to run. Run an audit
 |-------|---------------------------|-------|
 | `jd:ui-design-audit` | Frontend/UI: components, pages, styles, theme/design-system files | Scope it to the changed UI paths. |
 | `jd:db-audit` | DB schema (Prisma), migrations, or query-heavy data-access code | The static (prisma) layer needs only the schema file and always runs when a schema is present. The runtime (postgres) layer needs a read-only DB connection (`DATABASE_AUDIT_URL` or a passed URL); if none is configured, run the static layer only and record the runtime layer as skipped — do NOT stop to ask. |
-| `jd:error-audit` | New or changed error handling, logging, or critical paths (payment/auth/upload) | Scope it to the changed paths. If `error-standard.yaml` exists, conformance mode runs automatically and checks the diff against the project's error contract. |
+| `jd:error-audit` | **Always**, on any diff that touches code (any language); skip only on pure docs/config diffs | Not gated on the change touching error-handling code — error conformance is checked on every code change. When `error-standard.yaml` exists, conformance mode runs automatically against the contract; scope it to the changed paths. |
 
-If the diff touches none of these (e.g. docs or config only), skip all three and say so. Multiple may apply at once — run each relevant one. If the diff touches auth, PII, or upload paths, also run a security pass (the built-in security-review) and fold its findings into the general review. These audits are read-only; treat their findings as input to the general review, not a reason to halt unless a finding hits the STOP list.
+If the diff is pure docs or config, skip all of them and say so. Otherwise `jd:error-audit` ALWAYS runs (it is not gated on the change touching error-handling code); `jd:ui-design-audit` and `jd:db-audit` run only when their UI / DB triggers are in the diff. Multiple may apply at once — run each relevant one. If the diff touches auth, PII, or upload paths, also run a security pass (the built-in security-review) and fold its findings into the general review. These audits are read-only; treat their findings as input to the general review, not a reason to halt unless a finding hits the STOP list.
+
+End-to-end (e2e) tests are NOT part of this chain. The repo's e2e is live cross-service and partly Windows-only (menu-game ↔ cafe-service gRPC runs on cafe-win), so it cannot run in an unattended overnight Linux run. E2e is owned by the human afternoon acceptance pass on cafe-win — never block or fail an auto run on e2e.
 
 ## Fix policy
 
