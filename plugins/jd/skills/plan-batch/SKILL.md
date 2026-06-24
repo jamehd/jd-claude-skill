@@ -14,8 +14,10 @@ every card must pre-answer everything `jd:auto` would otherwise stop on.
 
 **Core principle:** a card is "agent-ready" only when nothing is left for the
 overnight agent to guess. The output is a populated `ready` column — never code,
-never a dispatch. Discuss EVERY card with the operator and promote it to `ready`
-only on his explicit OK; never self-promote. The operator then starts the batch.
+never a dispatch. For EVERY card, explain it to the operator — what it does, why,
+and the planned approach — in terms he can follow, settle the how together, and
+promote to `ready` only on his explicit OK; never self-promote. The operator then
+starts the batch.
 
 ## When to Use
 
@@ -61,9 +63,10 @@ non-e2e fast path.
 
 ## Ready-gate — all must hold before `status: ready`
 
-- [ ] **Operator-approved** — this specific card was discussed with the operator
-      this session and he explicitly OK'd `ready`. Never self-promote, even when
-      every other gate item passes.
+- [ ] **Operator-approved** — this specific card was explained to the operator
+      this session (what it does, why, and the planned approach), the how was
+      agreed together, and he explicitly OK'd `ready`. Never self-promote, even
+      when every other gate item passes.
 - [ ] **Scope** stated: what's in, what's explicitly out.
 - [ ] **`needsE2e`** set true/false by the heuristic above.
 - [ ] **Req ID(s)** named — an existing `CAFE-R#`/`DL-R#`/`WEB-R#`/`PACK-R#`/
