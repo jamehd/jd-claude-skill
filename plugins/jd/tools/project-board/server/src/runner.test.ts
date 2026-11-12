@@ -1063,6 +1063,25 @@ describe('Windows spawn planning failures', () => {
     expect(t.plans[1].command).toBe('claude -p --dangerously-skip-permissions --output-format stream-json --verbose --include-partial-messages --resume sess-1')
   })
 
+  it('a planning error on restart runs the normal failure cleanup and pumps the queue', async () => {
+    restore = withPlatform('win32')
+    const t = planningSetup()
+    const second = t.store.createItem({ type: 'task', title: 'second', component: 'infra' })
+    t.store.updateItem(second.id, { status: 'ready' })
+    const job = t.runner.dispatchTask(t.item.id)
+    const queued = t.runner.dispatchTask(second.id)
+    expect(t.created).toHaveLength(1)
+    t.created[0].stdout.emit('data', Buffer.from(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'bad & calc' }) + '\n'))
+    t.runner.message(job.id, 'next', 'queue')
+    t.created[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'))
+    expect(t.store.getItem(t.item.id)?.status).not.toBe('ai_running')
+    expect((t.runner as unknown as { timers: Map<string, unknown> }).timers.has(job.id)).toBe(false)
+    expect((t.runner as unknown as { messages: Map<string, unknown> }).messages.has(job.id)).toBe(false)
+    await vi.waitFor(() => expect(t.runner.getJob(queued.id)?.state).toBe('running'))
+    expect(t.created).toHaveLength(2)
+  })
+
   it('an invalid resume id fails the job without throwing', async () => {
     restore = withPlatform('win32')
     const t = planningSetup()

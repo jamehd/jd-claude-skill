@@ -532,7 +532,7 @@ export class JobRunner {
       proc = this.spawnFn(claudeBin, args, { cwd, shell: process.platform === 'win32', promptArgIndex: 1 })
     } catch (err) {
       this.running.delete(job.id)
-      this.finish(job, 'failed', `could not start claude: ${err instanceof Error ? err.message : err}`)
+      this.failJob(job, `could not start claude: ${err instanceof Error ? err.message : err}`)
       return
     }
     const entry: SegmentEntry = { proc, steering: false, buffer: '' }
@@ -603,19 +603,11 @@ export class JobRunner {
       return
     }
     if (job.error) {
-      this.clearTimer(job.id)
-      this.discardQueue(job)
-      this.afterFailure(job, job.error)
-      this.finish(job, 'failed', job.error)
-      this.pump()
+      this.failJob(job, job.error)
       return
     }
     if (code !== 0) {
-      this.clearTimer(job.id)
-      this.discardQueue(job)
-      this.afterFailure(job, `claude exited with code ${code}`)
-      this.finish(job, 'failed', `exit code ${code}`)
-      this.pump()
+      this.failJob(job, `claude exited with code ${code}`, `exit code ${code}`)
       return
     }
     const pending = this.messages.get(job.id)
@@ -648,6 +640,14 @@ export class JobRunner {
       this.afterFailure(job, reason)
       this.finish(job, 'failed', reason)
     }
+    this.pump()
+  }
+
+  private failJob(job: Job, reason: string, finishReason = reason): void {
+    this.clearTimer(job.id)
+    this.discardQueue(job)
+    this.afterFailure(job, reason)
+    this.finish(job, 'failed', finishReason)
     this.pump()
   }
 
