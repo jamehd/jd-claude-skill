@@ -34,7 +34,7 @@ Keep moving. When a decision has a reasonable default, pick it, record it as an 
    a. **General review** — Load superpowers:requesting-code-review; collect findings.
    b. **Domain audits** — Run only the audits the diff triggers (see **Domain review routing**); collect findings.
    c. **Fix and verify** — Apply fixes per the **Fix policy** (below) through a subagent with TDD, re-run the affected tests, then Load superpowers:verification-before-completion and confirm output before claiming done.
-7. **Integrate** — Load superpowers:finishing-a-development-branch. Commit and push the branch, then follow `git.integration` (default `pull-request`): `pull-request` opens the PR and reports the link; `merge-after-acceptance` pushes the branch, opens no merge, and reports that the AI merges into the main branch after the owner accepts.
+7. **Integrate** — Load superpowers:finishing-a-development-branch. Commit and push the branch, then follow `git.integration` (default `pull-request`): `pull-request` opens the PR and reports the link; `merge-after-acceptance` pushes the branch, opens no merge, and reports that the branch waits for the person to merge it, or for `/jd:accept` when the work belongs to a feature-flow feature.
 
 ## Board mode
 

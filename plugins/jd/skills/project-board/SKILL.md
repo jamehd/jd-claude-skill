@@ -42,7 +42,7 @@ On Windows the board spawns `claude` with the prompt on stdin, so no quoting wor
    ```powershell
    foreach ($d in 'tasks','status','jobs') { New-Item -ItemType Directory -Force "<target>\<data>\$d" | Out-Null }
    Set-Content -Path "<target>\<data>\.gitignore" -Value "jobs/", "auto.json"
-   if (-not (Select-String -Path "<target>\.gitignore" -Pattern '^\.board-worktrees/$' -Quiet -ErrorAction SilentlyContinue)) { Add-Content "<target>\.gitignore" ".board-worktrees/" }
+   if (-not (Select-String -Path "<target>\.gitignore" -Pattern '^\.board-worktrees/$' -Quiet -ErrorAction SilentlyContinue)) { $gi = "<target>\.gitignore"; $nl = if ((Test-Path $gi) -and ((Get-Content $gi -Raw) -notmatch "\n$")) { "`n" } else { "" }; Add-Content $gi ($nl + ".board-worktrees/") }
    ```
 
 3. **Config — pass env per process, do not share a `.env` between projects.** A `.env` in the tool dir silently applies to every project. To use an env file anyway, set `BOARD_ENV_FILE=<abs path>`; the board never loads an implicit `.env`, and real environment variables override the file. To require a login, generate a real password (never a placeholder), same command on every OS:

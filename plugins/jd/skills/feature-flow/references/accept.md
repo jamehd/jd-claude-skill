@@ -15,8 +15,13 @@ Only when the input explicitly accepts the feature.
    - `pull-request`: open a PR from the feature branch into `git.main` with `gh pr create`, record
      the PR link in `report.md`, and leave the feature `acceptance`. Do not merge. Tell the person
      to merge the PR. The feature becomes `done` only after the PR is merged: a later
-     `/jd:accept <ID>` or `/jd:next` runs `gh pr view` and, when the state is `MERGED`, continues
-     with steps 4-7; when it is still open, report that and stop.
+     `/jd:accept <ID>` or `/jd:next` runs `gh pr view` and acts on the state:
+     - `MERGED`: continue with steps 4-7.
+     - `OPEN`: report that the PR awaits merge and stop.
+     - `CLOSED` without merge: set `stopped` with `stoppedFrom: acceptance`, write a stop report
+       (PR closed unmerged), and ask the owner whether to reopen, recreate or abandon.
+     - `gh` unavailable or not authenticated: ask the person to confirm explicitly that the PR was
+       merged, record the confirmation and its date in `report.md`, then continue with steps 4-7.
    - `merge-after-acceptance`: merge the feature branch into `git.main` (merge commit or
      fast-forward, not squash), push `git.main`, delete the remote feature branch.
 4. `paths.scenarios`: this feature's scenarios → `active` (they now run in every build).
@@ -29,9 +34,12 @@ Only when the input explicitly accepts the feature.
 
 1. Record each note against its scenario; increment `reworkRound` in `feature.md` and the report.
 2. Within `limits.rework_rounds`: add a rework history row, set `building`, continue with
-   `build.md` limited to the notes.
+   `build.md` limited to the notes. Under `pull-request`, keep the existing PR open: push the
+   rework commits to the same feature branch and note the round in the PR.
 3. Beyond `limits.rework_rounds`: change no code. Set `stopped`, write a stop report comparing the
    notes with the brief and scenarios, propose brief corrections, and ask the owner to decide.
+   Under `pull-request`, close the open PR with a comment pointing to the stop report; a new PR is
+   opened after the brief is settled.
 
 Ambiguous input (no feature ID, or a mix of praise and concerns without a verdict) → ask for an
 explicit verdict and stop.

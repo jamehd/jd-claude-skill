@@ -20,7 +20,7 @@ if [ -n "$CONFIG" ] && [ -f "$CONFIG" ]; then
     /^[^[:space:]#]/ { in_hooks = ($0 ~ /^hooks:/); next }
     in_hooks && /^[[:space:]]+conventions:/ {
       v = $0; sub(/^[[:space:]]+conventions:[[:space:]]*/, "", v)
-      sub(/[[:space:]]+#.*$/, "", v); gsub(/|"|'"'"'/, "", v)
+      sub(/[[:space:]]+#.*$/, "", v); gsub(/\r/, "", v); gsub(/["'"'"']/, "", v)
       print v; exit
     }' "$CONFIG")
   if [ "$conventions" = "false" ]; then

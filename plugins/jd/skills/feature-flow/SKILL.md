@@ -94,8 +94,9 @@ anything in `acceptance.forbidden`; a missing tool, credential or service with n
 
 - Every build re-runs every `active` scenario plus the feature's own, then runs every skill in
   `audits.always` (and `audits.when_schema` when schema or queries changed).
-- One branch per feature (`git.branch_pattern`); integrate only at Gate B, only in `/jd:accept`
-  (`git.integration`: `pull-request` by default, or `merge-after-acceptance`).
+- One branch per feature (`git.branch_pattern`); integrate only at Gate B: the PR is opened or the merge done by `/jd:accept`, and a merged PR is
+  completed by `/jd:accept` or `/jd:next` (`git.integration`: `pull-request` by default, or
+  `merge-after-acceptance`).
 - `approvedAt` in `feature.md` is the authoritative Gate A record.
 - Task files use the project-board task format but are never set to `ready`, so board
   auto-dispatch cannot pick them up.

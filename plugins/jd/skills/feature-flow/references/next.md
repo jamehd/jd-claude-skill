@@ -10,7 +10,7 @@ Read `project.yaml`, `paths.status` and every `feature.md`. Decide from files on
 | A feature `stopped`, and the owner's latest message explicitly answers its stop question | Record the decision in the stop report, apply it, set the status back to `stoppedFrom`, clear `stoppedFrom`, continue from "Current step" in the status file |
 | A feature `stopped`, no explicit answer | Repeat the stop question in `language.owner`; do nothing else |
 | A feature `building` | Continue `build.md` from "Current step" and the first unfinished task |
-| A feature `acceptance` with a PR link in its report (`git.integration: pull-request`) | Run `gh pr view`; when merged, finish `accept.md` steps 4-7; otherwise report the open PR |
+| A feature `acceptance` with a PR link in its report (`git.integration: pull-request`) | Run `gh pr view` and act as `accept.md` step 3 says: `MERGED` finish steps 4-7; `OPEN` report it; `CLOSED` unmerged stop with a stop report; `gh` unavailable ask the person to confirm the merge |
 | A feature `acceptance` | Remind how to try it and that `/jd:accept` is needed; then, if the next feature in the queue is `idea`, run `feature.md` for it (drafting only) |
 | A feature `brief-review` | Remind the owner what needs approval; do not build |
 | Nothing active | Take the first `idea` in the queue whose `needs` are all done and run `feature.md` |
