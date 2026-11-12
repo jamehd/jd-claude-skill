@@ -99,6 +99,7 @@ export type ConsoleEvent =
   | { kind: 'raw'; text: string }
 
 export interface BoardSnapshot {
+  project: string
   items: BoardItem[]
   invalid: { file: string; error: string }[]
   components: ComponentStatus[]

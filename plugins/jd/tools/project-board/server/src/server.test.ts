@@ -60,13 +60,47 @@ describe('auth', () => {
     const app = await buildServer(deps)
     const login = await app.inject({ method: 'POST', url: '/api/login', payload: { password: 'secret' } })
     expect(login.statusCode).toBe(200)
-    const cookie = login.cookies.find((c) => c.name === 'board_session')
+    const cookie = login.cookies.find((c) => c.name === 'board_session_0')
     expect(cookie).toBeDefined()
     const res = await app.inject({
       method: 'GET', url: '/api/board',
-      cookies: { board_session: cookie!.value },
+      cookies: { board_session_0: cookie!.value },
     })
     expect(res.statusCode).toBe(200)
     expect(res.json()).toHaveProperty('items')
+  })
+})
+
+describe('per-port session cookies', () => {
+  it('names the cookie after the port and keeps two boards on different ports independent', async () => {
+    const a = makeDeps(); a.config.cookieName = 'board_session_4401'
+    const b = makeDeps(); b.config.cookieName = 'board_session_4402'
+    const appA = await buildServer(a)
+    const appB = await buildServer(b)
+    const loginA = await appA.inject({ method: 'POST', url: '/api/login', payload: { password: 'secret' } })
+    const loginB = await appB.inject({ method: 'POST', url: '/api/login', payload: { password: 'secret' } })
+    const cookieA = loginA.cookies.find((c) => c.name === 'board_session_4401')!
+    const cookieB = loginB.cookies.find((c) => c.name === 'board_session_4402')!
+    expect(cookieA).toBeDefined()
+    expect(cookieB).toBeDefined()
+    const both = { board_session_4401: cookieA.value, board_session_4402: cookieB.value }
+    expect((await appA.inject({ method: 'GET', url: '/api/board', cookies: both })).statusCode).toBe(200)
+    expect((await appB.inject({ method: 'GET', url: '/api/board', cookies: both })).statusCode).toBe(200)
+    expect((await appA.inject({ method: 'GET', url: '/api/board', cookies: { board_session_4402: cookieB.value } })).statusCode).toBe(401)
+  })
+})
+
+describe('board payload', () => {
+  it('exposes the project name', async () => {
+    const app = await buildServer(makeOpenDeps())
+    const res = await app.inject({ method: 'GET', url: '/api/board' })
+    expect(res.json().project).toBe('Test Project')
+  })
+
+  it('serves the project name without a session for the login page', async () => {
+    const app = await buildServer(makeDeps())
+    const res = await app.inject({ method: 'GET', url: '/api/info' })
+    expect(res.statusCode).toBe(200)
+    expect(res.json()).toEqual({ project: 'Test Project' })
   })
 })

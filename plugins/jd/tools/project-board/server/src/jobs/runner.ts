@@ -10,7 +10,15 @@ import { parseRequirementsDir } from './requirements.js'
 import { formatRequirementsTouched } from './requirements-touched.js'
 import { normalizeLine } from './events.js'
 
-export type SpawnFn = (bin: string, args: string[], opts: { cwd: string }) => ChildProcess
+export type SpawnFn = (bin: string, args: string[], opts: { cwd: string; shell?: boolean }) => ChildProcess
+
+function quoteForCmd(arg: string): string {
+  return /[\s"&|<>^%()]/.test(arg) || arg === '' ? `"${arg.replace(/"/g, '\\"')}"` : arg
+}
+
+// With shell: true on Windows, Node joins args unquoted into a cmd.exe command line.
+const defaultSpawn: SpawnFn = (bin, args, opts) =>
+  opts.shell ? spawn(quoteForCmd(bin), args.map(quoteForCmd), opts) : spawn(bin, args, opts)
 
 export interface GitOps {
   createWorktree(taskId: string, baseBranches?: string[]): string
@@ -36,6 +44,8 @@ export interface RunnerDeps {
   claudeBin: string
   timeoutMs: number
   maxConcurrent: number
+  branchPrefix?: string
+  integration?: 'pull-request' | 'merge-after-acceptance'
   spawnFn?: SpawnFn
 }
 
@@ -73,7 +83,7 @@ export class JobRunner {
   private lastRateLimit?: RateLimitSnapshot
 
   constructor(private deps?: RunnerDeps) {
-    this.spawnFn = deps?.spawnFn ?? spawn
+    this.spawnFn = deps?.spawnFn ?? defaultSpawn
     if (deps) {
       this.maxConcurrent = deps.maxConcurrent
       this.recoverInterrupted()
@@ -82,6 +92,10 @@ export class JobRunner {
       this.loadUsage()
       if (this.auto.enabled) { this.startAutoInterval(); this.autoTick() }
     }
+  }
+
+  private branchOf(taskId: string): string {
+    return `${this.deps?.branchPrefix ?? 'board/'}${taskId}`
   }
 
   // Resets any task stuck in ai_running with no live (queued/running) job back to ready.
@@ -446,14 +460,14 @@ export class JobRunner {
     let cwd: string
     let prompt: string
     if (job.kind === 'task') {
-      job.branch = `board/${job.taskId!}`
+      job.branch = this.branchOf(job.taskId!)
       // Rebuilding board/<taskId> invalidates any dependent stacked on the old
       // branch — reset them so they re-run on the fresh base.
       this.resetDependents(job.taskId!)
       // Stack unmerged dependency branches so this task builds on their work.
       const depItem = store.getItem(job.taskId!)
       const baseBranches = depItem
-        ? unmergedDeps(depItem, indexById(store.scan().items)).map((id) => `board/${id}`)
+        ? unmergedDeps(depItem, indexById(store.scan().items)).map((id) => this.branchOf(id))
         : []
       try {
         cwd = git.createWorktree(job.taskId!, baseBranches)
@@ -470,7 +484,7 @@ export class JobRunner {
       store.updateItem(item.id, { status: 'ai_running', job: job.id })
       prompt = buildTaskPrompt(item, parseRequirementsDir(this.deps!.repoRoot), this.deps!.repoRoot)
     } else if (job.kind === 'resolve') {
-      job.branch = `board/${job.taskId!}`
+      job.branch = this.branchOf(job.taskId!)
       // Resolve reuses the task's EXISTING worktree (recreating it would wipe the work).
       if (!git.hasWorktree(job.taskId!)) {
         this.finish(job, 'failed', 'worktree missing; re-run the task instead')
@@ -512,7 +526,7 @@ export class JobRunner {
       '--output-format', 'stream-json', '--verbose', '--include-partial-messages']
     if (resume) args.push('--resume', resume)
 
-    const proc = this.spawnFn(claudeBin, args, { cwd })
+    const proc = this.spawnFn(claudeBin, args, { cwd, shell: process.platform === 'win32' })
     const entry: SegmentEntry = { proc, steering: false, buffer: '' }
     this.running.set(job.id, entry)
 
@@ -702,7 +716,8 @@ export class JobRunner {
   private startTestGate(job: Job, cmd: string): void {
     this.note(job, 'info', `Test gate: ${cmd}`)
     const cwd = this.cwds.get(job.id) ?? this.deps!.git.worktreePath(job.taskId!)
-    const proc = this.spawnFn('bash', ['-lc', cmd], { cwd })
+    const useCmd = process.platform === 'win32' && process.env.BOARD_TEST_SHELL !== 'bash'
+    const proc = useCmd ? this.spawnFn('cmd', ['/c', cmd], { cwd }) : this.spawnFn('bash', ['-lc', cmd], { cwd })
     this.running.set(job.id, { proc, steering: false, buffer: '', gate: true })
     this.armTimer(job)
     const onChunk = (b: Buffer) => {
@@ -746,7 +761,7 @@ export class JobRunner {
         touched = '(could not read commits)'
         this.note(job, 'info', `requirements-touched: ${e instanceof Error ? e.message : e}`)
       }
-      const summary = `Job ${job.id} succeeded on branch board/${job.taskId}.\nRequirements touched: ${touched}\nChanged files:\n${git.changedFiles(job.taskId!).map((f) => `- ${f}`).join('\n')}\nFull output: data/jobs/${job.id}.log`
+      const summary = `Job ${job.id} succeeded on branch ${this.branchOf(job.taskId!)}.\nRequirements touched: ${touched}\nChanged files:\n${git.changedFiles(job.taskId!).map((f) => `- ${f}`).join('\n')}\nFull output: data/jobs/${job.id}.log`
 
       // needsE2e routes the finished task. true → stop in review for the human's
       // manual e2e on cafe-win. false → complete the cycle by opening a PR here.
@@ -761,7 +776,7 @@ export class JobRunner {
         return
       }
 
-      if (noE2e && item) {
+      if (noE2e && item && this.deps!.integration !== 'merge-after-acceptance') {
         try {
           const url = git.createPr(job.taskId!, `${item.id}: ${item.title}`, item.body)
           store.updateItem(job.taskId!, { pr: url, status: 'pr' })
@@ -790,7 +805,7 @@ export class JobRunner {
       // Either way the task must leave ai_running so it is never stuck.
       const next = job.kind === 'resolve' ? 'review' : (t ? gatedReadyStatus(t) : 'backlog')
       store.updateItem(job.taskId!, { status: next })
-      store.appendToBody(job.taskId!, `## AI result\nJob ${job.id} failed: ${reason}\nWorktree/branch kept for inspection: board/${job.taskId}`)
+      store.appendToBody(job.taskId!, `## AI result\nJob ${job.id} failed: ${reason}\nWorktree/branch kept for inspection: ${this.branchOf(job.taskId!)}`)
     } catch { /* task file may be unparseable after a bad edit; job error is still recorded */ }
   }
 

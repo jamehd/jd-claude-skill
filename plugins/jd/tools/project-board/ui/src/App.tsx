@@ -32,6 +32,10 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey)
   }, [consoleJob])
 
+  useEffect(() => {
+    if (snapshot?.project) document.title = `${snapshot.project} Board`
+  }, [snapshot?.project])
+
   if (!authed) return <Login onSuccess={() => { setAuthed(true); void refresh() }} />
   if (!snapshot) return <div className="p-8 text-text-secondary">Đang tải…</div>
 

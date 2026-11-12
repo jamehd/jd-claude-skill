@@ -156,3 +156,49 @@ describe('BoardGit', () => {
     git.removeWorktree('TASK-007')
   })
 })
+
+describe('BoardGit with project settings', () => {
+  let mrepo: string
+
+  beforeEach(() => {
+    mrepo = mkdtempSync(path.join(tmpdir(), 'board-git-master-'))
+    sh(mrepo, 'init', '-b', 'master')
+    sh(mrepo, 'config', 'user.email', 'test@test')
+    sh(mrepo, 'config', 'user.name', 'test')
+    writeFileSync(path.join(mrepo, 'a.txt'), 'hello\n')
+    sh(mrepo, 'add', '.')
+    sh(mrepo, 'commit', '-m', 'init')
+  })
+
+  it('branches from and diffs against the configured main branch with the configured prefix', () => {
+    const g = new BoardGit(mrepo, { mainBranch: 'master', remoteName: 'origin', branchPrefix: 'bd/' })
+    const wt = g.createWorktree('TASK-001')
+    expect(g.branchName('TASK-001')).toBe('bd/TASK-001')
+    expect(sh(mrepo, 'branch', '--list', 'bd/TASK-001').trim()).not.toBe('')
+    writeFileSync(path.join(wt, 'b.txt'), 'new\n')
+    sh(wt, 'add', '.')
+    sh(wt, 'commit', '-m', 'feat: b')
+    expect(g.changedFiles('TASK-001')).toEqual(['b.txt'])
+    expect(g.commitMessages('TASK-001')).toEqual(['feat: b'])
+    expect(g.branchDiff('TASK-001')).toContain('b.txt')
+    g.mergeBranch('TASK-001', 'merge b')
+    expect(sh(mrepo, 'log', '-1', '--format=%s').trim()).toBe('merge b')
+    expect(sh(mrepo, 'branch', '--list', 'bd/TASK-001').trim()).toBe('')
+  })
+
+  it('mergeBranch refuses when HEAD is not the configured main branch', () => {
+    const g = new BoardGit(mrepo, { mainBranch: 'trunk', remoteName: 'origin', branchPrefix: 'board/' })
+    expect(() => g.mergeBranch('TASK-001', 'm')).toThrow(/expected trunk/)
+  })
+
+  it('pushes to the configured remote name', () => {
+    const bare = mkdtempSync(path.join(tmpdir(), 'board-git-bare-'))
+    sh(bare, 'init', '--bare')
+    sh(mrepo, 'remote', 'add', 'upstream', bare)
+    const g = new BoardGit(mrepo, { mainBranch: 'master', remoteName: 'upstream', branchPrefix: 'board/' })
+    g.createWorktree('TASK-002')
+    sh(mrepo, 'push', 'upstream', 'board/TASK-002')
+    g.deleteRemoteBranch('TASK-002')
+    expect(sh(bare, 'branch', '--list', 'board/TASK-002').trim()).toBe('')
+  })
+})

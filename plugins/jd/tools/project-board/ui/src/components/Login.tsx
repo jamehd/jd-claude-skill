@@ -1,9 +1,14 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { api } from '../api.js'
 
 export function Login({ onSuccess }: { onSuccess: () => void }) {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [project, setProject] = useState('')
+
+  useEffect(() => {
+    api.info().then((i) => { setProject(i.project); document.title = `${i.project} Board` }).catch(() => {})
+  }, [])
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
@@ -18,7 +23,7 @@ export function Login({ onSuccess }: { onSuccess: () => void }) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-[rgba(8,13,20,.7)]">
       <form onSubmit={submit} className="w-80 space-y-4 rounded-[10px] border border-border bg-surface p-6">
-        <h1 className="text-lg font-semibold text-text-primary">GameSync Project Board</h1>
+        <h1 className="text-lg font-semibold text-text-primary">{project} Board</h1>
         <input
           type="password" value={password} onChange={(e) => setPassword(e.target.value)}
           placeholder="Mật khẩu" autoFocus

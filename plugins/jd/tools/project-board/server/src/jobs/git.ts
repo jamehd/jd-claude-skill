@@ -4,8 +4,20 @@ import path from 'node:path'
 
 export const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9_-]*$/
 
+export interface GitSettings {
+  mainBranch: string
+  remoteName: string
+  branchPrefix: string
+}
+
+const DEFAULT_SETTINGS: GitSettings = { mainBranch: 'main', remoteName: 'origin', branchPrefix: 'board/' }
+
 export class BoardGit {
-  constructor(readonly repoRoot: string) {}
+  private readonly settings: GitSettings
+
+  constructor(readonly repoRoot: string, settings: Partial<GitSettings> = {}) {
+    this.settings = { ...DEFAULT_SETTINGS, ...settings }
+  }
 
   private assertSafeId(taskId: string): void {
     if (!SAFE_ID.test(taskId)) throw new Error(`invalid task id: ${taskId}`)
@@ -26,7 +38,7 @@ export class BoardGit {
   }
 
   branchName(taskId: string): string {
-    return `board/${taskId}`
+    return `${this.settings.branchPrefix}${taskId}`
   }
 
   // baseBranches stacks unmerged dependency branches into the new worktree so a
@@ -41,7 +53,7 @@ export class BoardGit {
     // -B (create-or-reset) so re-dispatch after an interrupted/failed/discarded run starts
     // fresh from main even when the board/<id> branch still exists (removeWorktree drops the
     // worktree but not the branch). -b would fail with "branch already exists".
-    this.git(['worktree', 'add', '-B', this.branchName(taskId), wt, 'main'])
+    this.git(['worktree', 'add', '-B', this.branchName(taskId), wt, this.settings.mainBranch])
     for (const base of baseBranches) {
       // Merge inside the worktree (it is checked out on board/<taskId>).
       this.git(['-C', wt, 'merge', '--no-edit', base])
@@ -62,12 +74,12 @@ export class BoardGit {
 
   branchDiff(taskId: string): string {
     this.assertSafeId(taskId)
-    return this.git(['diff', `main...${this.branchName(taskId)}`])
+    return this.git(['diff', `${this.settings.mainBranch}...${this.branchName(taskId)}`])
   }
 
   changedFiles(taskId: string): string[] {
     this.assertSafeId(taskId)
-    return this.git(['diff', '--name-only', `main...${this.branchName(taskId)}`])
+    return this.git(['diff', '--name-only', `${this.settings.mainBranch}...${this.branchName(taskId)}`])
       .split('\n').filter(Boolean)
   }
 
@@ -75,7 +87,7 @@ export class BoardGit {
   // so multi-line bodies stay separable). Feeds formatRequirementsTouched.
   commitMessages(taskId: string): string[] {
     this.assertSafeId(taskId)
-    return this.git(['log', `main..${this.branchName(taskId)}`, '--format=%B%x00'])
+    return this.git(['log', `${this.settings.mainBranch}..${this.branchName(taskId)}`, '--format=%B%x00'])
       .split('\0')
       .map((s) => s.trim())
       .filter(Boolean)
@@ -85,10 +97,10 @@ export class BoardGit {
     this.assertSafeId(taskId)
     // Ignore untracked files (e.g. .board-worktrees/) — only staged/modified tracked files block the merge
     if (this.git(['status', '--porcelain', '--untracked-files=no']).trim() !== '') {
-      throw new Error('main working tree is dirty; commit or stash before merging')
+      throw new Error(`${this.settings.mainBranch} working tree is dirty; commit or stash before merging`)
     }
     const branch = this.git(['rev-parse', '--abbrev-ref', 'HEAD']).trim()
-    if (branch !== 'main') throw new Error(`repo is on ${branch}, expected main`)
+    if (branch !== this.settings.mainBranch) throw new Error(`repo is on ${branch}, expected ${this.settings.mainBranch}`)
     try {
       this.git(['merge', '--squash', this.branchName(taskId)])
     } catch {
@@ -96,7 +108,7 @@ export class BoardGit {
       // so `git merge --abort` won't work — reset --hard restores the pre-merge clean main
       // (the dirty-tree guard above proved it was clean) instead of leaving conflict markers.
       try { this.git(['reset', '--hard', 'HEAD']) } catch { /* best effort */ }
-      throw new Error(`merge conflict with main for ${this.branchName(taskId)}; main left unchanged — re-run the task (it rebranches from main) or merge manually`)
+      throw new Error(`merge conflict with ${this.settings.mainBranch} for ${this.branchName(taskId)}; main left unchanged — re-run the task (it rebranches from main) or merge manually`)
     }
     try {
       this.git(['commit', '-m', message])
@@ -117,13 +129,13 @@ export class BoardGit {
   // Deletes the remote branch (e.g. after a PR was closed without merging).
   deleteRemoteBranch(taskId: string): void {
     this.assertSafeId(taskId)
-    this.git(['push', 'origin', '--delete', this.branchName(taskId)])
+    this.git(['push', this.settings.remoteName, '--delete', this.branchName(taskId)])
   }
 
   // Pushes the branch and opens a GitHub PR; requires `gh` CLI and a configured remote.
   createPr(taskId: string, title: string, body: string): string {
     this.assertSafeId(taskId)
-    this.git(['push', '-u', 'origin', this.branchName(taskId)])
+    this.git(['push', '-u', this.settings.remoteName, this.branchName(taskId)])
     try {
       return execFileSync('gh',
         ['pr', 'create', '--head', this.branchName(taskId), '--title', title, '--body', body],

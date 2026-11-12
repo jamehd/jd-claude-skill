@@ -23,6 +23,7 @@ export interface ServerDeps {
 export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
   const app = Fastify({ logger: true })
   const sessions = new Set<string>()
+  const cookieName = deps.config.cookieName
 
   await app.register(cookie)
   await app.register(websocket)
@@ -42,6 +43,8 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
     })
   }
 
+  app.get('/api/info', () => ({ project: deps.config.project.project }))
+
   if (deps.config.password) {
     app.post<{ Body: { password?: string } }>('/api/login', (req, reply) => {
       if (req.body?.password !== deps.config.password) {
@@ -49,21 +52,21 @@ export async function buildServer(deps: ServerDeps): Promise<FastifyInstance> {
       }
       const sid = randomUUID()
       sessions.add(sid)
-      reply.setCookie('board_session', sid, { path: '/', httpOnly: true, sameSite: 'lax' })
+      reply.setCookie(cookieName, sid, { path: '/', httpOnly: true, sameSite: 'lax' })
       return { ok: true }
     })
 
     app.addHook('onRequest', (req, reply, done) => {
       const path = req.url.split('?')[0]
-      const open = path === '/api/login' || !path.startsWith('/api')
-      if (open || sessions.has(req.cookies.board_session ?? '')) return done()
+      const open = path === '/api/login' || path === '/api/info' || !path.startsWith('/api')
+      if (open || sessions.has(req.cookies[cookieName] ?? '')) return done()
       reply.code(401).send({ error: 'unauthorized' })
     })
 
     // /ws is not under /api so the hook passes it through;
     // auth is enforced here at upgrade time to prevent unauthenticated streaming
     app.get('/ws', { websocket: true }, (socket, req) => {
-      if (!sessions.has(req.cookies.board_session ?? '')) {
+      if (!sessions.has(req.cookies[cookieName] ?? '')) {
         socket.close(4401, 'unauthorized')
         return
       }

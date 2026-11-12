@@ -30,6 +30,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
 
   app.get('/api/board', () => ({
     ...store.scan(),
+    project: deps.config.project.project,
     components: store.componentStatuses(),
     jobs: deps.runner?.listJobs() ?? [],
   }))
@@ -347,7 +348,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     const item = requireReview(req.params.id, reply)
     if (!item) return reply
     deps.git.removeWorktree(item.id)
-    store.appendToBody(item.id, `Branch board/${item.id} discarded on ${new Date().toISOString().slice(0, 10)}.`)
+    store.appendToBody(item.id, `Branch ${deps.config.branchPrefix}${item.id} discarded on ${new Date().toISOString().slice(0, 10)}.`)
     const updated = store.updateItem(item.id, { status: gatedReadyStatus(item) })
     // Discarding this branch invalidates anything stacked on it.
     deps.runner.resetDependents(item.id)

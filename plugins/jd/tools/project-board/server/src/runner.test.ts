@@ -1,11 +1,11 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, afterEach } from 'vitest'
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { BoardStore } from './store.js'
 import { WsHub } from './ws.js'
-import { JobRunner, type SpawnFn, type GitOps } from './jobs/runner.js'
+import { JobRunner, type SpawnFn, type GitOps, type RunnerDeps } from './jobs/runner.js'
 
 class FakeProc extends EventEmitter {
   stdout = new EventEmitter()
@@ -14,7 +14,7 @@ class FakeProc extends EventEmitter {
   kill() { this.killed = true; this.emit('exit', 143) }
 }
 
-function setup() {
+function setup(over: Partial<RunnerDeps> = {}) {
   const dataDir = mkdtempSync(path.join(tmpdir(), 'board-run-'))
   for (const d of ['tasks', 'status', 'jobs']) mkdirSync(path.join(dataDir, d), { recursive: true })
   const store = new BoardStore(dataDir)
@@ -45,7 +45,7 @@ function setup() {
   }
   const runner = new JobRunner({
     store, hub: new WsHub(), git, spawnFn, repoRoot: dataDir,
-    jobsDir: path.join(dataDir, 'jobs'), claudeBin: 'claude', timeoutMs: 5000, maxConcurrent: 1,
+    jobsDir: path.join(dataDir, 'jobs'), claudeBin: 'claude', timeoutMs: 5000, maxConcurrent: 1, ...over,
   })
   const sendInit = (i = 0, session = 'sess-1') =>
     procs[i].stdout.emit('data', Buffer.from(JSON.stringify({ type: 'system', subtype: 'init', session_id: session }) + '\n'))
@@ -149,7 +149,7 @@ describe('JobRunner', () => {
     expect(t.git.createWorktree).not.toHaveBeenCalledWith('RESCAN')
     expect(t.git.createWorktree).not.toHaveBeenCalled()
     // Rescan spawns in the repo root, not a worktree path.
-    expect((t.spawnFn as ReturnType<typeof vi.fn>).mock.calls[0][2]).toEqual({ cwd: t.dataDir })
+    expect((t.spawnFn as ReturnType<typeof vi.fn>).mock.calls[0][2]).toMatchObject({ cwd: t.dataDir })
     // Simulate the AI writing a status file AFTER dispatch so its mtime beats the snapshot.
     writeFileSync(path.join(t.dataDir, 'status', 'infra.md'), STATUS_MD)
     t.procs[0].stdout.emit('data', Buffer.from(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-1' }) + '\n'))
@@ -825,6 +825,7 @@ describe('board test gate', () => {
   }
 
   it('pass gate → review', async () => {
+    vi.stubEnv('BOARD_TEST_SHELL', 'bash')
     const t = setup()
     ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
     setCmd(t, { infra: 'echo ok' })
@@ -839,6 +840,7 @@ describe('board test gate', () => {
   })
 
   it('fail gate → not review', async () => {
+    vi.stubEnv('BOARD_TEST_SHELL', 'bash')
     const t = setup()
     ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
     setCmd(t, { infra: 'exit 1' })
@@ -931,5 +933,105 @@ describe('needsE2e PR routing', () => {
     const item = t.store.getItem(id)!
     expect(item.status).toBe('review')
     expect(item.body).toContain('PR auto-open failed')
+  })
+})
+
+afterEach(() => { vi.unstubAllEnvs() })
+
+function withPlatform(platform: NodeJS.Platform) {
+  const original = Object.getOwnPropertyDescriptor(process, 'platform')!
+  Object.defineProperty(process, 'platform', { value: platform })
+  return () => Object.defineProperty(process, 'platform', original)
+}
+
+describe('integration routing', () => {
+  function readyTask(t: ReturnType<typeof setup>, extra?: Record<string, unknown>) {
+    const id = t.store.createItem({ type: 'task', title: 'x', component: 'infra' }).id
+    t.store.updateItem(id, { status: 'ready', ...(extra ? { extra } : {}) })
+    return id
+  }
+
+  it('merge-after-acceptance sends a needsE2e=false success to review without opening a PR', async () => {
+    const t = setup({ integration: 'merge-after-acceptance' })
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    const id = readyTask(t, { needsE2e: false })
+    t.runner.dispatchTask(id)
+    t.sendInit(0); t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.store.getItem(id)?.status).toBe('review'))
+    expect(t.git.createPr).not.toHaveBeenCalled()
+  })
+
+  it('pull-request (explicit) keeps the PR route', async () => {
+    const t = setup({ integration: 'pull-request' })
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    ;(t.git.createPr as ReturnType<typeof vi.fn>).mockReturnValue('https://gh/pr/2')
+    const id = readyTask(t, { needsE2e: false })
+    t.runner.dispatchTask(id)
+    t.sendInit(0); t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.store.getItem(id)?.status).toBe('pr'))
+  })
+
+  it('uses the configured branch prefix for the job branch', () => {
+    const t = setup({ branchPrefix: 'bd/' })
+    const id = readyTask(t)
+    const job = t.runner.dispatchTask(id)
+    expect(job.branch).toBe(`bd/${id}`)
+  })
+})
+
+describe('Windows process spawning', () => {
+  let restore: (() => void) | undefined
+  afterEach(() => { restore?.(); restore = undefined; vi.unstubAllEnvs() })
+
+  function readyTask(t: ReturnType<typeof setup>, component = 'infra') {
+    const id = t.store.createItem({ type: 'task', title: 'x', component }).id
+    t.store.updateItem(id, { status: 'ready' })
+    return id
+  }
+
+  it('spawns claude through a shell on win32', () => {
+    restore = withPlatform('win32')
+    const t = setup()
+    t.runner.dispatchTask(readyTask(t))
+    expect((t.spawnFn as ReturnType<typeof vi.fn>).mock.calls[0][2]).toMatchObject({ shell: true })
+  })
+
+  it('spawns claude without a shell on linux', () => {
+    restore = withPlatform('linux')
+    const t = setup()
+    t.runner.dispatchTask(readyTask(t))
+    expect((t.spawnFn as ReturnType<typeof vi.fn>).mock.calls[0][2].shell).toBeFalsy()
+  })
+
+  async function runToGate(t: ReturnType<typeof setup>) {
+    ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
+    writeFileSync(`${t.dataDir}/test-commands.json`, JSON.stringify({ infra: 'echo ok' }))
+    t.runner.dispatchTask(readyTask(t))
+    t.sendInit(0); t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.spawnCalls.length).toBe(2))
+  }
+
+  it('runs the test gate with cmd /c on win32', async () => {
+    restore = withPlatform('win32')
+    const t = setup()
+    await runToGate(t)
+    expect((t.spawnFn as ReturnType<typeof vi.fn>).mock.calls[1][0]).toBe('cmd')
+    expect(t.spawnCalls[1]).toEqual(['/c', 'echo ok'])
+  })
+
+  it('BOARD_TEST_SHELL=bash keeps bash -lc on win32', async () => {
+    restore = withPlatform('win32')
+    vi.stubEnv('BOARD_TEST_SHELL', 'bash')
+    const t = setup()
+    await runToGate(t)
+    expect((t.spawnFn as ReturnType<typeof vi.fn>).mock.calls[1][0]).toBe('bash')
+    expect(t.spawnCalls[1]).toEqual(['-lc', 'echo ok'])
+  })
+
+  it('runs the test gate with bash -lc on linux', async () => {
+    restore = withPlatform('linux')
+    const t = setup()
+    await runToGate(t)
+    expect((t.spawnFn as ReturnType<typeof vi.fn>).mock.calls[1][0]).toBe('bash')
   })
 })

@@ -16,6 +16,7 @@ export class UnauthorizedError extends Error {}
 
 export const api = {
   login: (password: string) => request<{ ok: boolean }>('/api/login', { method: 'POST', body: JSON.stringify({ password }) }),
+  info: () => request<{ project: string }>('/api/info'),
   board: () => request<BoardSnapshot>('/api/board'),
   createTask: (input: { type: string; title: string; component: string; priority?: string; body?: string }) =>
     request<BoardItem>('/api/tasks', { method: 'POST', body: JSON.stringify(input) }),

@@ -6,13 +6,13 @@ import type { ServerDeps } from './server.js'
 
 let app: FastifyInstance
 let deps: ServerDeps
-let cookie: { board_session: string }
+let cookie: Record<string, string>
 
 beforeEach(async () => {
   deps = makeDeps()
   app = await buildServer(deps)
   const login = await app.inject({ method: 'POST', url: '/api/login', payload: { password: 'secret' } })
-  cookie = { board_session: login.cookies.find((c) => c.name === 'board_session')!.value }
+  cookie = { board_session_0: login.cookies.find((c) => c.name === 'board_session_0')!.value }
 })
 
 describe('task routes', () => {

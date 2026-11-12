@@ -1,5 +1,9 @@
-import 'dotenv/config'
+import { existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
+import dotenv from 'dotenv'
+import { loadProjectConfig, resolveMainBranch, ProjectConfigError, type ProjectConfig } from './project-config.js'
+
+export type Integration = 'pull-request' | 'merge-after-acceptance'
 
 export interface Config {
   port: number
@@ -11,25 +15,68 @@ export interface Config {
   maxConcurrentJobs: number
   claudeBin: string
   uiDistDir?: string
+  project: ProjectConfig
+  mainBranch: string
+  remoteName: string
+  branchPrefix: string
+  integration: Integration
+  cookieName: string
 }
+
+const SETUP_HINT = 'run the jd:project-board setup skill (or create it by hand) before starting the board'
 
 function num(value: string | undefined, fallback: number): number {
   const n = Number(value)
   return Number.isFinite(n) ? n : fallback
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
+function readEnvFile(env: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  const file = env.BOARD_ENV_FILE
+  if (!file) return env
+  if (!existsSync(file)) throw new Error(`BOARD_ENV_FILE does not exist: ${file}`)
+  return { ...dotenv.parse(readFileSync(file)), ...env }
+}
+
+function validPort(port: unknown, file: string): number {
+  if (typeof port !== 'number' || !Number.isInteger(port) || port < 1 || port > 65535) {
+    throw new ProjectConfigError(`${file}: "board.port" must be an integer between 1 and 65535`, { file, key: 'board.port' })
+  }
+  return port
+}
+
+function validIntegration(value: unknown, file: string): Integration {
+  if (value !== 'pull-request' && value !== 'merge-after-acceptance') {
+    throw new ProjectConfigError(`${file}: "git.integration" must be "pull-request" or "merge-after-acceptance"`, { file, key: 'git.integration' })
+  }
+  return value
+}
+
+export function loadConfig(processEnv: NodeJS.ProcessEnv = process.env): Config {
+  const env = readEnvFile(processEnv)
   if (!env.BOARD_REPO_ROOT) throw new Error('BOARD_REPO_ROOT is required — absolute path to the target project repository')
   const repoRoot = path.resolve(env.BOARD_REPO_ROOT)
+  const loaded = loadProjectConfig(repoRoot)
+  if (!loaded.found) {
+    throw new Error(`project-board/project.yaml not found in ${repoRoot} — ${SETUP_HINT}`)
+  }
+  const project = loaded.config
+  validPort(project.board.port, loaded.path)
+  const port = num(env.BOARD_PORT, project.board.port)
   return {
-    port: num(env.BOARD_PORT, 4400),
+    port,
     host: env.BOARD_HOST ?? '0.0.0.0',
     password: env.BOARD_PASSWORD,
     repoRoot,
-    dataDir: path.join(repoRoot, 'project-board/data'),
+    dataDir: path.resolve(repoRoot, project.board.data_dir),
     jobTimeoutMs: num(env.BOARD_JOB_TIMEOUT_MS, 7_200_000),
     maxConcurrentJobs: num(env.BOARD_MAX_JOBS, 1),
     claudeBin: env.BOARD_CLAUDE_BIN ?? 'claude',
     uiDistDir: env.BOARD_UI_DIST,
+    project,
+    mainBranch: resolveMainBranch(repoRoot, project),
+    remoteName: project.git.remote_name,
+    branchPrefix: project.board.branch_prefix,
+    integration: validIntegration(project.git.integration, loaded.path),
+    cookieName: `board_session_${port}`,
   }
 }
