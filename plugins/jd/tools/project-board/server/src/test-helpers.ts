@@ -7,6 +7,7 @@ import type { ChildProcess } from 'node:child_process'
 import type { ServerDeps } from './server.js'
 import { BoardStore } from './store.js'
 import { WsHub } from './ws.js'
+import { defaultProjectConfig } from './project-config.js'
 import { JobRunner, type GitOps } from './jobs/runner.js'
 
 export function makeDeps(): ServerDeps {
@@ -56,7 +57,7 @@ export function makeDeps(): ServerDeps {
       port: 0, host: '127.0.0.1', password: 'secret', repoRoot: dataDir,
       dataDir, jobTimeoutMs: 1000, maxConcurrentJobs: 1, claudeBin: 'claude',
       uiDistDir,
-      project: { project: 'Test Project' } as ServerDeps['config']['project'],
+      project: { ...defaultProjectConfig(), project: 'Test Project' },
       mainBranch: 'main', remoteName: 'origin', branchPrefix: 'board/',
       integration: 'pull-request', cookieName: 'board_session_0',
     },

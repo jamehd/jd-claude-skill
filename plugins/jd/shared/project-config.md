@@ -23,6 +23,7 @@ Required by: `feature-flow`, `plan-batch`, board. Everything else runs on defaul
 | `requirements.subdirs` | `[components, capabilities]` | board, req-check, shared lib |
 | `requirements.map` | `.component-map.json` (inside `requirements.dir`) | req-check, Stop hook |
 | `requirements.id_pattern` | `[A-Z]{2,6}-R\d+` | shared lib, board, req-check |
+| `requirements.id_example` | empty (optional) | board task prompt (`Req: <example>` hint) |
 | `requirements.headings.description` | `Description` | candidates parser, rescan prompt |
 | `requirements.headings.acceptance` | `Acceptance criteria` | candidates parser, rescan prompt |
 | `e2e.host` / `e2e.note` / `e2e.contracts` | empty string / empty string / `[]` | board routing, plan-batch, auto |

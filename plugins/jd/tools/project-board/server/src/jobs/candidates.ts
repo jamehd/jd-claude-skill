@@ -1,4 +1,5 @@
 import type { Requirement } from './requirements.js'
+import type { ProjectConfig } from '../project-config.js'
 import type { BoardItem, Candidate } from '../../../ui/src/types.js'
 
 export interface StatusRow {
@@ -13,9 +14,41 @@ export interface StatusDoc {
   details?: Record<string, { statement: string; acceptance: string[] }>
 }
 
-const STATUS_ROW = /^\|\s*([A-Z]{2,6}-R\d+)\s*\|\s*(done|partial|missing)\s*\|\s*(yes|no)\s*\|\s*(.*?)\s*\|\s*$/
+export type CandidateConfig = Pick<ProjectConfig, 'requirements' | 'language'>
 
-export function parseStatusDoc(markdown: string): StatusDoc {
+const escapeRegex = (text: string): string => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+interface Wording {
+  implement: string
+  complete: string
+  test: string
+  missing: string
+  partial: string
+  untested: string
+}
+
+const ENGLISH: Wording = {
+  implement: 'Implement', complete: 'Complete', test: 'Add tests for',
+  missing: 'not built yet', partial: 'only partly built', untested: 'has no tests',
+}
+const WORDING: Record<string, Wording> = {
+  vi: {
+    implement: 'Hiện thực', complete: 'Hoàn thiện', test: 'Thêm test cho',
+    missing: 'chưa làm', partial: 'làm dở dang', untested: 'chưa có test',
+  },
+}
+
+function wordingFor(cfg: CandidateConfig): { w: Wording; vi: boolean } {
+  const w = WORDING[cfg.language.owner?.trim() ?? '']
+  return { w: w ?? ENGLISH, vi: Boolean(w) }
+}
+
+export function parseStatusDoc(markdown: string, cfg: CandidateConfig): StatusDoc {
+  const idPattern = `(?:${cfg.requirements.id_pattern})`
+  const STATUS_ROW = new RegExp(`^\\|\\s*(${idPattern})\\s*\\|\\s*(done|partial|missing)\\s*\\|\\s*(yes|no)\\s*\\|\\s*(.*?)\\s*\\|\\s*$`)
+  const DETAIL_HEADING = new RegExp(`^###\\s+(${idPattern})\\s*$`)
+  const DESCRIPTION = new RegExp(`^${escapeRegex(cfg.requirements.headings.description)}:\\s*(.*)$`)
+  const ACCEPTANCE = new RegExp(`^${escapeRegex(cfg.requirements.headings.acceptance)}:\\s*$`)
   const component = markdown.match(/^component:\s*(.+)$/m)?.[1]?.trim() ?? ''
   const rows: StatusRow[] = []
   for (const line of markdown.split('\n')) {
@@ -27,12 +60,12 @@ export function parseStatusDoc(markdown: string): StatusDoc {
   let curId: string | null = null
   let inAcc = false
   for (const line of lines) {
-    const h = line.match(/^###\s+([A-Z]{2,6}-R\d+)\s*$/)
+    const h = line.match(DETAIL_HEADING)
     if (h) { curId = h[1]; details[curId] = { statement: '', acceptance: [] }; inAcc = false; continue }
     if (!curId) continue
-    const mo = line.match(/^Mô tả:\s*(.*)$/)
+    const mo = line.match(DESCRIPTION)
     if (mo) { details[curId].statement = mo[1].trim(); inAcc = false; continue }
-    if (/^Tiêu chí chấp nhận:\s*$/.test(line)) { inAcc = true; continue }
+    if (ACCEPTANCE.test(line)) { inAcc = true; continue }
     if (inAcc) {
       const b = line.match(/^-\s+(.*)$/)
       if (b) { details[curId].acceptance.push(b[1].trim()); continue }
@@ -43,21 +76,25 @@ export function parseStatusDoc(markdown: string): StatusDoc {
   return { component, rows, details: Object.keys(details).length ? details : undefined }
 }
 
-function body(detail: { statement: string; acceptance: string[] } | undefined, req: Requirement | undefined, reqId: string, lead: string): string {
+function body(detail: { statement: string; acceptance: string[] } | undefined, req: Requirement | undefined, reqId: string, lead: string, acceptanceHeading: string): string {
   const statement = detail?.statement || req?.statement
   const acceptance = (detail?.acceptance.length ? detail.acceptance : req?.acceptance) ?? []
   const lines = [lead]
   if (statement) lines.push('', statement)
   if (acceptance.length > 0) {
-    lines.push('', 'Tiêu chí chấp nhận:')
+    lines.push('', `${acceptanceHeading}:`)
     for (const ac of acceptance) lines.push(`- ${ac}`)
   }
   lines.push('', `Req: ${reqId}`)
   return lines.join('\n')
 }
 
-export function buildCandidates(reqIndex: Map<string, Requirement>, docs: StatusDoc[]): Candidate[] {
+export function buildCandidates(reqIndex: Map<string, Requirement>, docs: StatusDoc[], cfg: CandidateConfig): Candidate[] {
   const out: Candidate[] = []
+  const { w, vi } = wordingFor(cfg)
+  const heading = cfg.requirements.headings.acceptance
+  const found = (id: string, what: string, note: string) =>
+    (vi ? `Scan phát hiện: ${id} ${what}. ${note}` : `Scan found: ${id} is ${what}. ${note}`).trim()
   for (const doc of docs) {
     for (const row of doc.rows) {
       const req = reqIndex.get(row.id)
@@ -66,14 +103,14 @@ export function buildCandidates(reqIndex: Map<string, Requirement>, docs: Status
       const title = req?.title ?? row.id
       if (row.state === 'missing') {
         out.push({ kind: 'implement', type: 'task', component: doc.component, reqId: row.id, priority: 'P1',
-          title: `Hiện thực ${row.id}: ${title}`, body: body(detail, req, row.id, `Scan phát hiện: ${row.id} chưa làm. ${row.note}`.trim()) })
+          title: `${w.implement} ${row.id}: ${title}`, body: body(detail, req, row.id, found(row.id, w.missing, row.note), heading) })
       } else if (row.state === 'partial') {
         out.push({ kind: 'implement', type: 'task', component: doc.component, reqId: row.id, priority: 'P2',
-          title: `Hoàn thiện ${row.id}: ${title}`, body: body(detail, req, row.id, `Scan phát hiện: ${row.id} làm dở dang. ${row.note}`.trim()) })
+          title: `${w.complete} ${row.id}: ${title}`, body: body(detail, req, row.id, found(row.id, w.partial, row.note), heading) })
       }
       if (row.state !== 'missing' && !row.tested) {
         out.push({ kind: 'test', type: 'task', component: doc.component, reqId: row.id, priority: 'P2',
-          title: `Thêm test cho ${row.id}: ${title}`, body: body(detail, req, row.id, `Scan phát hiện: ${row.id} chưa có test. ${row.note}`.trim()) })
+          title: `${w.test} ${row.id}: ${title}`, body: body(detail, req, row.id, found(row.id, w.untested, row.note), heading) })
       }
     }
   }

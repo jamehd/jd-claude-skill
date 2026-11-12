@@ -30,6 +30,8 @@ const runner = new JobRunner({
   claudeBin: config.claudeBin,
   timeoutMs: config.jobTimeoutMs,
   maxConcurrent: config.maxConcurrentJobs,
+  project: config.project,
+  mainBranch: config.mainBranch,
   branchPrefix: config.branchPrefix,
   integration: config.integration,
   testShell: config.testShell,

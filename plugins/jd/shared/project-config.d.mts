@@ -24,6 +24,7 @@ export interface ProjectConfig {
     subdirs: string[]
     map: string
     id_pattern: string
+    id_example?: string
     headings: { description: string; acceptance: string }
     [key: string]: unknown
   }

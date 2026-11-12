@@ -5,8 +5,9 @@ import { gatedReadyStatus, type BoardStore } from '../store.js'
 import type { WsHub } from '../ws.js'
 import type { AutoState, ConsoleEvent, Job, JobKind, NoteType, RateLimitSnapshot, UsageReport, UsageBucket, JobUsage } from '../../../ui/src/types.js'
 import { isBlocked, indexById, unmergedDeps, transitiveDependents } from '../../../ui/src/deps.js'
-import { buildTaskPrompt, buildRescanPrompt, buildResolvePrompt } from './prompt.js'
+import { buildTaskPrompt, buildRescanPrompt, buildResolvePrompt, e2eReviewNote } from './prompt.js'
 import { parseRequirementsDir } from './requirements.js'
+import { defaultProjectConfig, requirementIdRegex, type ProjectConfig } from '../project-config.js'
 import { formatRequirementsTouched } from './requirements-touched.js'
 import { normalizeLine } from './events.js'
 import { planSpawn, gateCommand, type SpawnOpts } from './spawn-plan.js'
@@ -44,6 +45,8 @@ export interface RunnerDeps {
   claudeBin: string
   timeoutMs: number
   maxConcurrent: number
+  project?: ProjectConfig
+  mainBranch?: string
   branchPrefix?: string
   integration?: 'pull-request' | 'merge-after-acceptance'
   testShell?: string
@@ -79,6 +82,7 @@ export class JobRunner {
   private autoFailedTasks = new Set<string>()
   private autoTimer?: NodeJS.Timeout
   private shuttingDown = false
+  private defaultProject?: ProjectConfig
   // Runtime concurrency limit; seeded from deps then overridden by any persisted value.
   private maxConcurrent = 1
   private lastRateLimit?: RateLimitSnapshot
@@ -93,6 +97,14 @@ export class JobRunner {
       this.loadUsage()
       if (this.auto.enabled) { this.startAutoInterval(); this.autoTick() }
     }
+  }
+
+  private get project(): ProjectConfig {
+    return this.deps?.project ?? (this.defaultProject ??= defaultProjectConfig())
+  }
+
+  private reqLayout() {
+    return this.project.requirements
   }
 
   private branchOf(taskId: string): string {
@@ -483,7 +495,7 @@ export class JobRunner {
         return
       }
       store.updateItem(item.id, { status: 'ai_running', job: job.id })
-      prompt = buildTaskPrompt(item, parseRequirementsDir(this.deps!.repoRoot), this.deps!.repoRoot)
+      prompt = buildTaskPrompt(item, this.project, parseRequirementsDir(this.deps!.repoRoot, this.reqLayout()), this.deps!.repoRoot)
     } else if (job.kind === 'resolve') {
       job.branch = this.branchOf(job.taskId!)
       // Resolve reuses the task's EXISTING worktree (recreating it would wipe the work).
@@ -498,13 +510,13 @@ export class JobRunner {
       }
       cwd = git.worktreePath(job.taskId!)
       store.updateItem(item.id, { status: 'ai_running', job: job.id })
-      prompt = buildResolvePrompt(item, parseRequirementsDir(this.deps!.repoRoot))
+      prompt = buildResolvePrompt(item, this.project, parseRequirementsDir(this.deps!.repoRoot, this.reqLayout()), this.deps!.mainBranch)
     } else {
       // Rescan writes status files directly to disk in the live repo; no worktree.
       cwd = this.deps!.repoRoot
       this.statusSnapshots.set(job.id, this.snapshotStatusDir())
       this.porcelainSnapshots.set(job.id, new Set(this.deps!.git.porcelain()))
-      prompt = buildRescanPrompt()
+      prompt = buildRescanPrompt(this.project)
     }
     this.cwds.set(job.id, cwd)
     this.persist(job)
@@ -764,7 +776,7 @@ export class JobRunner {
       const item = store.getItem(job.taskId!)
       let touched = 'none'
       try {
-        touched = formatRequirementsTouched(git.commitMessages(job.taskId!))
+        touched = formatRequirementsTouched(git.commitMessages(job.taskId!), requirementIdRegex(this.project))
       } catch (e) {
         touched = '(could not read commits)'
         this.note(job, 'info', `requirements-touched: ${e instanceof Error ? e.message : e}`)
@@ -772,7 +784,7 @@ export class JobRunner {
       const summary = `Job ${job.id} succeeded on branch ${this.branchOf(job.taskId!)}.\nRequirements touched: ${touched}\nChanged files:\n${git.changedFiles(job.taskId!).map((f) => `- ${f}`).join('\n')}\nFull output: data/jobs/${job.id}.log`
 
       // needsE2e routes the finished task. true → stop in review for the human's
-      // manual e2e on cafe-win. false → complete the cycle by opening a PR here.
+      // manual e2e. false → complete the cycle by opening a PR here.
       // Absent (legacy/unshaped tasks) → conservative review, never an auto-PR.
       const flag = item?.extra?.needsE2e
       const needsE2e = flag === true || flag === 'true'
@@ -780,7 +792,7 @@ export class JobRunner {
 
       if (needsE2e) {
         store.updateItem(job.taskId!, { status: 'review' })
-        store.appendToBody(job.taskId!, `## AI result\n${summary}\n\nMANUAL E2E REQUIRED — run e2e on cafe-win and verify before merging.`)
+        store.appendToBody(job.taskId!, `## AI result\n${summary}\n\n${e2eReviewNote(this.project)}`)
         return
       }
 

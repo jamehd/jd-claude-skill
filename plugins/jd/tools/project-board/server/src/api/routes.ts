@@ -359,18 +359,18 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
   app.get('/api/scan-candidates', () => {
     const docs = []
     for (const f of readdirSync(store.statusDir).filter((f) => f.endsWith('.md'))) {
-      try { docs.push(parseStatusDoc(readFileSync(path.join(store.statusDir, f), 'utf8'))) } catch { /* skip unparseable */ }
+      try { docs.push(parseStatusDoc(readFileSync(path.join(store.statusDir, f), 'utf8'), deps.config.project)) } catch { /* skip unparseable */ }
     }
-    const reqIndex = parseRequirementsDir(deps.config.repoRoot)
+    const reqIndex = parseRequirementsDir(deps.config.repoRoot, deps.config.project.requirements)
     const lastScanned = Object.fromEntries(store.componentStatuses().map((s) => [s.component, s.last_scanned]))
-    return { candidates: dedupeCandidates(buildCandidates(reqIndex, docs), store.scan().items, lastScanned) }
+    return { candidates: dedupeCandidates(buildCandidates(reqIndex, docs, deps.config.project), store.scan().items, lastScanned) }
   })
 
   app.get<{ Params: { id: string } }>('/api/tasks/:id/brainstorm-prompt', (req, reply) => {
     const item = store.getItem(req.params.id)
     if (!item) return reply.code(404).send({ error: 'not found' })
-    const reqIndex = parseRequirementsDir(deps.config.repoRoot)
-    return { prompt: buildBrainstormPrompt(item, reqIndex) }
+    const reqIndex = parseRequirementsDir(deps.config.repoRoot, deps.config.project.requirements)
+    return { prompt: buildBrainstormPrompt(item, deps.config.project, reqIndex) }
   })
 
   app.get('/api/auto', () => deps.runner.getAuto())

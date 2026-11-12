@@ -3,8 +3,11 @@ import { mkdtempSync, writeFileSync, mkdirSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { buildTaskPrompt, buildRescanPrompt, buildBrainstormPrompt, buildResolvePrompt } from './jobs/prompt.js'
+import { gamesyncConfig } from './fixtures/load.js'
 import type { Requirement } from './jobs/requirements.js'
 import type { BoardItem } from '../../ui/src/types.js'
+
+const G = gamesyncConfig()
 
 function item(body: string): BoardItem {
   return { id: 'TASK-001', type: 'task', title: 'Do it', status: 'ready', priority: 'P2',
@@ -21,27 +24,27 @@ const REQS = new Map<string, Requirement>([
 
 describe('buildTaskPrompt with requirements', () => {
   it('injects matched requirements referenced in the body', () => {
-    const p = buildTaskPrompt(item('Implement the theme RPC. Req: CAFE-R3'), REQS)
+    const p = buildTaskPrompt(item('Implement the theme RPC. Req: CAFE-R3'), G, REQS)
     expect(p).toContain('REQUIREMENTS YOU MUST SATISFY')
     expect(p).toContain('CAFE-R3 — GetTheme RPC')
     expect(p).toContain('Serves theme over gRPC.')
     expect(p).toContain('theme < 1s')
   })
   it('notes unknown ids without throwing', () => {
-    const p = buildTaskPrompt(item('Req: CAFE-R99'), REQS)
+    const p = buildTaskPrompt(item('Req: CAFE-R99'), G, REQS)
     expect(p).toContain('CAFE-R99')
     expect(p).toMatch(/not found in docs\/requirements/i)
   })
   it('is unchanged when the body references no requirement ids', () => {
-    const withReqs = buildTaskPrompt(item('just do the thing'), REQS)
-    const without = buildTaskPrompt(item('just do the thing'))
+    const withReqs = buildTaskPrompt(item('just do the thing'), G, REQS)
+    const without = buildTaskPrompt(item('just do the thing'), G)
     expect(withReqs).toBe(without)
     expect(withReqs).not.toContain('REQUIREMENTS YOU MUST SATISFY')
   })
 })
 
 describe('buildRescanPrompt (requirements-aware)', () => {
-  const p = buildRescanPrompt()
+  const p = buildRescanPrompt(G)
   it('directs reading the requirement docs', () => {
     expect(p).toContain('docs/requirements/components')
   })
@@ -64,7 +67,7 @@ describe('buildRescanPrompt (requirements-aware)', () => {
 
 describe('buildBrainstormPrompt', () => {
   it('includes the title, body, and brainstorm/plan instructions', () => {
-    const p = buildBrainstormPrompt(itemFull())
+    const p = buildBrainstormPrompt(itemFull(), G)
     expect(p).toContain('Do X')
     expect(p).toContain('Build the thing.')
     expect(p).toMatch(/brainstorm/i)
@@ -74,7 +77,7 @@ describe('buildBrainstormPrompt', () => {
 
 describe('buildTaskPrompt plan injection', () => {
   it('injects inline plan text', () => {
-    const p = buildTaskPrompt(itemFull({ plan: 'Step 1. do it' }))
+    const p = buildTaskPrompt(itemFull({ plan: 'Step 1. do it' }), G)
     expect(p).toContain('APPROVED PLAN')
     expect(p).toContain('Step 1. do it')
   })
@@ -82,23 +85,23 @@ describe('buildTaskPrompt plan injection', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'bg-'))
     mkdirSync(path.join(root, 'docs', 'plans'), { recursive: true })
     writeFileSync(path.join(root, 'docs/plans/p.md'), '# The Plan\nDetailed steps here.')
-    const p = buildTaskPrompt(itemFull({ plan: 'docs/plans/p.md' }), undefined, root)
+    const p = buildTaskPrompt(itemFull({ plan: 'docs/plans/p.md' }), G, undefined, root)
     expect(p).toContain('Detailed steps here.')
   })
   it('treats a non-existent .md path as inline text (non-fatal)', () => {
-    const p = buildTaskPrompt(itemFull({ plan: 'docs/plans/missing.md' }), undefined, '/nonexistent-root')
+    const p = buildTaskPrompt(itemFull({ plan: 'docs/plans/missing.md' }), G, undefined, '/nonexistent-root')
     expect(p).toContain('docs/plans/missing.md')
     expect(p).toContain('APPROVED PLAN')
   })
   it('omits the plan block when no plan', () => {
-    expect(buildTaskPrompt(itemFull())).not.toContain('APPROVED PLAN')
+    expect(buildTaskPrompt(itemFull(), G)).not.toContain('APPROVED PLAN')
   })
   it('does not read a file outside repoRoot (path traversal is treated as inline)', () => {
     const root = mkdtempSync(path.join(tmpdir(), 'bg-'))
     const secretDir = mkdtempSync(path.join(tmpdir(), 'secret-'))
     writeFileSync(path.join(secretDir, 'leak.md'), 'TOP SECRET CONTENT')
     const rel = path.join(path.relative(root, secretDir), 'leak.md') // e.g. ../secret-xxx/leak.md
-    const p = buildTaskPrompt(itemFull({ plan: rel }), undefined, root)
+    const p = buildTaskPrompt(itemFull({ plan: rel }), G, undefined, root)
     expect(p).not.toContain('TOP SECRET CONTENT')
     expect(p).toContain(rel) // the escaping path is kept as inline text, not read
   })
@@ -106,7 +109,7 @@ describe('buildTaskPrompt plan injection', () => {
 
 describe('buildResolvePrompt', () => {
   it('instructs merge-main + resolve + commit and includes the task title', () => {
-    const p = buildResolvePrompt(itemFull({ title: 'Add tests for X', body: 'do it\nReq: CAFE-R4' }))
+    const p = buildResolvePrompt(itemFull({ title: 'Add tests for X', body: 'do it\nReq: CAFE-R4' }), G)
     expect(p).toMatch(/git merge main/)
     expect(p).toMatch(/conflict/i)
     expect(p).toContain('Add tests for X')
@@ -114,7 +117,7 @@ describe('buildResolvePrompt', () => {
   })
   it('injects requirement context when resolvable', () => {
     const reqs = new Map([['CAFE-R4', { id: 'CAFE-R4', title: 'Manifest', statement: 'Parses v2.', acceptance: ['delta only'] }]])
-    const p = buildResolvePrompt(itemFull({ body: 'x\nReq: CAFE-R4' }), reqs)
+    const p = buildResolvePrompt(itemFull({ body: 'x\nReq: CAFE-R4' }), G, reqs)
     expect(p).toContain('CAFE-R4')
     expect(p).toContain('delta only')
   })
@@ -122,17 +125,17 @@ describe('buildResolvePrompt', () => {
 
 describe('buildTaskPrompt skill-driven', () => {
   it('drives delivery through the jd:auto skill in board mode', () => {
-    const p = buildTaskPrompt(itemFull({ plan: 'Step 1. do it' }))
+    const p = buildTaskPrompt(itemFull({ plan: 'Step 1. do it' }), G)
     expect(p).toMatch(/jd:auto/)
     expect(p).toMatch(/board mode/i)
     expect(p).toContain('APPROVED PLAN')
   })
   it('references jd:auto even without a plan', () => {
-    const p = buildTaskPrompt(itemFull())
+    const p = buildTaskPrompt(itemFull(), G)
     expect(p).toMatch(/jd:auto/)
   })
   it('forbids the agent from pushing or opening a PR (board owns it)', () => {
-    const p = buildTaskPrompt(itemFull())
+    const p = buildTaskPrompt(itemFull(), G)
     expect(p).toMatch(/do NOT push/i)
     expect(p).toMatch(/do NOT open a PR/i)
   })
@@ -140,11 +143,11 @@ describe('buildTaskPrompt skill-driven', () => {
 
 describe('buildTaskPrompt e2e gating', () => {
   it('instructs a MANUAL E2E REQUIRED footer when needsE2e is set', () => {
-    const p = buildTaskPrompt(itemFull({ extra: { needsE2e: true } }))
+    const p = buildTaskPrompt(itemFull({ extra: { needsE2e: true } }), G)
     expect(p).toContain('MANUAL E2E REQUIRED')
   })
   it('tells the agent the board opens the PR when not e2e-gated', () => {
-    const p = buildTaskPrompt(itemFull())
+    const p = buildTaskPrompt(itemFull(), G)
     expect(p).not.toContain('MANUAL E2E REQUIRED')
     expect(p).toMatch(/board will open the PR/i)
   })
@@ -152,7 +155,7 @@ describe('buildTaskPrompt e2e gating', () => {
 
 describe('buildRescanPrompt Vietnamese detail', () => {
   it('instructs a Vietnamese detail section per requirement', () => {
-    const p = buildRescanPrompt()
+    const p = buildRescanPrompt(G)
     expect(p).toContain('## Chi tiết (Tiếng Việt)')
     expect(p).toMatch(/Mô tả:/)
     expect(p).toMatch(/Tiêu chí chấp nhận:/)
@@ -161,7 +164,7 @@ describe('buildRescanPrompt Vietnamese detail', () => {
 
 describe('buildTaskPrompt requirements-sync done-criteria', () => {
   it('always instructs the agent to carry a Req: trailer and report Requirements touched', () => {
-    const p = buildTaskPrompt(item('just do the thing'))
+    const p = buildTaskPrompt(item('just do the thing'), G)
     expect(p).toContain('Req: <ID>')
     expect(p).toContain('Req: none')
     expect(p).toContain('Requirements touched:')

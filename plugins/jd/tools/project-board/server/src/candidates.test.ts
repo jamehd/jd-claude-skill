@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest'
 import { parseStatusDoc, buildCandidates, dedupeCandidates } from './jobs/candidates.js'
 import type { Requirement } from './jobs/requirements.js'
+import { gamesyncConfig } from './fixtures/load.js'
 import type { BoardItem } from '../../ui/src/types.js'
+
+const G = gamesyncConfig()
 
 const STATUS = `---
 component: cafe-service
@@ -29,7 +32,7 @@ const REQS = new Map<string, Requirement>([
 
 describe('parseStatusDoc', () => {
   it('reads component and rows', () => {
-    const doc = parseStatusDoc(STATUS)
+    const doc = parseStatusDoc(STATUS, G)
     expect(doc.component).toBe('cafe-service')
     expect(doc.rows).toHaveLength(4)
     expect(doc.rows[1]).toEqual({ id: 'CAFE-R4', state: 'partial', tested: false, note: 'signature verify missing' })
@@ -38,7 +41,7 @@ describe('parseStatusDoc', () => {
 })
 
 describe('buildCandidates', () => {
-  const cands = buildCandidates(REQS, [parseStatusDoc(STATUS)])
+  const cands = buildCandidates(REQS, [parseStatusDoc(STATUS, G)], G)
   it('missing -> implement P1, no separate test candidate', () => {
     const c = cands.filter((x) => x.reqId === 'CAFE-R10')
     expect(c).toHaveLength(1)
@@ -67,7 +70,7 @@ describe('buildCandidates', () => {
 })
 
 describe('dedupeCandidates', () => {
-  const cands = buildCandidates(REQS, [parseStatusDoc(STATUS)])
+  const cands = buildCandidates(REQS, [parseStatusDoc(STATUS, G)], G)
   it('suppresses a candidate already covered by a live item of the same kind', () => {
     const existing: BoardItem[] = [{
       id: 'TASK-001', type: 'task', title: 'Implement CAFE-R10: gRPC GetTheme', status: 'ready',
@@ -107,7 +110,7 @@ tested: 82
       ['CAFE-R1', { id: 'CAFE-R1', title: 'gRPC ListGames', statement: 'Lists games.', acceptance: [] }],
       ['CAFE-R12', { id: 'CAFE-R12', title: 'gRPC RegisterPC', statement: 'Registers PC.', acceptance: [] }],
     ])
-    const candidates = buildCandidates(REQS_BOTH, [parseStatusDoc(STATUS_BOTH)])
+    const candidates = buildCandidates(REQS_BOTH, [parseStatusDoc(STATUS_BOTH, G)], G)
 
     // A live item covers CAFE-R12 only
     const existing: BoardItem[] = [{
@@ -180,7 +183,7 @@ last_scanned: 2026-06-15
       ['IDC-R7', { id: 'IDC-R7', title: 'Manifest diff — REMOVED', statement: '', acceptance: [], removed: true }],
       ['IDC-R8', { id: 'IDC-R8', title: 'Something real', statement: '', acceptance: [] }],
     ])
-    const cands = buildCandidates(reqs, [parseStatusDoc(STATUS)])
+    const cands = buildCandidates(reqs, [parseStatusDoc(STATUS, G)], G)
     expect(cands.some((c) => c.reqId === 'IDC-R7')).toBe(false)
     expect(cands.some((c) => c.reqId === 'IDC-R8' && c.kind === 'test')).toBe(true)
   })
@@ -191,7 +194,7 @@ last_scanned: 2026-06-15
       const reqs = new Map<string, Requirement>([
         ['Z-R1', { id: 'Z-R1', title: 'Gone — REMOVED', statement: '', acceptance: [], removed: true }],
       ])
-      expect(buildCandidates(reqs, [parseStatusDoc(status)]).length).toBe(0)
+      expect(buildCandidates(reqs, [parseStatusDoc(status, G)], G).length).toBe(0)
     }
   })
 })
@@ -217,12 +220,12 @@ Tiêu chí chấp nhận:
 - chữ ký được xác minh
 `
   it('parses Vietnamese statement + AC per requirement', () => {
-    const doc = parseStatusDoc(DOC)
+    const doc = parseStatusDoc(DOC, G)
     expect(doc.details?.['CAFE-R4']?.statement).toBe('Phân tích manifest v2 và tải delta.')
     expect(doc.details?.['CAFE-R4']?.acceptance).toEqual(['delta chỉ tải các chunk thay đổi', 'chữ ký được xác minh'])
   })
   it('no detail section → details empty/undefined, rows intact', () => {
-    const doc = parseStatusDoc(`---\ncomponent: x\nlast_scanned: 2026-06-13\n---\n\n| Req | State | Tested | Note |\n|--|--|--|--|\n| CS-R1 | done | yes | ok |\n`)
+    const doc = parseStatusDoc(`---\ncomponent: x\nlast_scanned: 2026-06-13\n---\n\n| Req | State | Tested | Note |\n|--|--|--|--|\n| CS-R1 | done | yes | ok |\n`, G)
     expect(doc.rows).toHaveLength(1)
     expect(doc.details?.['CS-R1']).toBeUndefined()
   })
@@ -231,17 +234,49 @@ Tiêu chí chấp nhận:
 describe('buildCandidates uses Vietnamese details (fallback English)', () => {
   const REQS = new Map([['CAFE-R4', { id: 'CAFE-R4', title: 'Manifest v2', statement: 'Parses manifest v2.', acceptance: ['delta only', 'sig verified'] }]])
   it('prefers the status-doc Vietnamese statement/AC', () => {
-    const doc = parseStatusDoc(`---\ncomponent: cafe-service\nlast_scanned: 2026-06-13\n---\n\n| Req | State | Tested | Note |\n|--|--|--|--|\n| CAFE-R4 | partial | no | n |\n\n## Chi tiết (Tiếng Việt)\n\n### CAFE-R4\nMô tả: Phân tích manifest v2.\nTiêu chí chấp nhận:\n- chỉ tải chunk đổi\n`)
-    const c = buildCandidates(REQS, [doc]).find((x) => x.reqId === 'CAFE-R4' && x.kind === 'implement')!
+    const doc = parseStatusDoc(`---\ncomponent: cafe-service\nlast_scanned: 2026-06-13\n---\n\n| Req | State | Tested | Note |\n|--|--|--|--|\n| CAFE-R4 | partial | no | n |\n\n## Chi tiết (Tiếng Việt)\n\n### CAFE-R4\nMô tả: Phân tích manifest v2.\nTiêu chí chấp nhận:\n- chỉ tải chunk đổi\n`, G)
+    const c = buildCandidates(REQS, [doc], G).find((x) => x.reqId === 'CAFE-R4' && x.kind === 'implement')!
     expect(c.body).toContain('Phân tích manifest v2.')
     expect(c.body).toContain('chỉ tải chunk đổi')
     expect(c.body).not.toContain('Parses manifest v2.')   // English not used when VN present
     expect(c.body).toContain('Req: CAFE-R4')
   })
   it('falls back to English reqIndex when no VN detail', () => {
-    const doc = parseStatusDoc(`---\ncomponent: cafe-service\nlast_scanned: 2026-06-13\n---\n\n| Req | State | Tested | Note |\n|--|--|--|--|\n| CAFE-R4 | partial | no | n |\n`)
-    const c = buildCandidates(REQS, [doc]).find((x) => x.reqId === 'CAFE-R4' && x.kind === 'implement')!
+    const doc = parseStatusDoc(`---\ncomponent: cafe-service\nlast_scanned: 2026-06-13\n---\n\n| Req | State | Tested | Note |\n|--|--|--|--|\n| CAFE-R4 | partial | no | n |\n`, G)
+    const c = buildCandidates(REQS, [doc], G).find((x) => x.reqId === 'CAFE-R4' && x.kind === 'implement')!
     expect(c.body).toContain('Parses manifest v2.')
     expect(c.body).toContain('delta only')
+  })
+})
+
+describe('configured headings and language', () => {
+  const cfg = { ...G, requirements: { ...G.requirements, headings: { description: 'Summary', acceptance: 'Done when' } } }
+  const DETAIL = `---\ncomponent: billing\nlast_scanned: 2026-06-13\n---\n\n| Req | State | Tested | Note |\n|--|--|--|--|\n| CAFE-R4 | partial | no | n |\n\n### CAFE-R4\nSummary: Parse manifest v2.\nDone when:\n- only changed chunks\n`
+
+  it('parses detail blocks using the configured headings', () => {
+    const doc = parseStatusDoc(DETAIL, cfg)
+    expect(doc.details?.['CAFE-R4']).toEqual({ statement: 'Parse manifest v2.', acceptance: ['only changed chunks'] })
+  })
+
+  it('ignores blocks written with other headings', () => {
+    expect(parseStatusDoc(DETAIL, G).details?.['CAFE-R4']).toEqual({ statement: '', acceptance: [] })
+  })
+
+  it('uses the acceptance heading as the label in candidate bodies', () => {
+    const c = buildCandidates(REQS, [parseStatusDoc(DETAIL, cfg)], cfg).find((x) => x.kind === 'implement')!
+    expect(c.body).toContain('Done when:\n- only changed chunks')
+  })
+
+  it('uses the id pattern from config', () => {
+    const t = { ...cfg, requirements: { ...cfg.requirements, id_pattern: 'T-\\d+' } }
+    const doc = parseStatusDoc('---\ncomponent: x\n---\n\n| Req | State | Tested | Note |\n|--|--|--|--|\n| T-9 | missing | no | n |\n| CAFE-R1 | missing | no | n |\n', t)
+    expect(doc.rows.map((r) => r.id)).toEqual(['T-9'])
+  })
+
+  it('writes English titles and notes when language.owner is not vi', () => {
+    const en = { ...cfg, language: { ...cfg.language, owner: '' } }
+    const c = buildCandidates(REQS, [parseStatusDoc(DETAIL, en)], en)
+    expect(c.map((x) => x.title)).toEqual(['Complete CAFE-R4: Manifest v2 + delta', 'Add tests for CAFE-R4: Manifest v2 + delta'])
+    expect(c[0].body).toContain('Scan found: CAFE-R4 is only partly built. n')
   })
 })
