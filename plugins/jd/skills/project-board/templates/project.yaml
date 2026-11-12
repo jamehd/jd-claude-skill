@@ -1,0 +1,29 @@
+# Minimal project.yaml for the Project Board. Every omitted key falls back to its default
+# (see plugins/jd/shared/project-config.md). jd:feature-flow reads a fuller version of this file.
+
+project: <name>
+
+language:
+  owner:
+  docs: en
+
+git:
+  main: main
+  integration: pull-request
+
+tasks:
+  id_prefix: TASK
+
+requirements:
+  dir: docs/requirements
+  id_example: <e.g. AB-R12>
+
+board:
+  port: 4400
+  data_dir: project-board/data
+  branch_prefix: board/
+
+e2e:
+  host: ""
+  note: ""
+  contracts: []

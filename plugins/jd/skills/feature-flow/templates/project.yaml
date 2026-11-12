@@ -4,7 +4,7 @@
 project: <name>
 
 language:
-  owner: vi
+  owner:
   docs: en
 
 paths:
@@ -44,8 +44,19 @@ limits:
 git:
   remote: <host/owner/repo>
   main: main
+  integration: pull-request
   branch_pattern: "feat/<ID>-<slug>"
   commit_footer: "Co-Authored-By: <model> <noreply@anthropic.com>"
+
+tasks:
+  id_prefix: TASK
+
+board:
+  port: 4400
+
+hooks:
+  req_check: true
+  conventions: true
 
 models:
   large_task: opus

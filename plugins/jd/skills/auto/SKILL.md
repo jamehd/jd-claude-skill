@@ -5,7 +5,11 @@ description: Use when the user runs /jd:auto or asks to work autonomously — au
 
 # Auto Mode (Autonomous Delivery)
 
-Run the full delivery chain end-to-end with no per-step check-ins, then commit to a branch and open a PR. This is the opposite of Manual mode, which pauses at every phase to confirm. By invoking /jd:auto the user has pre-authorized the entire chain including the final PR.
+## Project config
+
+If `<repo>/project-board/project.yaml` exists, read it first (keys and defaults: `../../shared/project-config.md`). Without it, run on the defaults. Keys used here: `git.integration`, `git.main`, `models.*`, `audits.*`, `design_system`, `ui_dirs`, `e2e.*`.
+
+Run the full delivery chain end-to-end with no per-step check-ins, then commit to a branch and integrate it per `git.integration` (a PR by default). This is the opposite of Manual mode, which pauses at every phase to confirm. By invoking /jd:auto the user has pre-authorized the entire chain including the final PR.
 
 ## Core principle
 
@@ -23,14 +27,14 @@ Keep moving. When a decision has a reasonable default, pick it, record it as an 
 
 1. **Brainstorm** — Load superpowers:brainstorming and run it as self-Q&A: surface the questions it would ask, answer each with a sensible default drawn from the request, codebase, CLAUDE.md, or memory, and record every answer as an assumption. Do not pause for user input — the only exceptions are STOP-list items.
 2. **Spec** — Write a short spec: scope, the decisions you made, and an explicit **Assumptions** list. Write the spec, the Assumptions list, and the plan under `.jd/auto/<YYYY-MM-DD-HHMMSS>/` (shared output convention: `../../shared/output-convention.md`). The PR and branch are the deliverable; these files are the audit trail the user reviews later.
-3. **Plan** — Load superpowers:writing-plans. Break into independent, testable tasks. Assign model per task (Sonnet for routine, Opus for complex).
+3. **Plan** — Load superpowers:writing-plans. Break into independent, testable tasks. Assign model per task from `models.small_task` / `models.large_task` (defaults: sonnet / opus).
 4. **Worktree** — Load superpowers:using-git-worktrees. Isolate work in a fresh worktree/branch off the base branch. Never work on the base branch directly.
 5. **Implement (subagent-driven)** — Load superpowers:subagent-driven-development + superpowers:test-driven-development. One task at a time. Dispatch each task to a subagent on the model matched to its size (see **Subagent model selection**). Run the project's tests after each task; do not defer the suite to the end. Debug failures with superpowers:systematic-debugging, not guesswork, and honor the **Escalation** rule below.
 6. **Review** — in order:
    a. **General review** — Load superpowers:requesting-code-review; collect findings.
    b. **Domain audits** — Run only the audits the diff triggers (see **Domain review routing**); collect findings.
    c. **Fix and verify** — Apply fixes per the **Fix policy** (below) through a subagent with TDD, re-run the affected tests, then Load superpowers:verification-before-completion and confirm output before claiming done.
-7. **Pull request** — Load superpowers:finishing-a-development-branch. Commit, push the branch, open the PR, report the link.
+7. **Integrate** — Load superpowers:finishing-a-development-branch. Commit and push the branch, then follow `git.integration` (default `pull-request`): `pull-request` opens the PR and reports the link; `merge-after-acceptance` pushes the branch, opens no merge, and reports that the AI merges into the main branch after the owner accepts.
 
 ## Board mode
 
@@ -38,7 +42,7 @@ When the dispatch prompt declares **board mode** (the project-board runner sets 
 
 - **Skip step 4 (Worktree).** You are already in `.board-worktrees/<id>` on branch `board/<id>`. Do NOT create another worktree and do NOT switch branches.
 - **Use the attached plan as spec+plan.** If the prompt carries an APPROVED PLAN / shaped task, treat it as the output of steps 1–3: implement from it directly, recording assumptions only for genuine gaps. Skip the self-brainstorm. A bare task with no plan falls back to the normal step 1–3 self-Q&A.
-- **Replace step 7 with commit-on-branch only.** Commit every change to the current branch with clear messages, then STOP. Do NOT push, do NOT open a PR, do NOT merge, do NOT touch other branches — the board owns review, PR, and merge. End with the assumptions report and, if the task is flagged `needsE2e`, a prominent final line: `MANUAL E2E REQUIRED` (the board surfaces it for the human's afternoon acceptance on cafe-win).
+- **Replace step 7 with commit-on-branch only.** Commit every change to the current branch with clear messages, then STOP. Do NOT push, do NOT open a PR, do NOT merge, do NOT touch other branches — the board owns review, PR, and merge. End with the assumptions report and, if the task is flagged `needsE2e`, a prominent final line: `MANUAL E2E REQUIRED` (the board surfaces it for the human's manual end-to-end acceptance; if `e2e.note` is set, repeat it on that line).
 - **Never touch `project-board/data/`.** Task state is owned by the dashboard.
 
 Board mode does not relax the STOP list or Escalation rule; a headless job cannot ask, so a genuine STOP-list hit means halt and report (leave the work on the branch), exactly as Escalation prescribes.
@@ -87,13 +91,15 @@ In review step 6b, decide from the diff which domain audits to run. Run an audit
 
 | Audit | Run when the diff touches | Notes |
 |-------|---------------------------|-------|
-| `jd:ui-design-audit` | Frontend/UI: components, pages, styles, theme/design-system files | Scope it to the changed UI paths. |
+| `jd:ui-design-audit` | Frontend/UI: components, pages, styles, theme/design-system files (paths under `ui_dirs` when set) | Scope it to the changed UI paths; pass `design_system` as the design source when set. |
 | `jd:db-audit` | DB schema (Prisma), migrations, or query-heavy data-access code | The static (prisma) layer needs only the schema file and always runs when a schema is present. The runtime (postgres) layer needs a read-only DB connection (`DATABASE_AUDIT_URL` or a passed URL); if none is configured, run the static layer only and record the runtime layer as skipped — do NOT stop to ask. |
 | `jd:error-audit` | **Always**, on any diff that touches code (any language); skip only on pure docs/config diffs | Not gated on the change touching error-handling code — error conformance is checked on every code change. When `error-standard.yaml` exists, conformance mode runs automatically against the contract; scope it to the changed paths. |
 
-If the diff is pure docs or config, skip all of them and say so. Otherwise `jd:error-audit` ALWAYS runs (it is not gated on the change touching error-handling code); `jd:ui-design-audit` and `jd:db-audit` run only when their UI / DB triggers are in the diff. Multiple may apply at once — run each relevant one. If the diff touches auth, PII, or upload paths, also run a security pass (the built-in security-review) and fold its findings into the general review. These audits are read-only; treat their findings as input to the general review, not a reason to halt unless a finding hits the STOP list.
+The table shows the defaults. When `audits.always`, `audits.when_ui` or `audits.when_schema` is set in `project.yaml`, run those skills instead: every `audits.always` skill on any code diff, the `audits.when_ui` skills when the diff touches UI, the `audits.when_schema` skills when it touches schema, migrations or queries.
 
-End-to-end (e2e) tests are NOT part of this chain. The repo's e2e is live cross-service and partly Windows-only (menu-game ↔ cafe-service gRPC runs on cafe-win), so it cannot run in an unattended overnight Linux run. E2e is owned by the human afternoon acceptance pass on cafe-win — never block or fail an auto run on e2e.
+If the diff is pure docs or config, skip all of them and say so. Multiple audits may apply at once — run each relevant one. If the diff touches auth, PII, or upload paths, also run a security pass (the built-in security-review) and fold its findings into the general review. These audits are read-only; treat their findings as input to the general review, not a reason to halt unless a finding hits the STOP list.
+
+End-to-end (e2e) tests are NOT part of this chain. The human owns e2e acceptance — never block or fail an auto run on e2e. When `e2e.contracts` lists contracts and the diff touches one, record in the report that manual e2e is required, with `e2e.host` as where it runs and `e2e.note` as the reason when set.
 
 ## Fix policy
 
@@ -105,21 +111,21 @@ End-to-end (e2e) tests are NOT part of this chain. The repo's e2e is live cross-
 
 Match the subagent's model to the task size when dispatching in step 5:
 
-- **Large task → Opus.** Cross-cutting changes, new architecture or schema, tricky algorithms, security-sensitive code, anything where a wrong approach is costly to unwind.
-- **Medium / small task → Sonnet.** Routine CRUD, UI wiring, copy and i18n, config, tests, mechanical edits, well-scoped changes that follow an existing pattern.
+- **Large task → `models.large_task` (default Opus).** Cross-cutting changes, new architecture or schema, tricky algorithms, security-sensitive code, anything where a wrong approach is costly to unwind.
+- **Medium / small task → `models.small_task` (default Sonnet).** Routine CRUD, UI wiring, copy and i18n, config, tests, mechanical edits, well-scoped changes that follow an existing pattern.
 
-When a task sits on the line, size up: more files, more unknowns, or higher blast radius means Opus; otherwise Sonnet. State the chosen model in the plan for each task.
+When a task sits on the line, size up: more files, more unknowns, or higher blast radius means the large-task model; otherwise the small-task model. State the chosen model in the plan for each task.
 
 ## Guardrails (always on)
 
 - English for code and docs; no redundant comments; no icons or symbols.
-- Web PWA follows Hyundai Premium v3 tokens; never hardcode hex.
+- UI work follows the design system named by `design_system` (else `DESIGN_SYSTEM.md` or the project's theme files when present); never hardcode colors that a token covers.
 - Commit footer: Co-Authored-By line. PR body footer: Generated with Claude Code.
 - Tests: capture the baseline once before implementing (run the suite, record failures). A task is done only when it adds NO failures beyond that baseline. Pre-existing failures outside this change's diff are recorded as out-of-scope, never "fixed" to force green. Evidence (the actual run) before claiming done.
 
 ## End of run — report
 
-- PR link
+- PR link (or the pushed branch name under `merge-after-acceptance`)
 - One-line summary per task
 - The full **Assumptions** list, surfaced prominently so the user can correct anything you decided
 - Any **Escalation** or **out-of-scope** items left unresolved

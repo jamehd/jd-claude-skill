@@ -1,7 +1,7 @@
 {
   "name": "jd",
-  "description": "Personal skill library by jamehd — design/scaffold (architect) and audit skills for UI, error handling, and databases, plus engineering workflows.",
-  "version": "0.33.0",
+  "description": "Personal engineering skill library by jamehd: audits (UI, errors, database), error-system architect, autonomous delivery (jd:auto), feature lifecycle with acceptance gates (jd:feature-flow), a project board with batch planning, and a requirements-drift hook. Project values come from project-board/project.yaml.",
+  "version": "0.34.0",
   "author": {
     "name": "jamehd"
   },
@@ -10,8 +10,14 @@
   "license": "MIT",
   "keywords": [
     "skills",
+    "audit",
     "ui-review",
     "design-system",
-    "frontend"
+    "error-handling",
+    "database",
+    "feature-flow",
+    "project-board",
+    "autonomous",
+    "multi-project"
   ]
 }

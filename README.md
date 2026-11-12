@@ -6,7 +6,7 @@ Personal Claude Code marketplace by **jamehd**. Houses the `jd` plugin and any f
 
 ### Plugin `jd`
 
-A growing library of personal engineering skills. After install, every skill is namespaced `jd:<name>` and every command is invoked as `/jd:<name>`.
+A growing library of personal engineering skills that work across projects: project specifics live in `<repo>/project-board/project.yaml` (reference: `plugins/jd/shared/project-config.md`). After install, every skill is namespaced `jd:<name>` and every command is invoked as `/jd:<name>`.
 
 | Skill | Description |
 |-------|-------------|
@@ -15,10 +15,16 @@ A growing library of personal engineering skills. After install, every skill is 
 | `jd:db-audit` | Layered database audit. A static layer over the Prisma schema (missing FK indexes, timezone-naive timestamps, cascade and type review) and a runtime layer over the live PostgreSQL database (performance, security, schema, configuration, operations). Per-project scope, auto-detected or from `db-audit.config.json`. The runtime layer needs a read-only DB connection. Outputs a unified severity-classified report plus reviewable schema and SQL fixes (never executed). |
 | `jd:architect-error-system-design` | Design and scaffold a unified, project-wide error system. Produces a language-agnostic error contract (`error-standard.yaml`: codes, HTTP mapping, localized messages, log/alert policy) plus idiomatic code per language. Adapters: TypeScript (Node/Next.js App Router) and Go; pluggable for more. Writes code behind human-gated decisions. The architect counterpart to `jd:error-audit`, which enforces the contract. |
 | `jd:start-conversation` | Baseline working conventions applied to every conversation: English-only docs and source code, no redundant code comments (comment WHY, not WHAT), and mirror the user's conversation language (reply in Vietnamese when the user writes Vietnamese). Auto-loaded each session via a SessionStart hook; the user's explicit instructions always take precedence. |
+| `jd:auto` | Autonomous end-to-end delivery: brainstorm, spec, plan, worktree, subagent TDD, review with domain audits, then integration per `git.integration` (PR by default), stopping only for architectural, hard-to-reverse or destructive decisions. Models, audits, design system and e2e notes come from `project.yaml`; runs on defaults without it. Board mode is commit-only. |
+| `jd:plan-batch` | Morning planning pass for the project board: shapes rough intents and backlog items into agent-ready tasks (scope, `needsE2e`, requirement IDs, locked decisions), promoting to `ready` only on explicit operator OK. Requires `project.yaml`. |
+| `jd:project-board` | Sets up and runs the Project Board dashboard (LAN web board that tracks tasks as markdown and dispatches them to headless Claude Code) for a repository, on Windows or Linux. Requires `project-board/project.yaml` and creates it from a template. |
 | `jd:feature-flow` | Feature lifecycle for AI-built projects: the owner gives requirements and accepts, the AI drafts briefs with numbered acceptance scenarios (Gate A), builds with subagents test-first, re-runs every accepted scenario plus `jd:error-audit` / `jd:ui-design-audit`, prepares a dev environment for acceptance (Gate B) and merges only after acceptance. Hard limits (3 fix attempts, 2 rework rounds, one active feature) with stop reports instead of loops. Project values in `project-board/project.yaml`, state in `project-board/data/`. |
 
 | Command | Description |
 |---------|-------------|
+| `/jd:auto <request>` | Deliver a defined change autonomously, from brainstorm to PR (or merge after acceptance). |
+| `/jd:plan-batch [intents]` | Shape the day's intents and backlog into agent-ready board tasks. |
+| `/jd:project-board [path\|action]` | Set up, build, run or restart the Project Board for a repository. |
 | `/jd:ui-design-audit [scope]` | Run the UI design audit. Optional `scope` argument restricts to a path. |
 | `/jd:error-audit [scope\|stack\|conformance\|dry-run]` | Run the error-handling audit. Optional argument: scope path, stack filter (`nodejs`/`go`/`frontend`), `conformance` to check only against `error-standard.yaml`, or `dry-run` to list checks. |
 | `/jd:db-audit [layer\|category\|url\|dry-run]` | Run the layered database audit. Optional argument: layer (`prisma`/`runtime`), category filter (`performance`/`security`/`schema`/`configuration`/`operations`), connection URL, or `dry-run`. |
@@ -29,6 +35,22 @@ A growing library of personal engineering skills. After install, every skill is 
 | `/jd:feature <ID\|text>` | Feature flow: check needs and draft the brief and acceptance scenarios for owner approval (Gate A). |
 | `/jd:build <ID>` | Feature flow: build an approved feature, re-run all accepted scenarios, audit, prepare dev acceptance (stops at Gate B). |
 | `/jd:accept <ID> ok\|notes` | Feature flow: record the verdict — merge on ok, or start a rework round with notes. |
+
+## Hooks
+
+Registered in `plugins/jd/hooks/hooks.json`, run through `hooks/run-hook.cmd` (works on Windows and Unix).
+
+| Hook | Event | Behaviour |
+|------|-------|-----------|
+| `session-start` | SessionStart | Injects the `jd:start-conversation` conventions. Skipped when env `JD_CONVENTIONS=off` or `project.yaml` sets `hooks.conventions: false`. `language.*` in `project.yaml` takes precedence over the language rule. |
+| `req-check-stop` | Stop | Advisory reminder when code mapped to a component changed without a matching requirement. Active only when `project.yaml` exists and `hooks.req_check` is not `false`; never blocks. |
+
+## Tools
+
+| Tool | Description |
+|------|-------------|
+| `plugins/jd/tools/project-board` | Fastify + React board server used by `jd:project-board`; needs `project-board/project.yaml`; configured by `board.*` and `BOARD_*` env vars (`BOARD_ENV_FILE` for an env file). |
+| `plugins/jd/tools/req-check` | Zero-dependency Node CLI behind the Stop hook; verifies the `Req:` commit trailer against the requirements map. |
 
 ## Output convention
 
@@ -81,12 +103,13 @@ jd-claude-skill/
 │   └── jd/
 │       ├── .claude-plugin/
 │       │   └── plugin.json
-│       ├── skills/
-│       │   └── ui-design-audit/
-│       │       ├── SKILL.md
-│       │       └── references/
-│       └── commands/
-│           └── ui-design-audit.md
+│       ├── skills/          one folder per skill, each with SKILL.md
+│       ├── commands/        one markdown file per /jd:<name> command
+│       ├── hooks/           hooks.json, run-hook.cmd, session-start, req-check-stop
+│       ├── shared/          project-config (reader + docs), requirements parser, output convention
+│       └── tools/
+│           ├── project-board/
+│           └── req-check/
 ├── README.md
 └── LICENSE
 ```

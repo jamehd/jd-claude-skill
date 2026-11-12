@@ -2,11 +2,31 @@
 # SessionStart hook for the jd plugin.
 # Injects the jd:start-conversation baseline conventions into every session so
 # they are active before the first reply.
+# Skipped when JD_CONVENTIONS=off or project-board/project.yaml sets hooks.conventions: false.
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PLUGIN_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+if [ "${JD_CONVENTIONS:-}" = "off" ]; then
+  exit 0
+fi
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || true)"
+CONFIG="${ROOT:+$ROOT/project-board/project.yaml}"
+if [ -n "$CONFIG" ] && [ -f "$CONFIG" ]; then
+  conventions=$(awk '
+    /^[^[:space:]#]/ { in_hooks = ($0 ~ /^hooks:/); next }
+    in_hooks && /^[[:space:]]+conventions:/ {
+      v = $0; sub(/^[[:space:]]+conventions:[[:space:]]*/, "", v)
+      sub(/[[:space:]]+#.*$/, "", v); gsub(/|"|'"'"'/, "", v)
+      print v; exit
+    }' "$CONFIG")
+  if [ "$conventions" = "false" ]; then
+    exit 0
+  fi
+fi
 
 rules_content=$(cat "${PLUGIN_ROOT}/skills/start-conversation/SKILL.md" 2>&1 || echo "Error reading start-conversation skill")
 
@@ -22,7 +42,7 @@ escape_for_json() {
 }
 
 rules_escaped=$(escape_for_json "$rules_content")
-session_context="<IMPORTANT>\nThese are jamehd's baseline working conventions (the 'jd:start-conversation' skill). Keep them active for the whole session unless the user's explicit instructions override them.\n\n${rules_escaped}\n</IMPORTANT>"
+session_context="<IMPORTANT>\nThese are jamehd's baseline working conventions (the 'jd:start-conversation' skill). Keep them active for the whole session unless the user's explicit instructions override them. When the repository has project-board/project.yaml, its language.* settings take precedence over the language rules below.\n\n${rules_escaped}\n</IMPORTANT>"
 
 # Emit only the field the current platform consumes (avoids duplicate injection).
 if [ -n "${CURSOR_PLUGIN_ROOT:-}" ]; then

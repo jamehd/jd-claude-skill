@@ -1,6 +1,6 @@
 ---
 name: ui-design-audit
-description: Use this skill whenever the user asks for a UI review, design audit, theme compliance check, or wants to verify that the frontend implementation matches the project's design system. Trigger on phrases like "review UI", "ui audit", "design audit", "kiểm tra UI", "check design", "rà soát giao diện", "audit theme", "check Tailwind", or whenever the user has finished a UI change and wants quality assurance. The skill scans the source code, compares it against the project's DESIGN_SYSTEM.md / design-theme-v2.html (or a default UI-quality checklist if those files are absent), and reports concrete, file-and-line-anchored violations grouped by severity.
+description: Use this skill whenever the user asks for a UI review, design audit, theme compliance check, or wants to verify that the frontend implementation matches the project's design system. Trigger on phrases like "review UI", "ui audit", "design audit", "kiểm tra UI", "check design", "rà soát giao diện", "audit theme", "check Tailwind", or whenever the user has finished a UI change and wants quality assurance. The skill scans the source code, compares it against the project's design system (`design_system` in `project-board/project.yaml`, else `DESIGN_SYSTEM.md` or theme files; or a default UI-quality checklist if none exists), and reports concrete, file-and-line-anchored violations grouped by severity.
 ---
 
 # UI Design Audit
@@ -25,7 +25,7 @@ Follow these phases in order. Don't skip discovery — the report quality depend
 
 ### Phase 1 — Discover the design system
 
-Look for canonical design documents at the project root and one level deep. Common names:
+If `<repo>/project-board/project.yaml` exists, read `design_system` (or `audits.ui_design_source`) and `ui_dirs` first (reference: `../../shared/project-config.md`). A configured design source is the canonical document; skip the name search below unless it is missing. Otherwise look for canonical design documents at the project root and one level deep. Common names:
 
 - `DESIGN_SYSTEM.md`, `DESIGN.md`, `THEME.md`, `STYLE_GUIDE.md`
 - `design-theme*.html`, `design-system*.html`, `theme*.html`
@@ -43,11 +43,12 @@ If both modes apply (e.g., a partial design doc exists), run the default checkli
 
 Identify what to review. Don't scan node_modules, dist, build, .next, coverage, or generated files.
 
-Typical UI locations:
+Scope is `ui_dirs` when configured (or the path the user passed). Otherwise detect from typical UI locations:
 - `src/app/**/*.{tsx,jsx,vue,svelte}` — Next.js / React app routes
 - `src/components/**`
 - `src/pages/**`
 - `app/**` (Next 13+ app router)
+- `lib/**` (Flutter/Dart widgets), `resources/views/**` (Blade/server-rendered templates)
 - `styles/**`, `*.css`, `*.scss`
 
 If the project is large, ask the user to narrow scope ("which directory should I focus on?") rather than scanning everything. A focused review is more valuable than a shallow one.

@@ -1,5 +1,5 @@
 ---
-description: Run a UI design audit against DESIGN_SYSTEM.md / theme files (or default UI quality checklist) — produces a severity-grouped report with file:line evidence.
+description: Run a UI design audit against the project's design system (`design_system` in `project.yaml`, DESIGN_SYSTEM.md or theme files) (or default UI quality checklist) — produces a severity-grouped report with file:line evidence.
 argument-hint: "[scope path or directory — optional, defaults to detected UI source dirs]"
 ---
 
@@ -12,7 +12,7 @@ Invoke the `jd:ui-design-audit` skill to audit the frontend for design-system an
 Steps:
 1. Load the `jd:ui-design-audit` skill via the Skill tool.
 2. If `$ARGUMENTS` is non-empty, restrict the review to that path.
-3. Otherwise, auto-detect UI source directories (`src/app`, `src/components`, `app/`, `components/`, …) and report which scope was chosen before proceeding.
+3. Otherwise use `ui_dirs` from `project-board/project.yaml` when set, else auto-detect UI source directories (`src/app`, `src/components`, `app/`, `components/`, `lib/`, `resources/views`, …) and report which scope was chosen before proceeding.
 4. Produce the report inline — do not write report files unless I explicitly ask.
 5. End with the prioritized fix list so I can act on the top items immediately.
 

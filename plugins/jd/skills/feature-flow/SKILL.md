@@ -1,6 +1,6 @@
 ---
 name: feature-flow
-description: Use when running a project through the feature lifecycle — owner gives requirements and accepts, AI drafts briefs with numbered acceptance scenarios, builds with subagents test-first, re-runs every accepted scenario, audits, and merges only after acceptance. Entry points /jd:status, /jd:next, /jd:feature, /jd:build, /jd:accept. Triggers on "continue", "next feature", "new feature", "approve brief", "accept feature", "làm tiếp", "tính năng mới", "duyệt brief", "nghiệm thu", "trạng thái dự án".
+description: Use only in repositories that contain project-board/project.yaml (otherwise offer setup) — running a project through the feature lifecycle — owner gives requirements and accepts, AI drafts briefs with numbered acceptance scenarios, builds with subagents test-first, re-runs every accepted scenario, audits, and merges only after acceptance. Entry points /jd:status, /jd:next, /jd:feature, /jd:build, /jd:accept. Triggers on "continue", "next feature", "new feature", "approve brief", "accept feature", "làm tiếp", "tính năng mới", "duyệt brief", "nghiệm thu", "trạng thái dự án".
 ---
 
 # Feature Flow
@@ -62,7 +62,7 @@ Files are the source of truth. Never keep state or counters only in memory.
 | `brief-review` | Brief and scenarios ready | Owner approves or corrects |
 | `building` | Approved, AI building | AI (`/jd:build`) |
 | `acceptance` | On dev with report and try-it guide | Owner verdict (`/jd:accept`) |
-| `done` | Accepted and merged | — |
+| `done` | Accepted and integrated (PR merged, or merged by the AI) | — |
 | `stopped` | Limit or STOP decision hit; stop report in the status file | Person named in the report |
 
 The queue is every feature not `done`, sorted by `order` in `feature.md`. `needs` lists feature IDs
@@ -74,7 +74,7 @@ and owner-action IDs that must be done first.
   `/jd:build <ID>`. Record the line `Approved by owner: <date>` in the brief and `approvedAt` in
   `feature.md`.
 - **Gate B**: only `/jd:accept <ID> ok` (or an equally explicit statement) accepts. Then the AI
-  merges the feature branch into `git.main`.
+  integrates the feature branch as `git.integration` says (`references/accept.md`).
 - Never infer approval or acceptance from vague replies such as "ok", "tiếp", "good"; ask.
 
 ## Limits
@@ -94,7 +94,8 @@ anything in `acceptance.forbidden`; a missing tool, credential or service with n
 
 - Every build re-runs every `active` scenario plus the feature's own, then runs every skill in
   `audits.always` (and `audits.when_schema` when schema or queries changed).
-- One branch per feature (`git.branch_pattern`); merge only at Gate B, only in `/jd:accept`.
+- One branch per feature (`git.branch_pattern`); integrate only at Gate B, only in `/jd:accept`
+  (`git.integration`: `pull-request` by default, or `merge-after-acceptance`).
 - `approvedAt` in `feature.md` is the authoritative Gate A record.
 - Task files use the project-board task format but are never set to `ready`, so board
   auto-dispatch cannot pick them up.
