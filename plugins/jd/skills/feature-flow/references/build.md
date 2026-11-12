@@ -39,7 +39,7 @@ Write "Current step: build <n>" to `paths.status` as each step starts.
    (IDs `T-NNN`, `epic: <ID>`). Existing task files keep their counters; re-planning must
    **never reset** them, only add or amend.
    Quote titles and values that contain `:` in the frontmatter, or the board skips the file.
-4. Write one automated test per scenario in `acceptance.md` first; confirm they fail; record test
+4. Write one automated test per scenario and per quality budget in `acceptance.md` first; confirm they fail; record test
    names in `acceptance.md` and `paths.scenarios`.
 5. Implement with superpowers:subagent-driven-development and superpowers:test-driven-development,
    one task at a time, models per `models.large_task` / `models.small_task`. Set a task
@@ -57,7 +57,8 @@ Write "Current step: build <n>" to `paths.status` as each step starts.
    - Dispatch the `jd:qa-runner` agent with this feature's ID and the `when` conditions that hold. It
      runs `actions.test_scenarios` for every `active` scenario in `paths.scenarios` plus this
      feature's, then `actions.test_all`, `actions.test_integration`, `actions.lint`,
-     `actions.gen_check` and the matching conditional actions. Only its `QA RESULT: PASS` counts;
+     `actions.gen_check` and the matching conditional actions, plus the quality actions in
+     `quality.md`. Only its `QA RESULT: PASS` counts;
      copy its tables into the report. `FLAKY` and `NO TEST` are failures.
    - Every skill in `audits.always`, scoped to this feature's changes. The UI audit uses
      `design_system` and records "no UI surface in changes" when there is none. Skills in

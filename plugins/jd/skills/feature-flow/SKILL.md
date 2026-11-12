@@ -101,6 +101,8 @@ anything in `acceptance.forbidden`; a missing tool, credential or service with n
 
 ## Always
 
+- Crashes, leaks and performance are numeric quality budgets in the brief, measured by actions
+  (`references/quality.md`); a budget is a scenario like any other.
 - Every build re-runs every `active` scenario plus the feature's own, then runs every skill in
   `audits.always` (and `audits.when_schema` when schema or queries changed).
 - One branch per feature (`git.branch_pattern`); integrate only at Gate B: the PR is opened or the merge done by `/jd:accept`, and a merged PR is

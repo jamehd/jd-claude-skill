@@ -54,5 +54,5 @@ Validation at board start: `git.main` and `board.branch_prefix` must be valid br
 The board's `/api/info` endpoint is unauthenticated (even with a password) and returns only the
 project name.
 
-Other keys (`actions`, `acceptance`, `git.remote`, `git.commit_footer`) are feature-flow
+Other keys (`actions`, `acceptance`, `quality.bench_regression_pct`, `git.remote`, `git.commit_footer`) are feature-flow
 settings with no defaults; see the feature-flow `templates/project.yaml`.

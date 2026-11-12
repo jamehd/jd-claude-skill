@@ -18,7 +18,7 @@ A growing library of personal engineering skills that work across projects: proj
 | `jd:auto` | Autonomous end-to-end delivery: brainstorm, spec, plan, worktree, subagent TDD, review with domain audits, then integration per `git.integration` (PR by default), stopping only for architectural, hard-to-reverse or destructive decisions. Models, audits, design system and e2e notes come from `project.yaml`; runs on defaults without it. Board mode is commit-only. |
 | `jd:plan-batch` | Morning planning pass for the project board: shapes rough intents and backlog items into agent-ready tasks (scope, `needsE2e`, requirement IDs, locked decisions), promoting to `ready` only on explicit operator OK. Requires `project.yaml`. |
 | `jd:project-board` | Sets up and runs the Project Board dashboard (LAN web board that tracks tasks as markdown and dispatches them to headless Claude Code) for a repository, on Windows or Linux. Requires `project-board/project.yaml` and creates it from a template. |
-| `jd:feature-flow` | Feature lifecycle for AI-built projects: the owner gives requirements and accepts, the AI drafts briefs with numbered acceptance scenarios (Gate A), builds with subagents test-first, re-runs every accepted scenario plus `jd:error-audit` / `jd:ui-design-audit`, prepares a dev environment for acceptance (Gate B) and merges only after acceptance. Hard limits (3 fix attempts, 2 rework rounds, one active feature by default; configurable in `limits.*`) with stop reports instead of loops. `git.integration` chooses pull-request or merge-after-acceptance. Project values in `project-board/project.yaml`, state in `project-board/data/`. |
+| `jd:feature-flow` | Feature lifecycle for AI-built projects: the owner gives requirements and accepts, the AI drafts briefs with numbered acceptance scenarios (Gate A), builds with subagents test-first, re-runs every accepted scenario and numeric quality budget (crashes, leaks, performance) plus `jd:error-audit` / `jd:ui-design-audit`, prepares a dev environment for acceptance (Gate B) and merges only after acceptance. Hard limits (3 fix attempts, 2 rework rounds, one active feature by default; configurable in `limits.*`) with stop reports instead of loops. `git.integration` chooses pull-request or merge-after-acceptance. Project values in `project-board/project.yaml`, state in `project-board/data/`. |
 
 | Command | Description |
 |---------|-------------|
@@ -42,6 +42,10 @@ A growing library of personal engineering skills that work across projects: proj
 | `jd:security-reviewer` | Independent, read-only security review (Opus) of a git range: authentication, authorization, injection, secrets, personal data, payment integrity, uploads, client storage, dependencies. Severity-graded findings with exploit steps and fixes; verdict `BLOCK` on Critical/High. Used by `jd:feature-flow` when auth, personal data, payment or uploads change. |
 
 Agents ship in `plugins/jd/agents/` as subagent types `jd:<name>` and are available to any session that has the plugin installed.
+
+## Upgrading to 0.36.0
+
+`jd:feature-flow` briefs gain a "Quality budgets" section: numeric budgets for crashes, leaks and performance, each a `<ID>-Q<n>` scenario measured by new optional actions `test_bench`, `test_load`, `test_soak` and checked by `jd:qa-runner` (`references/quality.md`). New key `quality.bench_regression_pct` (default 10). Existing projects: add the three actions as `pending: true` until a feature delivers them.
 
 ## Upgrading to 0.35.0
 

@@ -22,6 +22,9 @@ actions:
   test_scenarios: { run: "<acceptance scenario suite command>", pending: true }
   lint: { run: "<lint command>", pending: true }
   gen_check: { run: "<generated code drift check>", pending: true }
+  test_bench: { run: "<benchmarks, compared with git.main>", pending: true }
+  test_load: { run: "<load test that prints the measured values>", pending: true }
+  test_soak: { run: "<long-running stability test that prints memory, threads, crashes>", pending: true }
   dev_up: { run: "<start dev dependencies>", pending: true }
   dev_seed: { run: "<load sample data>", pending: true }
   dev_run: { run: "<run the app for acceptance>", pending: true }
@@ -37,6 +40,9 @@ acceptance:
   environment: >-
     <where and how the owner tries features, e.g. this workstation, which emulator or browser>
   forbidden: [production, real payment providers, messages to real users]
+
+quality:
+  bench_regression_pct: 10
 
 limits:
   fix_attempts: 3

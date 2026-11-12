@@ -37,10 +37,17 @@ the regression suite only (nightly mode).
    - `actions.test_scenarios`
    - with a feature ID: `actions.test_all`, `actions.test_integration`, `actions.lint`,
      `actions.gen_check`, and any other action whose `when` condition the caller says holds.
+   - Quality actions, per the skill's `references/quality.md`: `actions.test_bench` on every run;
+     `actions.test_load` in nightly mode or when a collected `-Q` budget names it;
+     `actions.test_soak` in nightly mode, or when the caller asks for it.
 5. Map results to scenarios by test name. A test that fails: run that test alone once more. If it
    passes the second time, mark the scenario `FLAKY` (counts as a failure) and show both outputs.
    Do not run it a third time.
-6. If an action cannot start (missing tool, service not running), report `BLOCKED` with the exact
+6. Quality budgets (`-Q` rows): read the measured value for each budget from its action's output
+   and compare it with the budget. A value missing from the output is `NO MEASUREMENT` (a failure).
+   For `test_bench`, fail any benchmark slower than on `git.main` by more than
+   `quality.bench_regression_pct` (default 10). Never re-run a quality action to get a better number.
+7. If an action cannot start (missing tool, service not running), report `BLOCKED` with the exact
    error. Do not install tools or start services that are not part of a configured action.
 
 ## Report (your final message)
@@ -53,6 +60,10 @@ Feature: <ID or "regression only">   Commit: <short sha>   Branch: <name>
 |---|---|---|---|
 | S-001 | <test name> | PASS / FAIL / FLAKY / NO TEST | <one line: assertion or error> |
 
+| Budget | Limit | Measured | Result |
+|---|---|---|---|
+| S-Q1 | <budget> | <value from output> | PASS / FAIL / NO MEASUREMENT |
+
 | Action | Command | Result | Exit |
 |---|---|---|---|
 | test_scenarios | <run> | PASS / FAIL / NOT AVAILABLE / BLOCKED | <code> |
@@ -60,7 +71,8 @@ Feature: <ID or "regression only">   Commit: <short sha>   Branch: <name>
 Failures (one block each): scenario or action, command, exit code, relevant output lines.
 ```
 
-`PASS` only when every collected scenario is `PASS` and every applicable, available action passed.
+`PASS` only when every collected scenario and budget is `PASS` and every applicable, available
+action passed.
 `EMPTY` when no scenario was collected or `actions.test_scenarios` is not available: nothing was
 verified, so it is never a pass.
 Keep the report factual: no guesses about causes beyond what the output shows.

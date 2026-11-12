@@ -16,6 +16,15 @@
 | Full regression (all active scenarios) | <n>/<n> pass |
 | Unit / integration | pass |
 | Lint, generation check | pass |
+| Quality budgets | <n>/<n> within budget |
+
+## Quality budgets
+
+| ID | Budget | Measured | Result | Source |
+|---|---|---|---|---|
+| <ID>-Q1 | <budget> | <value> | <pass / fail> | <action and run date> |
+
+Benchmark comparison with `git.main`: <worst change in %, threshold `quality.bench_regression_pct`>.
 
 ## Audits
 

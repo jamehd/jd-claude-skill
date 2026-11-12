@@ -17,6 +17,10 @@
    - Scenarios must be observable in `acceptance.environment`, with timing where it matters.
    - Find features that touch the same behaviour; add intersection scenarios; list them under
      Overlaps.
+   - Fill "Quality budgets" (see `quality.md`): numeric budgets for latency, resources and
+     stability on every user-facing path, long-running process and money path, each with its
+     condition and the action that measures it; otherwise "none" with the reason. Add one
+     `<ID>-Q<n>` row per budget to `acceptance.md`.
    - Every decision the docs do not settle goes under Open questions with a recommendation.
    - Use superpowers:brainstorming as self Q&A only; do not run its interactive questions.
 5. Add the scenario IDs to `paths.scenarios` with state `proposed`.
