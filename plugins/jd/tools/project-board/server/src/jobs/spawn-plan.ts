@@ -2,6 +2,7 @@ export interface SpawnOpts {
   cwd: string
   shell?: boolean
   windowsVerbatimArguments?: boolean
+  promptArgIndex?: number
 }
 
 export interface SpawnPlan {
@@ -23,8 +24,8 @@ function windowsBin(bin: string): string {
 // On Windows the shell parses the command line, so only fixed tokens go on it; the prompt travels over stdin.
 export function planSpawn(bin: string, args: string[], opts: SpawnOpts, platform: NodeJS.Platform): SpawnPlan {
   if (!opts.shell || platform !== 'win32') return { command: bin, args, options: opts }
-  const promptAt = args.indexOf('-p') + 1
-  const hasPrompt = promptAt > 0 && promptAt < args.length && !args[promptAt].startsWith('--')
+  const promptAt = opts.promptArgIndex
+  const hasPrompt = promptAt !== undefined && promptAt >= 0 && promptAt < args.length
   const tokens = hasPrompt ? args.filter((_, i) => i !== promptAt) : args
   tokens.forEach((token, i) => {
     if (!SAFE_TOKEN.test(token)) throw new Error(`unsafe argument for Windows shell: ${token}`)

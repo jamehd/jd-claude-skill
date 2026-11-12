@@ -5,6 +5,7 @@ import path from 'node:path'
 import { EventEmitter } from 'node:events'
 import { BoardStore } from './store.js'
 import { WsHub } from './ws.js'
+import { planSpawn } from './jobs/spawn-plan.js'
 import { JobRunner, type SpawnFn, type GitOps, type RunnerDeps } from './jobs/runner.js'
 
 class FakeProc extends EventEmitter {
@@ -1031,5 +1032,45 @@ describe('Windows process spawning', () => {
     const t = setup()
     await runToGate(t)
     expect((t.spawnFn as ReturnType<typeof vi.fn>).mock.calls[1][0]).toBe('bash')
+  })
+})
+
+describe('Windows spawn planning failures', () => {
+  let restore: (() => void) | undefined
+  afterEach(() => { restore?.(); restore = undefined })
+
+  function planningSetup() {
+    const created: FakeProc[] = []
+    const plans: ReturnType<typeof planSpawn>[] = []
+    const spawnFn: SpawnFn = (bin, args, opts) => {
+      plans.push(planSpawn(bin, args, opts, 'win32'))
+      const p = new FakeProc()
+      created.push(p)
+      return p as never
+    }
+    return { ...setup({ spawnFn }), created, plans }
+  }
+
+  it.each(['--help', '--model x'])('steer text %j reaches claude as the prompt over stdin', async (text) => {
+    restore = withPlatform('win32')
+    const t = planningSetup()
+    const job = t.runner.dispatchTask(t.item.id)
+    t.created[0].stdout.emit('data', Buffer.from(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'sess-1' }) + '\n'))
+    t.runner.message(job.id, text, 'queue')
+    t.created[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.plans).toHaveLength(2))
+    expect(t.plans[1].stdinPayload).toBe(text)
+    expect(t.plans[1].command).toBe('claude -p --dangerously-skip-permissions --output-format stream-json --verbose --include-partial-messages --resume sess-1')
+  })
+
+  it('an invalid resume id fails the job without throwing', async () => {
+    restore = withPlatform('win32')
+    const t = planningSetup()
+    const job = t.runner.dispatchTask(t.item.id)
+    t.created[0].stdout.emit('data', Buffer.from(JSON.stringify({ type: 'system', subtype: 'init', session_id: 'bad & calc' }) + '\n'))
+    t.runner.message(job.id, 'next', 'queue')
+    expect(() => t.created[0].emit('exit', 0)).not.toThrow()
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'))
+    expect(t.runner.getJob(job.id)?.error).toMatch(/could not start claude/)
   })
 })

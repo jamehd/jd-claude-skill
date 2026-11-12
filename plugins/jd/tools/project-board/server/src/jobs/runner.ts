@@ -527,7 +527,14 @@ export class JobRunner {
       '--output-format', 'stream-json', '--verbose', '--include-partial-messages']
     if (resume) args.push('--resume', resume)
 
-    const proc = this.spawnFn(claudeBin, args, { cwd, shell: process.platform === 'win32' })
+    let proc: ChildProcess
+    try {
+      proc = this.spawnFn(claudeBin, args, { cwd, shell: process.platform === 'win32', promptArgIndex: 1 })
+    } catch (err) {
+      this.running.delete(job.id)
+      this.finish(job, 'failed', `could not start claude: ${err instanceof Error ? err.message : err}`)
+      return
+    }
     const entry: SegmentEntry = { proc, steering: false, buffer: '' }
     this.running.set(job.id, entry)
 
