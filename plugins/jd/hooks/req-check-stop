@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Stop hook: advisory requirements-drift reminder, shown to the user as a systemMessage. Never blocks.
-# No-ops unless <repo>/project-board/project.yaml exists and does not set hooks.req_check to false.
+# No-ops unless <repo>/project-board/project.yaml exists, hooks.req_check is not false and the map file exists.
 set -uo pipefail
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLI="$HOOK_DIR/../tools/req-check/cli.mjs"
@@ -8,8 +8,20 @@ CLI="$HOOK_DIR/../tools/req-check/cli.mjs"
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 CONFIG="$ROOT/project-board/project.yaml"
 [ -f "$CONFIG" ] || exit 0
-if awk '/^hooks:/{h=1;next} /^[^[:space:]#]/{h=0} h && /^[[:space:]]+req_check:[[:space:]]*false/{f=1} END{exit !f}' "$CONFIG"; then
-  exit 0
-fi
+
+yaml_value() {
+  awk -v sect="$1" -v key="$2" '
+    /^[^[:space:]#]/ { in_sect = ($0 ~ "^" sect ":") ; next }
+    in_sect && $0 ~ "^[[:space:]]+" key ":" {
+      v = $0; sub("^[[:space:]]+" key ":[[:space:]]*", "", v)
+      sub(/[[:space:]]+#.*$/, "", v); gsub(/\r|^["'\'']|["'\'']$/, "", v)
+      print v; exit
+    }' "$CONFIG"
+}
+
+[ "$(yaml_value hooks req_check)" = "false" ] && exit 0
+DIR="$(yaml_value requirements dir)"; DIR="${DIR:-docs/requirements}"
+MAP="$(yaml_value requirements map)"; MAP="${MAP:-.component-map.json}"
+[ -f "$ROOT/$DIR/$MAP" ] || exit 0
 (cd "$ROOT" && node "$CLI" --worktree --advisory --system-message 2>/dev/null) || true
 exit 0

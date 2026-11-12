@@ -73,13 +73,19 @@ function main() {
   }
 
   if (args.mode === 'worktree') {
-    const changed = worktreeChangedFiles(root)
-    const touched = classifyChanges(changed, map)
-    const docFiles = new Set(map.components.map((c) => c.doc).filter(Boolean))
-    const changedDocs = new Set(
-      changed.map((f) => path.basename(f)).filter((b) => docFiles.has(b)),
-    )
-    const { reminders } = evaluateWorktree({ touched, changedDocs })
+    let reminders
+    try {
+      const changed = worktreeChangedFiles(root)
+      const touched = classifyChanges(changed, map)
+      const docFiles = new Set(map.components.map((c) => c.doc).filter(Boolean))
+      const changedDocs = new Set(
+        changed.map((f) => path.basename(f)).filter((b) => docFiles.has(b)),
+      )
+      ;({ reminders } = evaluateWorktree({ touched, changedDocs }))
+    } catch (e) {
+      console.error(`req-check: invalid component map ${path.relative(root, mapPath)} (${firstLine(e)}); skipping`)
+      process.exit(0)
+    }
     // Advisory output goes to stdout; only blocking failures (range mode) go to stderr.
     // Worktree mode is always advisory (never blocks); --advisory is accepted for explicitness.
     if (reminders.length) {

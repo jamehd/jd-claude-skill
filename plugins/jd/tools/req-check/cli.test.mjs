@@ -163,3 +163,12 @@ test('--system-message wraps advisory output as JSON', () => {
   assert.equal(r.code, 0)
   assert.match(JSON.parse(r.stdout).systemMessage, /requirements reminder/)
 })
+
+test('structurally invalid map prints one line and exits 0', () => {
+  const root = newRepo()
+  writeFileSync(path.join(root, 'docs/requirements/.component-map.json'), '{"components": 5}')
+  writeFileSync(path.join(root, 'cafe-service/api.go'), 'package main\n')
+  const r = runCli(['--worktree', '--advisory'], root)
+  assert.equal(r.code, 0)
+  assert.equal(`${r.stdout}${r.stderr}`.trim().split('\n').length, 1)
+})
