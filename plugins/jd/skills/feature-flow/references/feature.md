@@ -10,7 +10,9 @@
 3. Check `needs`. Each ID is looked up among features and owner actions; an **unknown** ID →
    report it and stop. A need that is not done → report what is missing, propose an order, stop.
    Exception: a feature need in `building` or `acceptance` allows drafting (never building).
-4. Draft `brief.md` and `acceptance.md` from the templates:
+4. Draft `brief.md` and `acceptance.md` from the templates. If a `brief.md` already exists,
+   keep its content (goal, checks, "Delivers", needs) and merge it into the template structure
+   instead of overwriting it.
    - Use the owner's words, the design docs in `paths.design_docs`, and existing scenarios.
    - Scenarios must be observable in `acceptance.environment`, with timing where it matters.
    - Find features that touch the same behaviour; add intersection scenarios; list them under

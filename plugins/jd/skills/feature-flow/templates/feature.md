@@ -8,6 +8,8 @@ needs: []
 approvedAt:
 reworkRound: 0
 featureFixAttempts: 0
+featureFixLimit: 3
+stoppedFrom:
 branch: feat/<ID>-<slug>
 created: <YYYY-MM-DD>
 updated: <YYYY-MM-DD>

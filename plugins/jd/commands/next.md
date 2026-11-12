@@ -1,5 +1,6 @@
 ---
 description: "Feature flow: continue from the status file until the next gate or stop"
+argument-hint: "(no arguments)"
 ---
 
 # /jd:next

@@ -81,10 +81,10 @@ and owner-action IDs that must be done first.
 
 | Limit | Key | On reaching it |
 |---|---|---|
-| Fix attempts per technical task | `limits.fix_attempts` | Stop with a stop report |
-| Feature-level fix attempts (verification: suite, lint, audits) | `limits.fix_attempts` | Stop with a stop report |
+| Fix attempts per technical task (`attempts` vs `attemptLimit`) | `limits.fix_attempts` | Stop with a stop report |
+| Feature fix-and-verify cycles (`featureFixAttempts` vs `featureFixLimit`) | `limits.fix_attempts` | Stop with a stop report |
 | Rework rounds after owner rejection | `limits.rework_rounds` | Re-examine the brief with the owner instead of changing code |
-| Features in `building` or `acceptance` at once | `limits.features_active` | Draft the next brief only |
+| Features in `building`, `acceptance` or `stopped` at once | `limits.features_active` | Draft the next brief only |
 
 Stop immediately, regardless of counters, for: architecture or contracts not fixed by the
 project's design docs; irreversible data actions; deleting work not created in this run;
@@ -94,7 +94,8 @@ anything in `acceptance.forbidden`; a missing tool, credential or service with n
 
 - Every build re-runs every `active` scenario plus the feature's own, then runs every skill in
   `audits.always` (and `audits.when_schema` when schema or queries changed).
-- One branch per feature (`git.branch_pattern`); merge only at Gate B.
+- One branch per feature (`git.branch_pattern`); merge only at Gate B, only in `/jd:accept`.
+- `approvedAt` in `feature.md` is the authoritative Gate A record.
 - Task files use the project-board task format but are never set to `ready`, so board
   auto-dispatch cannot pick them up.
 - End every command by updating the status file and `feature.md`.

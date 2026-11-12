@@ -1,5 +1,5 @@
 ---
-id: <task ID>
+id: T-NNN
 type: task
 title: <title>
 status: backlog
@@ -7,6 +7,7 @@ priority: P2
 component: <area>
 epic: <feature ID>
 attempts: 0
+attemptLimit: 3
 created: <YYYY-MM-DD>
 updated: <YYYY-MM-DD>
 ---

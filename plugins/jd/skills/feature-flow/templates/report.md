@@ -2,8 +2,8 @@
 
 | Field | Value |
 |---|---|
-| Rework round | 0/2 |
-| Feature fix attempts | 0/3 |
+| Rework round | 0/<limits.rework_rounds> |
+| Feature fix attempts | 0/<featureFixLimit> |
 | Branch | feat/<ID>-<slug> |
 | Build date | <date> |
 | Environment | <from acceptance.environment in project.yaml> |

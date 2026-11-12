@@ -8,12 +8,15 @@ recreate it.
 Only when the input explicitly accepts the feature.
 
 1. Fill the verdict table with ok for every scenario.
-2. Merge the feature branch into `git.main` (merge commit or fast-forward, not squash), push
+2. Check the branch is pushed and the report's verification is green. If `git.main` moved since
+   the build, rebase and re-run `build.md` step 7 (a counted cycle); a conflict that is not
+   mechanical → stop with a stop report.
+3. Merge the feature branch into `git.main` (merge commit or fast-forward, not squash), push
    `git.main`, delete the remote feature branch.
-3. `paths.scenarios`: this feature's scenarios → `active` (they now run in every build).
-4. Task files of this feature → `done`.
-5. `feature.md` → `done`; the status file names the next feature in the queue.
-6. Reply with a one-line confirmation and the suggested next command.
+4. `paths.scenarios`: this feature's scenarios → `active` (they now run in every build).
+5. Task files of this feature → `done`.
+6. `feature.md` → `done`; the status file names the next feature in the queue.
+7. Reply with a one-line confirmation and the suggested next command.
 
 ## Verdict with notes
 

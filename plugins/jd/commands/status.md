@@ -1,5 +1,6 @@
 ---
 description: "Feature flow: summarise active feature, items waiting for the owner, queue and done features"
+argument-hint: "(no arguments)"
 ---
 
 # /jd:status

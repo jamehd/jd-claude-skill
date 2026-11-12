@@ -6,7 +6,8 @@ Use when any feature-flow command runs in a repository that has no `project-boar
    Do nothing else until they agree.
 2. On agreement:
    - Copy `templates/project.yaml` to `project-board/project.yaml`.
-   - Create the folders named by `paths.features`, `paths.tasks`, `paths.owner_actions`.
+   - Create the folders named by `paths.features`, `paths.tasks`, `paths.owner_actions`, and
+     `project-board/data/status/` (the board reads it at startup).
    - Create `paths.status` from `templates/status.md` and `paths.scenarios` from
      `templates/scenarios.md`.
    - Add `jobs/` and `auto.json` to `project-board/data/.gitignore`; add `.board-worktrees/` to the

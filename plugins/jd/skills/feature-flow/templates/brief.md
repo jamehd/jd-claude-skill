@@ -6,7 +6,7 @@
 | Original request | "<owner's words, verbatim>" |
 | Branch | feat/<ID>-<slug> |
 
-Approved by owner: <date — written only after an explicit approval; also set approvedAt in feature.md>
+Approved by owner: —
 
 ## Goal
 
@@ -22,6 +22,10 @@ Approved by owner: <date — written only after an explicit approval; also set a
 |---|---|---|
 | Feature | <ID> | <status> |
 | Owner action | <ID> | <done / waiting> |
+
+## Delivers
+
+<Project actions (keys under `actions` in project.yaml) this feature creates, or "none".>
 
 ## Overlaps with existing features
 
