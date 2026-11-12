@@ -1,0 +1,19 @@
+Brainstorm and shape board task TASK-007 for the GameSync project before it is executed.
+
+Title: Serve theme over gRPC
+
+Description:
+Implement the theme RPC.
+
+Req: CAFE-R3
+Req: CAFE-R99
+
+Requirements this task must satisfy:
+- CAFE-R3 — GetTheme RPC: Serves theme over gRPC.
+    AC: theme < 1s
+    AC: tests both paths
+- CAFE-R99: not found in docs/requirements
+
+Use the superpowers brainstorming skill to turn this into a design, then writing-plans to produce an implementation plan.
+Write the spec under docs/specs/ and the plan under docs/plans/.
+When done, attach the plan to this board task: paste the plan into the task plan field, or set the plan field to the plan file path (e.g. docs/plans/<file>.md). The task can then move to Ready.

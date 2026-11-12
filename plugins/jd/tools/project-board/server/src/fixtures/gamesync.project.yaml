@@ -1,0 +1,22 @@
+project: GameSync
+language:
+  owner: vi
+  docs: en
+requirements:
+  dir: docs/requirements
+  subdirs: [components, capabilities]
+  id_pattern: '[A-Z]{2,6}-R\d+'
+  id_example: CAFE-R3
+  headings:
+    description: Mô tả
+    acceptance: Tiêu chí chấp nhận
+e2e:
+  host: cafe-win
+  note: ''
+audits:
+  always: [jd:error-audit]
+  when_ui: [jd:ui-design-audit]
+  when_schema: []
+board:
+  branch_prefix: board/
+  data_dir: project-board/data

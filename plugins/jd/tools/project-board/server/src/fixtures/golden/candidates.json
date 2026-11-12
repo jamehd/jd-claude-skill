@@ -1,0 +1,38 @@
+[
+  {
+    "kind": "implement",
+    "type": "task",
+    "component": "cafe-service",
+    "reqId": "CAFE-R3",
+    "priority": "P1",
+    "title": "Hiện thực CAFE-R3: GetTheme RPC",
+    "body": "Scan phát hiện: CAFE-R3 chưa làm. nothing yet\n\nServes theme over gRPC.\n\nTiêu chí chấp nhận:\n- theme < 1s\n- tests both paths\n\nReq: CAFE-R3"
+  },
+  {
+    "kind": "implement",
+    "type": "task",
+    "component": "cafe-service",
+    "reqId": "CAFE-R4",
+    "priority": "P2",
+    "title": "Hoàn thiện CAFE-R4: Manifest",
+    "body": "Scan phát hiện: CAFE-R4 làm dở dang. half done\n\nPhân tích manifest v2.\n\nTiêu chí chấp nhận:\n- chỉ tải chunk đổi\n\nReq: CAFE-R4"
+  },
+  {
+    "kind": "test",
+    "type": "task",
+    "component": "cafe-service",
+    "reqId": "CAFE-R4",
+    "priority": "P2",
+    "title": "Thêm test cho CAFE-R4: Manifest",
+    "body": "Scan phát hiện: CAFE-R4 chưa có test. half done\n\nPhân tích manifest v2.\n\nTiêu chí chấp nhận:\n- chỉ tải chunk đổi\n\nReq: CAFE-R4"
+  },
+  {
+    "kind": "test",
+    "type": "task",
+    "component": "cafe-service",
+    "reqId": "CAFE-R5",
+    "priority": "P2",
+    "title": "Thêm test cho CAFE-R5: Cache",
+    "body": "Scan phát hiện: CAFE-R5 chưa có test.\n\nCache chunks.\n\nReq: CAFE-R5"
+  }
+]

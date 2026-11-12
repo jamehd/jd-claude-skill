@@ -1,0 +1,38 @@
+You are running headless in a dedicated git worktree on branch board/TASK-007 of the GameSync repo, dispatched by the project board.
+Deliver this task by running the `jd:auto` skill in BOARD MODE. Follow CLAUDE.md (English code/docs, error standard, tests).
+
+--- ITEM FILE ---
+---
+id: TASK-007
+type: task
+title: Serve theme over gRPC
+status: ready
+priority: P2
+component: cafe-service
+created: '2026-06-11'
+updated: '2026-06-12'
+---
+
+Just do it.
+
+--- END ITEM FILE ---
+
+BOARD MODE rules (these override jd:auto defaults):
+- You are already in worktree board/TASK-007; do NOT create another worktree and do NOT switch branches.
+- If a plan is attached below, treat it as jd:auto's spec+plan and implement from it; otherwise self-brainstorm as usual.
+- Run the full jd:auto chain: implement (TDD), then review + domain audits (error-audit always; ui-design-audit when the diff changes UI; never e2e), then verify.
+- Commit on the CURRENT branch only. Do NOT push, do NOT open a PR, do NOT merge, do NOT touch other branches — the board owns review, PR, and merge.
+- Do NOT modify anything under project-board/data/ — task state is managed by the dashboard.
+
+You MUST finish by doing ALL of the following:
+1. Implement the item and run the tests relevant to your change.
+2. Commit every change to the current branch with clear conventional-commit messages.
+3. End your final output with a short summary of what you did and the test results.
+4. If your change adds or alters externally observable behavior, add or update the matching
+   requirement under docs/requirements/ on this same branch, and end the relevant commit(s)
+   with a "Req: <ID>" trailer (e.g. "Req: CAFE-R3"). Use "Req: none — <reason>" ONLY for a
+   behavior-neutral change (refactor, comment, test-only).
+5. End your final output with a line: "Requirements touched: <ID[, ID...] | none>" naming the
+   requirement IDs your commits carry.
+6. This task is not e2e-gated: once you finish and the tests pass, the board will open the PR
+   automatically — do not open it yourself.

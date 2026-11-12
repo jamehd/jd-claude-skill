@@ -1,0 +1,1 @@
+MANUAL E2E REQUIRED — run e2e on cafe-win and verify before merging.

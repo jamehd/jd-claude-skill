@@ -1,0 +1,16 @@
+You are in a git worktree on branch board/TASK-007 of the GameSync repo.
+main has advanced and this branch now CONFLICTS with it. Your job is to bring the
+branch up to date with main and resolve the conflict — do NOT re-implement from scratch.
+
+Task: Serve theme over gRPC
+
+Just do it.
+
+Do ALL of the following:
+1. Run `git merge main` to bring main's changes into this branch.
+2. Resolve EVERY conflict, preserving BOTH this task's intent AND main's changes.
+3. Run the tests relevant to the changed files and make them pass.
+4. Commit the resolution (git add + git commit). Do NOT push, do NOT touch other branches,
+   and do NOT modify anything under project-board/data/.
+5. Verify `git diff main...HEAD` no longer reports conflicts.
+6. End with a short summary of what conflicted and how you resolved it.
