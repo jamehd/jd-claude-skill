@@ -37,6 +37,15 @@ Plain requests map to these commands. Talk to people in `language.owner`; write 
 | Acceptance on dev (Gate B) | Owner (later a tester; owner signs off large features) |
 | Resolve a stop | Owner for business questions; a developer for technical ones when the team has one |
 
+Agents shipped with the jd plugin (subagent types `jd:<name>`; if the agent type is not available, use a
+general-purpose subagent and give it `../../agents/<name>.md` (relative to this skill) as its
+instructions):
+
+| Agent | Used for |
+|---|---|
+| `jd:qa-runner` | Build verification and nightly regression: runs scenarios and actions, read-only, reports pass/fail with evidence |
+| `jd:security-reviewer` | Independent security review when auth, personal data, payment or uploads changed |
+
 ## Data layout (all under the target repository)
 
 | Item | Location | Template |

@@ -49,12 +49,16 @@ Write "Current step: build <n>" to `paths.status` as each step starts.
      the limit before every new attempt.
    - When this feature creates an action named in "Delivers", run it once; if it works, set its
      `pending: false` in `project.yaml` immediately so the following steps use it.
-6. Review with superpowers:requesting-code-review; add a security pass when auth, personal data,
-   payment or uploads changed. Fixing findings is a counted cycle.
+6. Review with superpowers:requesting-code-review. When auth, personal data, payment or uploads
+   changed, also dispatch the `jd:security-reviewer` agent with the branch range
+   (`git merge-base <git.main> HEAD`..`HEAD`) and the brief. Critical/High findings from either
+   review must be fixed; fixing findings is a counted cycle.
 7. Rebase on `git.main`, then verify; all must pass:
-   - `actions.test_scenarios` for every `active` scenario in `paths.scenarios` plus this feature's.
-   - `actions.test_all`, `actions.test_integration`, `actions.lint`, `actions.gen_check`, and any
-     other action whose `when` condition holds.
+   - Dispatch the `jd:qa-runner` agent with this feature's ID and the `when` conditions that hold. It
+     runs `actions.test_scenarios` for every `active` scenario in `paths.scenarios` plus this
+     feature's, then `actions.test_all`, `actions.test_integration`, `actions.lint`,
+     `actions.gen_check` and the matching conditional actions. Only its `QA RESULT: PASS` counts;
+     copy its tables into the report. `FLAKY` and `NO TEST` are failures.
    - Every skill in `audits.always`, scoped to this feature's changes. The UI audit uses
      `design_system` and records "no UI surface in changes" when there is none. Skills in
      `audits.when_schema` when schema or queries changed.

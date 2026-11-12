@@ -36,6 +36,17 @@ A growing library of personal engineering skills that work across projects: proj
 | `/jd:build <ID>` | Feature flow: build an approved feature, re-run all accepted scenarios, audit, prepare dev acceptance (stops at Gate B). |
 | `/jd:accept <ID> ok\|notes` | Feature flow: record the verdict — merge on ok, or start a rework round with notes. |
 
+| Agent | Description |
+|-------|-------------|
+| `jd:qa-runner` | Read-only tester (Sonnet). Runs the acceptance scenario suite and verification actions from `project.yaml`, retries a failing test once to flag flakes, reports pass/fail per scenario with evidence. Never edits or fixes. Used by `jd:feature-flow` builds and for nightly regression runs. Complements the audits: audits read code, `qa-runner` runs the product. |
+| `jd:security-reviewer` | Independent, read-only security review (Opus) of a git range: authentication, authorization, injection, secrets, personal data, payment integrity, uploads, client storage, dependencies. Severity-graded findings with exploit steps and fixes; verdict `BLOCK` on Critical/High. Used by `jd:feature-flow` when auth, personal data, payment or uploads change. |
+
+Agents ship in `plugins/jd/agents/` as subagent types `jd:<name>` and are available to any session that has the plugin installed.
+
+## Upgrading to 0.35.0
+
+Adds the `jd:qa-runner` and `jd:security-reviewer` agents. `jd:feature-flow` build step 6 dispatches `jd:security-reviewer` for security-sensitive changes and step 7 runs verification through `jd:qa-runner`. No configuration change is needed.
+
 ## Upgrading to 0.34.0
 
 Every skill, hook and the board now read per-project settings from `<repo>/project-board/project.yaml` (keys: `plugins/jd/shared/project-config.md`).
@@ -114,6 +125,7 @@ jd-claude-skill/
 │       │   └── plugin.json
 │       ├── skills/          one folder per skill, each with SKILL.md
 │       ├── commands/        one markdown file per /jd:<name> command
+│       ├── agents/          subagent definitions (qa-runner, security-reviewer)
 │       ├── hooks/           hooks.json, run-hook.cmd, session-start, req-check-stop
 │       ├── shared/          project-config (reader + docs), requirements parser, output convention
 │       └── tools/
