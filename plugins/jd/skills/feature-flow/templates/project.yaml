@@ -1,0 +1,52 @@
+# Project layer for jd:feature-flow. Commands read every project-specific value from here.
+# An action with pending: true does not exist yet; the feature that delivers it clears the flag.
+
+project: <name>
+
+language:
+  owner: vi
+  docs: en
+
+paths:
+  data: project-board/data
+  features: project-board/data/features
+  tasks: project-board/data/tasks
+  owner_actions: project-board/data/owner-actions
+  scenarios: project-board/data/scenarios.md
+  status: project-board/data/STATUS.md
+  design_docs: docs
+
+actions:
+  test_all: { run: "<unit test command>", pending: true }
+  test_integration: { run: "<integration test command>", pending: true }
+  test_scenarios: { run: "<acceptance scenario suite command>", pending: true }
+  lint: { run: "<lint command>", pending: true }
+  gen_check: { run: "<generated code drift check>", pending: true }
+  dev_up: { run: "<start dev dependencies>", pending: true }
+  dev_seed: { run: "<load sample data>", pending: true }
+  dev_run: { run: "<run the app for acceptance>", pending: true }
+
+audits:
+  always: [jd:error-audit, jd:ui-design-audit]
+  when_schema: [jd:db-audit]
+  ui_design_source: DESIGN_SYSTEM.md
+
+acceptance:
+  environment: >-
+    <where and how the owner tries features, e.g. this workstation, which emulator or browser>
+  forbidden: [production, real payment providers, messages to real users]
+
+limits:
+  fix_attempts: 3
+  rework_rounds: 2
+  features_active: 1
+
+git:
+  remote: <host/owner/repo>
+  main: main
+  branch_pattern: "feat/<ID>-<slug>"
+  commit_footer: "Co-Authored-By: <model> <noreply@anthropic.com>"
+
+models:
+  large_task: opus
+  small_task: sonnet
