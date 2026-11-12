@@ -1,24 +1,34 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 
-const REQ_ID = /\b[A-Z]{2,6}-R\d+\b/g
-const HEADING = /^##\s+([A-Z]{2,6}-R\d+):\s*(.+)$/
 const AC = /^\s*-\s*AC:\s*(.+)$/
 
-export function extractReqIds(text) {
-  return [...new Set(text.match(REQ_ID) ?? [])]
+function idRegexFrom(pattern) {
+  return new RegExp(`\\b(?:${pattern})\\b`, 'g')
 }
 
-export function parseRequirementDoc(markdown) {
+const DEFAULT_ID_REGEX = idRegexFrom('[A-Z]{2,6}-R\\d+')
+
+function headingRegex(idRegex) {
+  return new RegExp(`^##\\s+(?<id>${idRegex.source}):\\s*(?<title>.+)$`)
+}
+
+export function extractReqIds(text, idRegex = DEFAULT_ID_REGEX) {
+  const re = idRegex.global ? idRegex : new RegExp(idRegex.source, `${idRegex.flags}g`)
+  return [...new Set(text.match(re) ?? [])]
+}
+
+export function parseRequirementDoc(markdown, idRegex = DEFAULT_ID_REGEX) {
+  const heading = headingRegex(idRegex)
   const reqs = []
   let cur = null
   let sawStatement = false
   for (const line of markdown.replace(/\r\n?/g, '\n').split('\n')) {
-    const h = line.match(HEADING)
+    const h = line.match(heading)
     if (h) {
       if (cur) reqs.push(cur)
-      const title = h[2].trim()
-      cur = { id: h[1], title, statement: '', acceptance: [], removed: /\bREMOVED\s*$/i.test(title) }
+      const title = h.groups.title.trim()
+      cur = { id: h.groups.id, title, statement: '', acceptance: [], removed: /\bREMOVED\s*$/i.test(title) }
       sawStatement = false
       continue
     }
@@ -34,15 +44,16 @@ export function parseRequirementDoc(markdown) {
   return reqs
 }
 
-export function parseRequirementsDir(repoRoot) {
+export function parseRequirementsDir(repoRoot, cfg = {}) {
   const index = new Map()
-  const base = path.join(repoRoot, 'docs/requirements')
-  for (const sub of ['components', 'capabilities']) {
+  const base = path.join(repoRoot, cfg.dir ?? 'docs/requirements')
+  const idRegex = cfg.id_pattern ? idRegexFrom(cfg.id_pattern) : DEFAULT_ID_REGEX
+  for (const sub of cfg.subdirs ?? ['components', 'capabilities']) {
     const dir = path.join(base, sub)
     if (!existsSync(dir)) continue
     for (const file of readdirSync(dir).filter((f) => f.endsWith('.md'))) {
       try {
-        for (const req of parseRequirementDoc(readFileSync(path.join(dir, file), 'utf8'))) {
+        for (const req of parseRequirementDoc(readFileSync(path.join(dir, file), 'utf8'), idRegex)) {
           index.set(req.id, req)
         }
       } catch { /* skip unreadable doc */ }

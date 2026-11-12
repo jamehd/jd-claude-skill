@@ -1,9 +1,15 @@
 #!/usr/bin/env bash
-# Stop hook: advisory requirements-drift reminder. Never blocks.
-# No-ops in any repo without docs/requirements/.component-map.json (engine exits 0).
-set -euo pipefail
+# Stop hook: advisory requirements-drift reminder, shown to the user as a systemMessage. Never blocks.
+# No-ops unless <repo>/project-board/project.yaml exists and does not set hooks.req_check to false.
+set -uo pipefail
 HOOK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CLI="$HOOK_DIR/../tools/req-check/cli.mjs"
 [ -f "$CLI" ] || exit 0
-node "$CLI" --worktree --advisory 2>&1 || true
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+CONFIG="$ROOT/project-board/project.yaml"
+[ -f "$CONFIG" ] || exit 0
+if awk '/^hooks:/{h=1;next} /^[^[:space:]#]/{h=0} h && /^[[:space:]]+req_check:[[:space:]]*false/{f=1} END{exit !f}' "$CONFIG"; then
+  exit 0
+fi
+(cd "$ROOT" && node "$CLI" --worktree --advisory --system-message 2>/dev/null) || true
 exit 0

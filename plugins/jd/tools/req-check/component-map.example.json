@@ -1,0 +1,8 @@
+{
+  "components": [
+    { "globs": ["services/api/**"], "doc": "api-service.md", "prefixes": ["API"] },
+    { "globs": ["apps/web/**", "packages/ui/**"], "doc": "web-app.md", "prefixes": ["WEB"] },
+    { "globs": ["libs/shared/**"], "prefixes": ["API", "WEB"] }
+  ],
+  "exclude": ["**/*.md", "docs/**"]
+}

@@ -3,7 +3,7 @@ import { extractReqIds } from '../../../shared/requirements.mjs'
 const REQ_LINE = /^Req:\s*(.+)$/gim
 const NONE = /^none\b\s*[—:-]\s*(.+)$/i
 
-export function parseTrailers(messages) {
+export function parseTrailers(messages, idRegex) {
   const ids = new Set()
   const noneReasons = []
   for (const msg of messages) {
@@ -15,7 +15,7 @@ export function parseTrailers(messages) {
         if (reason) noneReasons.push(reason)
         continue
       }
-      for (const id of extractReqIds(value)) ids.add(id)
+      for (const id of extractReqIds(value, idRegex)) ids.add(id)
     }
   }
   return { ids: [...ids], noneReasons }

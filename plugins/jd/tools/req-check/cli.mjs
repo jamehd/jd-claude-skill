@@ -1,5 +1,6 @@
 import { existsSync } from 'node:fs'
 import path from 'node:path'
+import { loadProjectConfig, requirementIdRegex } from '../../shared/project-config.mjs'
 import { parseRequirementsDir } from '../../shared/requirements.mjs'
 import { loadMap, classifyChanges } from './lib/map.mjs'
 import { parseTrailers } from './lib/trailers.mjs'
@@ -11,8 +12,12 @@ import {
   worktreeChangedFiles,
 } from './lib/git.mjs'
 
+function firstLine(e) {
+  return (e && e.message ? e.message : String(e)).split('\n')[0]
+}
+
 function parseArgs(argv) {
-  const args = { mode: null, range: null, advisory: false }
+  const args = { mode: null, range: null, advisory: false, systemMessage: false }
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--range') {
       args.mode = 'range'; args.range = argv[++i]
@@ -20,6 +25,7 @@ function parseArgs(argv) {
     }
     else if (argv[i] === '--worktree') { args.mode = 'worktree' }
     else if (argv[i] === '--advisory') { args.advisory = true }
+    else if (argv[i] === '--system-message') { args.systemMessage = true }
   }
   return args
 }
@@ -29,22 +35,35 @@ function main() {
   const cwd = process.cwd()
   let root
   try { root = repoRoot(cwd) } catch { process.exit(0) } // not a git repo → no-op
-  const mapPath = path.join(root, 'docs/requirements/.component-map.json')
+  let reqCfg, config
+  try {
+    config = loadProjectConfig(root).config
+    if (config.hooks?.req_check === false && args.advisory) process.exit(0)
+    reqCfg = config.requirements
+  } catch (e) {
+    console.error(`req-check: ${firstLine(e)}; skipping`)
+    process.exit(0)
+  }
+  const mapPath = path.join(root, reqCfg.dir, reqCfg.map)
   if (!existsSync(mapPath)) process.exit(0) // not a configured repo
-  const map = loadMap(mapPath)
+  let map
+  try { map = loadMap(mapPath) } catch (e) {
+    console.error(`req-check: cannot read ${path.relative(root, mapPath)} (${firstLine(e)}); skipping`)
+    process.exit(0)
+  }
 
   if (args.mode === 'range') {
     let touched, trailers
     try {
       touched = classifyChanges(changedFilesInRange(args.range, root), map)
       if (touched.length === 0) process.exit(0)
-      trailers = parseTrailers(commitMessagesInRange(args.range, root))
+      trailers = parseTrailers(commitMessagesInRange(args.range, root), requirementIdRegex(config))
     } catch (e) {
       const msg = (e && e.message ? e.message : String(e)).split('\n')[0]
       console.error(`req-check: could not evaluate range "${args.range}" (${msg}); skipping`)
       process.exit(0)
     }
-    const definedIds = new Set(parseRequirementsDir(root).keys())
+    const definedIds = new Set(parseRequirementsDir(root, reqCfg).keys())
     const { ok, failures } = evaluateRange({ touched, trailers, definedIds })
     if (!ok) {
       console.error('✗ requirements drift:\n  - ' + failures.join('\n  - '))
@@ -61,10 +80,12 @@ function main() {
       changed.map((f) => path.basename(f)).filter((b) => docFiles.has(b)),
     )
     const { reminders } = evaluateWorktree({ touched, changedDocs })
-    // Advisory output goes to stdout so the Stop hook surfaces it as context to
-    // the model; only blocking failures (range mode) go to stderr.
+    // Advisory output goes to stdout; only blocking failures (range mode) go to stderr.
     // Worktree mode is always advisory (never blocks); --advisory is accepted for explicitness.
-    if (reminders.length) console.log('⚠ requirements reminder:\n  - ' + reminders.join('\n  - '))
+    if (reminders.length) {
+      const text = '⚠ requirements reminder:\n  - ' + reminders.join('\n  - ')
+      console.log(args.systemMessage ? JSON.stringify({ systemMessage: text }) : text)
+    }
     process.exit(0) // advisory: never block
   }
 

@@ -49,3 +49,22 @@ test('parseRequirementsDir indexes components and capabilities', () => {
   assert.ok(index.has('CAFE-R1'))
   assert.equal(index.has('CAFE-R9'), false)
 })
+
+test('custom id pattern drives extractReqIds and parseRequirementDoc', () => {
+  const re = /\b(?:REQ-\d+)\b/g
+  assert.deepEqual(extractReqIds('see REQ-12 and CAFE-R3', re), ['REQ-12'])
+  const [req] = parseRequirementDoc('## REQ-7: Thing\nStatement.\n- AC: ok\n', re)
+  assert.equal(req.id, 'REQ-7')
+  assert.equal(req.title, 'Thing')
+  assert.deepEqual(parseRequirementDoc('## CAFE-R3: x\n', re), [])
+})
+
+test('parseRequirementsDir honours dir, subdirs and id_pattern from config', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'reqcfg-'))
+  mkdirSync(path.join(root, 'reqs/specs'), { recursive: true })
+  mkdirSync(path.join(root, 'reqs/components'), { recursive: true })
+  writeFileSync(path.join(root, 'reqs/specs/a.md'), '## REQ-1: one\nText.\n')
+  writeFileSync(path.join(root, 'reqs/components/b.md'), '## REQ-2: two\nText.\n')
+  const index = parseRequirementsDir(root, { dir: 'reqs', subdirs: ['specs'], id_pattern: 'REQ-\\d+' })
+  assert.deepEqual([...index.keys()], ['REQ-1'])
+})

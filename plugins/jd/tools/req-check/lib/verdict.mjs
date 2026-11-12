@@ -1,6 +1,5 @@
 function prefixOf(id) {
-  const i = id.indexOf('-R')
-  return i === -1 ? id : id.slice(0, i)
+  return id.replace(/-?R?\d+$/, '')
 }
 
 export function evaluateRange({ touched, trailers, definedIds }) {
