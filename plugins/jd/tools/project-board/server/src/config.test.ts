@@ -103,4 +103,46 @@ describe('loadConfig', () => {
     writeFileSync(envFile, 'BOARD_TEST_SHELL=bash\n')
     expect(loadConfig({ BOARD_REPO_ROOT: repo, BOARD_ENV_FILE: envFile }).testShell).toBe('bash')
   })
+
+  it('resolves featuresDir from paths.features, else <data_dir>/features', () => {
+    writeYaml('project: Demo\n')
+    expect(loadConfig({ BOARD_REPO_ROOT: repo }).featuresDir).toBe(path.join(repo, 'project-board/data/features'))
+    writeYaml('paths:\n  features: docs/features\n')
+    expect(loadConfig({ BOARD_REPO_ROOT: repo }).featuresDir).toBe(path.join(repo, 'docs/features'))
+  })
+
+  it('warns when paths.tasks differs from <data_dir>/tasks', () => {
+    writeYaml('project: Demo\n')
+    expect(loadConfig({ BOARD_REPO_ROOT: repo }).warnings).toEqual([])
+    writeYaml('paths:\n  tasks: project-board/data/tasks\n')
+    expect(loadConfig({ BOARD_REPO_ROOT: repo }).warnings).toEqual([])
+    writeYaml('paths:\n  tasks: docs/tasks\n')
+    const w = loadConfig({ BOARD_REPO_ROOT: repo }).warnings
+    expect(w).toHaveLength(1)
+    expect(w[0]).toMatch(/paths\.tasks.*docs\/tasks/)
+  })
+
+  it('passes tasks.id_prefix through', () => {
+    writeYaml('tasks:\n  id_prefix: T\n')
+    expect(loadConfig({ BOARD_REPO_ROOT: repo }).project.tasks.id_prefix).toBe('T')
+  })
+
+  it.each([
+    ['git:\n  main: "bad branch"', /git\.main/],
+    ['git:\n  main: "-x"', /git\.main/],
+    ['git:\n  main: "a..b"', /git\.main/],
+    ['git:\n  remote_name: "-evil"', /git\.remote_name/],
+    ['git:\n  remote_name: "a b"', /git\.remote_name/],
+    ['board:\n  branch_prefix: "bad prefix/"', /board\.branch_prefix/],
+    ['board:\n  branch_prefix: "-x/"', /board\.branch_prefix/],
+    ['board:\n  branch_prefix: "a..b/"', /board\.branch_prefix/],
+  ])('rejects invalid git ref value %s', (yamlText, re) => {
+    writeYaml(yamlText)
+    expect(() => loadConfig({ BOARD_REPO_ROOT: repo })).toThrow(re)
+  })
+
+  it('accepts valid git refs', () => {
+    writeYaml('git:\n  main: release/1.0\n  remote_name: my-remote.2\nboard:\n  branch_prefix: bd/\n')
+    expect(loadConfig({ BOARD_REPO_ROOT: repo }).mainBranch).toBe('release/1.0')
+  })
 })

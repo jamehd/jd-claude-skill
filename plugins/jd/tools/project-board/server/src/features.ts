@@ -5,8 +5,8 @@ import type { BoardItem } from '../../ui/src/types.js'
 
 export const MANAGED_MESSAGE = 'managed by feature-flow'
 
-export function isFeatureManaged(task: Pick<BoardItem, 'extra'>, dataDir: string): boolean {
+export function isFeatureManaged(task: Pick<BoardItem, 'extra'>, featuresDir: string): boolean {
   const epic = task.extra?.epic
   if (typeof epic !== 'string' || !SAFE_ID.test(epic)) return false
-  return existsSync(path.join(dataDir, 'features', epic, 'feature.md'))
+  return existsSync(path.join(featuresDir, epic, 'feature.md'))
 }

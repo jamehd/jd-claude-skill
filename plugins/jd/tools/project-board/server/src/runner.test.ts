@@ -163,7 +163,15 @@ describe('JobRunner', () => {
     const job = t.runner.dispatchRescan()
     t.procs[0].emit('exit', 0)
     await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'))
-    expect(t.runner.getJob(job.id)?.error).toMatch(/no files under project-board\/data\/status changed/)
+    expect(t.runner.getJob(job.id)?.error).toMatch(/no files under status changed/)
+  })
+
+  it('rescan failure reason names the configured status dir relative to the repo root', async () => {
+    const t = setup()
+    const job = t.runner.dispatchRescan()
+    t.procs[0].emit('exit', 0)
+    await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'))
+    expect(t.runner.getJob(job.id)?.error).not.toContain('project-board/data')
   })
 
   it('rescan fails with stray-change reason when porcelain gains a new entry', async () => {
@@ -177,7 +185,7 @@ describe('JobRunner', () => {
     ;(t.git.porcelain as ReturnType<typeof vi.fn>).mockReturnValue([' M src/foo.ts'])
     t.procs[0].emit('exit', 0)
     await vi.waitFor(() => expect(t.runner.getJob(job.id)?.state).toBe('failed'))
-    expect(t.runner.getJob(job.id)?.error).toMatch(/rescan touched files outside project-board\/data\/status/)
+    expect(t.runner.getJob(job.id)?.error).toMatch(/rescan touched files outside status/)
     expect(t.runner.getJob(job.id)?.error).toContain('src/foo.ts')
   })
 

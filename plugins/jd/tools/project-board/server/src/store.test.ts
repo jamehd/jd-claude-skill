@@ -117,4 +117,22 @@ describe('BoardStore', () => {
     expect(item.requiresShaping).toBe(true)
     expect(store.getItem(item.id)?.requiresShaping).toBe(true)
   })
+
+  it('uses the configured id prefix for tasks and keeps BUG for bugs', () => {
+    const custom = new BoardStore(dataDir, { idPrefix: 'T' })
+    expect(custom.createItem({ type: 'task', title: 'One', component: 'x' }).id).toBe('T-001')
+    expect(custom.createItem({ type: 'task', title: 'Two', component: 'x' }).id).toBe('T-002')
+    expect(custom.createItem({ type: 'bug', title: 'Bad', component: 'x' }).id).toBe('BUG-001')
+  })
+
+  it('never reuses the id of a task file that fails to parse', () => {
+    writeFileSync(path.join(dataDir, 'tasks', 'TASK-007-hidden.md'), '---\ntitle: no id: here\n---\n')
+    expect(store.scan().items).toHaveLength(0)
+    expect(store.createItem({ type: 'task', title: 'Next', component: 'x' }).id).toBe('TASK-008')
+  })
+
+  it('defaults featuresDir to <dataDir>/features and honours an override', () => {
+    expect(store.featuresDir).toBe(path.join(dataDir, 'features'))
+    expect(new BoardStore(dataDir, { featuresDir: '/elsewhere/features' }).featuresDir).toBe('/elsewhere/features')
+  })
 })

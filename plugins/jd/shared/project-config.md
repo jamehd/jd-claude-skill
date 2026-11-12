@@ -30,7 +30,7 @@ Required by: `feature-flow`, `plan-batch`, board. Everything else runs on defaul
 | `audits.always` | `[jd:error-audit]` | auto, feature-flow, board prompt |
 | `audits.when_ui` | `[jd:ui-design-audit]` | auto, feature-flow, board prompt |
 | `audits.when_schema` | `[jd:db-audit]` | auto, feature-flow, board prompt |
-| `audits.ui_design_source` / `design_system` | none | auto, ui-design-audit |
+| `design_system` | none; `audits.ui_design_source` is read as a fallback when empty | auto, feature-flow, ui-design-audit |
 | `ui_dirs` | none (detected) | ui-design-audit |
 | `language.owner` | none (asked at setup) | all replies, board text |
 | `language.docs` | `en` | docs, rescan output |
@@ -42,5 +42,17 @@ Required by: `feature-flow`, `plan-batch`, board. Everything else runs on defaul
 | `hooks.req_check` | `true` | hooks |
 | `hooks.conventions` | `true` | hooks |
 
-Other keys (`paths`, `actions`, `acceptance`, `git.remote`, `git.commit_footer`) are feature-flow
+`paths.*` (feature-flow folders and files, relative to the repo root; `paths` defaults to an empty
+mapping): the board reads `paths.features` for feature folders (default `<board.data_dir>/features`)
+and logs a start-up warning when `paths.tasks` differs from `<board.data_dir>/tasks`, because the board
+only reads and writes that folder.
+
+Validation at board start: `git.main` and `board.branch_prefix` must be valid branch names
+(`git check-ref-format --branch`), `git.remote_name` must match `^[A-Za-z0-9._][A-Za-z0-9._-]*$`;
+`requirements.id_pattern` must not contain capturing groups (use `(?:...)`).
+
+The board's `/api/info` endpoint is unauthenticated (even with a password) and returns only the
+project name.
+
+Other keys (`actions`, `acceptance`, `git.remote`, `git.commit_footer`) are feature-flow
 settings with no defaults; see the feature-flow `templates/project.yaml`.

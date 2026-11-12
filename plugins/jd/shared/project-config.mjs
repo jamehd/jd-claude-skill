@@ -14,6 +14,7 @@ export class ProjectConfigError extends Error {
 
 const DEFAULTS = {
   language: { docs: 'en' },
+  paths: {},
   git: { integration: 'pull-request', remote_name: 'origin', branch_pattern: 'feat/<ID>-<slug>' },
   tasks: { id_prefix: 'TASK' },
   requirements: {
@@ -75,9 +76,17 @@ export function loadProjectConfig(repoRoot) {
   if (config.git.main !== undefined && typeof config.git.main !== 'string') {
     throw new ProjectConfigError(`${file}: "git.main" must be a string`, { file, key: 'git.main' })
   }
+  if (!config.design_system && config.audits.ui_design_source) config.design_system = config.audits.ui_design_source
   try {
-    new RegExp(config.requirements.id_pattern)
-  } catch {
+    const groups = new RegExp(`${config.requirements.id_pattern}|`).exec('').length - 1
+    if (groups > 0) {
+      throw new ProjectConfigError(
+        `${file}: "requirements.id_pattern" must not contain capturing groups; use (?:...) instead`,
+        { file, key: 'requirements.id_pattern' }
+      )
+    }
+  } catch (err) {
+    if (err instanceof ProjectConfigError) throw err
     throw new ProjectConfigError(`${file}: "requirements.id_pattern" is not a valid regular expression`, {
       file,
       key: 'requirements.id_pattern'

@@ -7,7 +7,7 @@ export class ProjectConfigError extends Error {
 export interface ProjectConfig {
   project: string
   language: { owner?: string; docs: string; [key: string]: unknown }
-  paths?: Record<string, string>
+  paths: Record<string, string>
   actions?: Record<string, { run: string; pending?: boolean; when?: string }>
   git: {
     main?: string

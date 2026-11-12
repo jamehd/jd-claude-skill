@@ -55,7 +55,7 @@ export function makeDeps(): ServerDeps {
   return {
     config: {
       port: 0, host: '127.0.0.1', password: 'secret', repoRoot: dataDir,
-      dataDir, jobTimeoutMs: 1000, maxConcurrentJobs: 1, claudeBin: 'claude',
+      dataDir, featuresDir: path.join(dataDir, 'features'), warnings: [], jobTimeoutMs: 1000, maxConcurrentJobs: 1, claudeBin: 'claude',
       uiDistDir,
       project: { ...defaultProjectConfig(), project: 'Test Project' },
       mainBranch: 'main', remoteName: 'origin', branchPrefix: 'board/',

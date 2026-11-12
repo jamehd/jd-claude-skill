@@ -90,7 +90,8 @@ note on what's missing.
 
 Frontmatter keys the board parses: `id, type, title, status, priority,
 component, created, updated`, plus optional `plan`, `requiresShaping`, and
-`needsE2e`. The body is markdown.
+`needsE2e`. The body is markdown. Quote any title or value that contains `:` (YAML), for
+example `title: "Fix: login loop"`; an unquoted colon makes the file invalid and the board skips it.
 
 - **`id`**: the next `<tasks.id_prefix>-###` (default `TASK`; `BUG-###` for bugs), zero-padded to
   3 digits, one past the highest existing id in `<board.data_dir>/tasks/`.
@@ -109,7 +110,7 @@ Example (shaped, e2e-gated; ids and names are illustrative):
 ---
 id: TASK-042
 type: task
-title: Add a GetServerTime call to the sync service contract
+title: "Add a GetServerTime call to the sync service contract"
 status: ready
 priority: P2
 component: sync-service

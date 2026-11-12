@@ -38,7 +38,12 @@ export class BoardStore {
   readonly jobsDir: string
   private watcher?: FSWatcher
 
-  constructor(readonly dataDir: string) {
+  readonly featuresDir: string
+  private readonly taskPrefix: string
+
+  constructor(readonly dataDir: string, opts: { idPrefix?: string; featuresDir?: string } = {}) {
+    this.taskPrefix = opts.idPrefix ?? 'TASK'
+    this.featuresDir = opts.featuresDir ?? path.join(dataDir, 'features')
     this.tasksDir = path.join(dataDir, 'tasks')
     this.statusDir = path.join(dataDir, 'status')
     this.jobsDir = path.join(dataDir, 'jobs')
@@ -76,15 +81,9 @@ export class BoardStore {
     return file ? parseItem(readFileSync(file, 'utf8')) : undefined
   }
 
-  taskFileRelPath(id: string): string | undefined {
-    const file = this.fileFor(id)
-    return file ? path.join('project-board/data/tasks', path.basename(file)) : undefined
-  }
-
   createItem(input: CreateItemInput): BoardItem {
-    const prefix = input.type === 'task' ? 'TASK' : 'BUG'
-    const existing = this.scan().items.filter((i) => i.id.startsWith(prefix + '-'))
-    const max = existing.reduce((m, i) => Math.max(m, Number(i.id.split('-')[1])), 0)
+    const prefix = input.type === 'task' ? this.taskPrefix : 'BUG'
+    const max = this.maxNumberFor(prefix)
     const id = `${prefix}-${String(max + 1).padStart(3, '0')}`
     const item: BoardItem = {
       id,
@@ -100,6 +99,21 @@ export class BoardStore {
     if (input.requiresShaping) item.requiresShaping = true
     writeFileSync(path.join(this.tasksDir, `${id}-${slugify(input.title)}.md`), serializeItem(item))
     return item
+  }
+
+  private maxNumberFor(prefix: string): number {
+    const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const fromName = new RegExp(`^${escaped}-(\\d+)`)
+    let max = 0
+    for (const item of this.scan().items) {
+      const m = fromName.exec(item.id)
+      if (m) max = Math.max(max, Number(m[1]))
+    }
+    for (const file of readdirSync(this.tasksDir)) {
+      const m = fromName.exec(file)
+      if (m) max = Math.max(max, Number(m[1]))
+    }
+    return max
   }
 
   updateItem(id: string, patch: Partial<Omit<BoardItem, 'id' | 'created'>>): BoardItem {

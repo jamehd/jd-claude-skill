@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import path from 'node:path'
 import dotenv from 'dotenv'
 import { loadProjectConfig, resolveMainBranch, ProjectConfigError, type ProjectConfig } from './project-config.js'
@@ -11,6 +12,8 @@ export interface Config {
   password?: string
   repoRoot: string
   dataDir: string
+  featuresDir: string
+  warnings: string[]
   jobTimeoutMs: number
   maxConcurrentJobs: number
   claudeBin: string
@@ -52,6 +55,25 @@ function validIntegration(value: unknown, file: string): Integration {
   return value
 }
 
+function validBranchName(name: string): boolean {
+  const r = spawnSync('git', ['check-ref-format', '--branch', name], { stdio: 'ignore' })
+  return r.error ? !/\s|\.\.|^-/.test(name) : r.status === 0
+}
+
+function validateGitRefs(project: ProjectConfig, file: string): void {
+  const bad = (key: string, value: string, what: string) =>
+    new ProjectConfigError(`${file}: "${key}" is not ${what}: ${JSON.stringify(value)}`, { file, key })
+  if (project.git.main !== undefined && !validBranchName(project.git.main)) {
+    throw bad('git.main', project.git.main, 'a valid branch name')
+  }
+  if (!/^[A-Za-z0-9._][A-Za-z0-9._-]*$/.test(project.git.remote_name)) {
+    throw bad('git.remote_name', project.git.remote_name, 'a valid remote name')
+  }
+  if (!validBranchName(`${project.board.branch_prefix}TASK-001`)) {
+    throw bad('board.branch_prefix', project.board.branch_prefix, 'a valid branch prefix')
+  }
+}
+
 export function loadConfig(processEnv: NodeJS.ProcessEnv = process.env): Config {
   const env = readEnvFile(processEnv)
   if (!env.BOARD_REPO_ROOT) throw new Error('BOARD_REPO_ROOT is required — absolute path to the target project repository')
@@ -62,6 +84,7 @@ export function loadConfig(processEnv: NodeJS.ProcessEnv = process.env): Config 
   }
   const project = loaded.config
   validPort(project.board.port, loaded.path)
+  validateGitRefs(project, loaded.path)
   if (env.BOARD_PORT !== undefined) {
     const envPort = Number(env.BOARD_PORT)
     if (!Number.isInteger(envPort) || envPort < 1 || envPort > 65535) {
@@ -69,12 +92,20 @@ export function loadConfig(processEnv: NodeJS.ProcessEnv = process.env): Config 
     }
   }
   const port = num(env.BOARD_PORT, project.board.port)
+  const dataDir = path.resolve(repoRoot, project.board.data_dir)
+  const warnings: string[] = []
+  const tasksPath = project.paths.tasks
+  if (tasksPath && path.resolve(repoRoot, tasksPath) !== path.join(dataDir, 'tasks')) {
+    warnings.push(`paths.tasks (${tasksPath}) differs from <board.data_dir>/tasks; the board reads and writes only ${path.join(dataDir, 'tasks')}`)
+  }
   return {
     port,
     host: env.BOARD_HOST ?? '0.0.0.0',
     password: env.BOARD_PASSWORD,
     repoRoot,
-    dataDir: path.resolve(repoRoot, project.board.data_dir),
+    dataDir,
+    featuresDir: project.paths.features ? path.resolve(repoRoot, project.paths.features) : path.join(dataDir, 'features'),
+    warnings,
     jobTimeoutMs: num(env.BOARD_JOB_TIMEOUT_MS, 7_200_000),
     maxConcurrentJobs: num(env.BOARD_MAX_JOBS, 1),
     claudeBin: env.BOARD_CLAUDE_BIN ?? 'claude',

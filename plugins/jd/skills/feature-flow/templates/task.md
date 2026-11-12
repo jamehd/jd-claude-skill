@@ -1,7 +1,7 @@
 ---
 id: T-NNN
 type: task
-title: <title>
+title: "<title>"
 status: backlog
 priority: P2
 component: <area>

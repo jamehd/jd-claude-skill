@@ -28,10 +28,18 @@ const BATCH_ACTIONS: BatchAction[] = ['delete', 'dispatch', 'status', 'priority'
 
 export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
   const { store, hub } = deps
-  const isManaged = (item: Parameters<typeof isFeatureManaged>[0]) => isFeatureManaged(item, store.dataDir)
+  const isManaged = (item: Parameters<typeof isFeatureManaged>[0]) => isFeatureManaged(item, store.featuresDir)
+
+  const warnedInvalid = new Set<string>()
 
   function boardScan() {
     const scan = store.scan()
+    for (const bad of scan.invalid) {
+      const key = `${bad.file}:${bad.error}`
+      if (warnedInvalid.has(key)) continue
+      warnedInvalid.add(key)
+      app.log.warn({ file: bad.file, error: bad.error }, 'invalid task file skipped')
+    }
     return { ...scan, items: scan.items.map((i) => ({ ...i, managed: isManaged(i) })) }
   }
 

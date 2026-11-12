@@ -26,8 +26,10 @@ function auditList(names: string[]): string {
 function auditSummary(cfg: ProjectConfig): string {
   const parts: string[] = []
   if (cfg.audits.always.length > 0) parts.push(`${auditList(cfg.audits.always)} always`)
-  if (cfg.audits.when_ui.length > 0) parts.push(`${auditList(cfg.audits.when_ui)} when the diff changes UI`)
-  if (cfg.audits.when_schema.length > 0) parts.push(`${auditList(cfg.audits.when_schema)} when the diff changes the database schema`)
+  const uiOnly = cfg.audits.when_ui.filter((n) => !cfg.audits.always.includes(n))
+  if (uiOnly.length > 0) parts.push(`${auditList(uiOnly)} when the diff changes UI`)
+  const schemaOnly = cfg.audits.when_schema.filter((n) => !cfg.audits.always.includes(n))
+  if (schemaOnly.length > 0) parts.push(`${auditList(schemaOnly)} when the diff changes the database schema`)
   parts.push('never e2e')
   return parts.join('; ')
 }

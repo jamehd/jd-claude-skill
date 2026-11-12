@@ -26,10 +26,12 @@ actions:
   dev_seed: { run: "<load sample data>", pending: true }
   dev_run: { run: "<run the app for acceptance>", pending: true }
 
+design_system: DESIGN_SYSTEM.md
+
 audits:
   always: [jd:error-audit, jd:ui-design-audit]
+  when_ui: []
   when_schema: [jd:db-audit]
-  ui_design_source: DESIGN_SYSTEM.md
 
 acceptance:
   environment: >-

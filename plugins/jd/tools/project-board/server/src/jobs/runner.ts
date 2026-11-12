@@ -101,7 +101,7 @@ export class JobRunner {
   }
 
   private isManaged(item: BoardItem): boolean {
-    return !!this.deps && isFeatureManaged(item, this.deps.store.dataDir)
+    return !!this.deps && isFeatureManaged(item, this.deps.store.featuresDir)
   }
 
   private get project(): ProjectConfig {
@@ -655,7 +655,7 @@ export class JobRunner {
     } else {
       const reason = job.kind !== 'rescan'
         ? 'process exited 0 but no commits found on the branch'
-        : 'process exited 0 but no files under project-board/data/status changed'
+        : `process exited 0 but no files under ${this.statusRel()} changed`
       this.afterFailure(job, reason)
       this.finish(job, 'failed', reason)
     }
@@ -716,6 +716,14 @@ export class JobRunner {
     return snap
   }
 
+  private relToRepo(dir: string): string {
+    return path.relative(this.deps!.repoRoot, dir).split(path.sep).join('/')
+  }
+
+  private statusRel(): string {
+    return this.relToRepo(this.deps!.store.statusDir)
+  }
+
   // Returns a failure reason if the rescan introduced new tracked-file changes, else undefined.
   private checkRescanStray(job: Job): string | undefined {
     const before = this.porcelainSnapshots.get(job.id) ?? new Set<string>()
@@ -723,7 +731,7 @@ export class JobRunner {
     const stray = after.filter((line) => !before.has(line))
     if (stray.length === 0) return undefined
     const paths = stray.map((l) => l.slice(3).trim()).join(', ')
-    return `rescan touched files outside project-board/data/status: ${paths}`
+    return `rescan touched files outside ${this.statusRel()}: ${paths}`
   }
 
   // Resolves the configured per-component test command for a task/resolve job, if any.
@@ -788,7 +796,7 @@ export class JobRunner {
         touched = '(could not read commits)'
         this.note(job, 'info', `requirements-touched: ${e instanceof Error ? e.message : e}`)
       }
-      const summary = `Job ${job.id} succeeded on branch ${this.branchOf(job.taskId!)}.\nRequirements touched: ${touched}\nChanged files:\n${git.changedFiles(job.taskId!).map((f) => `- ${f}`).join('\n')}\nFull output: data/jobs/${job.id}.log`
+      const summary = `Job ${job.id} succeeded on branch ${this.branchOf(job.taskId!)}.\nRequirements touched: ${touched}\nChanged files:\n${git.changedFiles(job.taskId!).map((f) => `- ${f}`).join('\n')}\nFull output: ${this.relToRepo(this.deps!.jobsDir)}/${job.id}.log`
 
       // needsE2e routes the finished task. true → stop in review for the human's
       // manual e2e. false → complete the cycle by opening a PR here.

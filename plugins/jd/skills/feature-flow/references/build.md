@@ -38,6 +38,7 @@ Write "Current step: build <n>" to `paths.status` as each step starts.
 3. Plan with superpowers:writing-plans into task files in `paths.tasks` from `templates/task.md`
    (IDs `T-NNN`, `epic: <ID>`). Existing task files keep their counters; re-planning must
    **never reset** them, only add or amend.
+   Quote titles and values that contain `:` in the frontmatter, or the board skips the file.
 4. Write one automated test per scenario in `acceptance.md` first; confirm they fail; record test
    names in `acceptance.md` and `paths.scenarios`.
 5. Implement with superpowers:subagent-driven-development and superpowers:test-driven-development,
@@ -55,7 +56,7 @@ Write "Current step: build <n>" to `paths.status` as each step starts.
    - `actions.test_all`, `actions.test_integration`, `actions.lint`, `actions.gen_check`, and any
      other action whose `when` condition holds.
    - Every skill in `audits.always`, scoped to this feature's changes. The UI audit uses
-     `audits.ui_design_source` and records "no UI surface in changes" when there is none. Skills in
+     `design_system` and records "no UI surface in changes" when there is none. Skills in
      `audits.when_schema` when schema or queries changed.
    - Fix Critical/High findings in this feature's changes (counted cycle); list Medium/Low in the
      report and add follow-up features or tasks.

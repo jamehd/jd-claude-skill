@@ -22,7 +22,7 @@ If the file is missing, copy `templates/project.yaml` (this skill's minimal boar
 | Target is a git repo with the main branch (`git.main`, default `origin/HEAD` target or `main`) | `git -C <target> rev-parse --verify <main>` | Merge gate needs it; warn user |
 | `claude` CLI on PATH | bash `command -v claude`; PowerShell `Get-Command claude` | Dispatch button will fail; tell user |
 | `gh` CLI (optional) | bash `command -v gh`; PowerShell `Get-Command gh` | Only the "Create PR" button needs it |
-| Node 22+ | `node --version` | Required to run the server |
+| Node 22.12+ | `node --version` | Required to run the server |
 
 On Windows the board spawns `claude` with the prompt on stdin, so no quoting workarounds are needed. Optional `BOARD_TEST_SHELL` selects the shell used for test commands.
 

@@ -171,3 +171,12 @@ describe('buildTaskPrompt requirements-sync done-criteria', () => {
     expect(p).toContain('docs/requirements/')
   })
 })
+
+describe('audit summary', () => {
+  it('lists an audit that is in both always and when_ui only once', () => {
+    const cfg = { ...G, audits: { always: ['jd:error-audit', 'jd:ui-design-audit'], when_ui: ['jd:ui-design-audit'], when_schema: [] } }
+    const p = buildTaskPrompt(item('Do it'), cfg, new Map())
+    expect(p).toContain('error-audit, ui-design-audit always; never e2e')
+    expect(p.match(/ui-design-audit/g)).toHaveLength(1)
+  })
+})

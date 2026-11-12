@@ -16,7 +16,7 @@ try {
 }
 for (const d of ['tasks', 'status', 'jobs']) mkdirSync(path.join(config.dataDir, d), { recursive: true })
 
-const store = new BoardStore(config.dataDir)
+const store = new BoardStore(config.dataDir, { idPrefix: config.project.tasks.id_prefix, featuresDir: config.featuresDir })
 const hub = new WsHub()
 const git = new BoardGit(config.repoRoot, {
   mainBranch: config.mainBranch,
@@ -40,6 +40,7 @@ const runner = new JobRunner({
 store.watch(() => hub.broadcast({ type: 'board_update' }))
 
 const app = await buildServer({ config, store, hub, runner, git })
+for (const w of config.warnings) app.log.warn(w)
 await app.listen({ port: config.port, host: config.host })
 app.log.info(`project board on http://${config.host}:${config.port}`)
 

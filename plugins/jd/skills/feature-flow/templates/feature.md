@@ -1,6 +1,6 @@
 ---
 id: <ID>
-title: <feature name>
+title: "<feature name>"
 status: idea
 order: <number in the queue>
 aliases: []

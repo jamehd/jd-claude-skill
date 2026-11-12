@@ -154,3 +154,26 @@ test('resolveMainBranch prefers config, then origin/HEAD, then main', () => {
   git('symbolic-ref', 'refs/remotes/origin/HEAD', 'refs/remotes/origin/develop')
   assert.equal(resolveMainBranch(repo, cfg), 'develop')
 })
+
+test('id_pattern with a capturing group is rejected, non-capturing is accepted', () => {
+  assert.throws(
+    () => loadProjectConfig(makeRepo(`requirements:\n  id_pattern: '(REQ)-\\d+'\n`)),
+    (err) => err instanceof ProjectConfigError && err.key === 'requirements.id_pattern' && /capturing/.test(err.message)
+  )
+  const c = loadProjectConfig(makeRepo(`requirements:\n  id_pattern: '(?:REQ|FR)-\\d+'\n`)).config
+  assert.equal(c.requirements.id_pattern, '(?:REQ|FR)-\\d+')
+})
+
+test('design_system falls back to audits.ui_design_source; explicit design_system wins', () => {
+  const legacy = loadProjectConfig(makeRepo('audits:\n  ui_design_source: A.md\n')).config
+  assert.equal(legacy.design_system, 'A.md')
+  const both = loadProjectConfig(makeRepo('design_system: B.md\naudits:\n  ui_design_source: A.md\n')).config
+  assert.equal(both.design_system, 'B.md')
+  assert.equal(loadProjectConfig(makeRepo(undefined)).config.design_system, undefined)
+})
+
+test('paths defaults to an empty mapping and must be a mapping', () => {
+  assert.deepEqual(loadProjectConfig(makeRepo(undefined)).config.paths, {})
+  assert.equal(loadProjectConfig(makeRepo('paths:\n  features: docs/f\n')).config.paths.features, 'docs/f')
+  assert.throws(() => loadProjectConfig(makeRepo('paths: x\n')), ProjectConfigError)
+})

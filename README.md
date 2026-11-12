@@ -18,7 +18,7 @@ A growing library of personal engineering skills that work across projects: proj
 | `jd:auto` | Autonomous end-to-end delivery: brainstorm, spec, plan, worktree, subagent TDD, review with domain audits, then integration per `git.integration` (PR by default), stopping only for architectural, hard-to-reverse or destructive decisions. Models, audits, design system and e2e notes come from `project.yaml`; runs on defaults without it. Board mode is commit-only. |
 | `jd:plan-batch` | Morning planning pass for the project board: shapes rough intents and backlog items into agent-ready tasks (scope, `needsE2e`, requirement IDs, locked decisions), promoting to `ready` only on explicit operator OK. Requires `project.yaml`. |
 | `jd:project-board` | Sets up and runs the Project Board dashboard (LAN web board that tracks tasks as markdown and dispatches them to headless Claude Code) for a repository, on Windows or Linux. Requires `project-board/project.yaml` and creates it from a template. |
-| `jd:feature-flow` | Feature lifecycle for AI-built projects: the owner gives requirements and accepts, the AI drafts briefs with numbered acceptance scenarios (Gate A), builds with subagents test-first, re-runs every accepted scenario plus `jd:error-audit` / `jd:ui-design-audit`, prepares a dev environment for acceptance (Gate B) and merges only after acceptance. Hard limits (3 fix attempts, 2 rework rounds, one active feature) with stop reports instead of loops. Project values in `project-board/project.yaml`, state in `project-board/data/`. |
+| `jd:feature-flow` | Feature lifecycle for AI-built projects: the owner gives requirements and accepts, the AI drafts briefs with numbered acceptance scenarios (Gate A), builds with subagents test-first, re-runs every accepted scenario plus `jd:error-audit` / `jd:ui-design-audit`, prepares a dev environment for acceptance (Gate B) and merges only after acceptance. Hard limits (3 fix attempts, 2 rework rounds, one active feature by default; configurable in `limits.*`) with stop reports instead of loops. `git.integration` chooses pull-request or merge-after-acceptance. Project values in `project-board/project.yaml`, state in `project-board/data/`. |
 
 | Command | Description |
 |---------|-------------|
@@ -35,6 +35,15 @@ A growing library of personal engineering skills that work across projects: proj
 | `/jd:feature <ID\|text>` | Feature flow: check needs and draft the brief and acceptance scenarios for owner approval (Gate A). |
 | `/jd:build <ID>` | Feature flow: build an approved feature, re-run all accepted scenarios, audit, prepare dev acceptance (stops at Gate B). |
 | `/jd:accept <ID> ok\|notes` | Feature flow: record the verdict — merge on ok, or start a rework round with notes. |
+
+## Upgrading to 0.34.0
+
+Every skill, hook and the board now read per-project settings from `<repo>/project-board/project.yaml` (keys: `plugins/jd/shared/project-config.md`).
+
+- The board refuses to start without `project-board/project.yaml`; create it with `jd:project-board`. Add it before updating an existing project. For a GameSync-style project, copy the values from the old behaviour (ports, requirement headings, id pattern, e2e host); a worked example is `plugins/jd/tools/project-board/server/src/fixtures/gamesync.project.yaml`.
+- The `.env` file in the tool folder is no longer loaded automatically; point `BOARD_ENV_FILE` at it (real environment variables still win).
+- The `req-check-stop` hook stays silent until `project.yaml` exists.
+- The board's `/api/info` is unauthenticated and returns only the project name.
 
 ## Hooks
 
