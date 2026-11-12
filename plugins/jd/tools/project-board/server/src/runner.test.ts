@@ -1093,3 +1093,80 @@ describe('Windows spawn planning failures', () => {
     expect(t.runner.getJob(job.id)?.error).toMatch(/could not start claude/)
   })
 })
+
+describe('feature-flow managed tasks', () => {
+  function manage(t: ReturnType<typeof setup>, id: string, epic = 'FEAT-1') {
+    mkdirSync(path.join(t.dataDir, 'features', epic), { recursive: true })
+    writeFileSync(path.join(t.dataDir, 'features', epic, 'feature.md'), '---\nid: FEAT-1\n---\n')
+    t.store.updateItem(id, { extra: { epic } })
+  }
+  function restart(t: ReturnType<typeof setup>) {
+    return new JobRunner({
+      store: t.store, hub: new WsHub(), git: t.git, spawnFn: t.spawnFn, repoRoot: t.dataDir,
+      jobsDir: path.join(t.dataDir, 'jobs'), claudeBin: 'claude', timeoutMs: 5000, maxConcurrent: 1,
+    })
+  }
+
+  it('never auto-dispatches a managed ready task', () => {
+    const t = setup()
+    manage(t, t.item.id)
+    t.runner.setAuto({ enabled: true })
+    expect(t.store.getItem(t.item.id)?.status).toBe('ready')
+    expect(t.spawnCalls).toHaveLength(0)
+  })
+
+  it('still auto-dispatches a task whose epic has no feature.md', () => {
+    const t = setup()
+    t.store.updateItem(t.item.id, { extra: { epic: 'NOPE' } })
+    t.runner.setAuto({ enabled: true })
+    expect(t.store.getItem(t.item.id)?.status).toBe('ai_running')
+  })
+
+  it('keeps an orphaned managed ai_running task as is on reconcile', () => {
+    const t = setup()
+    manage(t, t.item.id)
+    t.store.updateItem(t.item.id, { status: 'ai_running' })
+    expect(t.runner.reconcileOrphanedTasks()).toBe(0)
+    expect(t.store.getItem(t.item.id)?.status).toBe('ai_running')
+    expect(t.store.getItem(t.item.id)?.body).not.toContain('orphaned')
+  })
+
+  it('keeps a managed ai_running task after a restart, with or without a stale running job', () => {
+    const t = setup()
+    manage(t, t.item.id)
+    t.store.updateItem(t.item.id, { status: 'ai_running' })
+    writeFileSync(path.join(t.dataDir, 'jobs', 'job-009.json'),
+      JSON.stringify({ id: 'job-009', kind: 'task', taskId: t.item.id, state: 'running' }))
+    restart(t)
+    expect(t.store.getItem(t.item.id)?.status).toBe('ai_running')
+    restart(t)
+    expect(t.store.getItem(t.item.id)?.status).toBe('ai_running')
+  })
+
+  it('picks up a feature created after startup without a restart', () => {
+    const t = setup()
+    t.store.updateItem(t.item.id, { extra: { epic: 'FEAT-2' }, status: 'ai_running' })
+    expect(t.runner.reconcileOrphanedTasks()).toBe(1)
+    t.store.updateItem(t.item.id, { status: 'ai_running' })
+    manage(t, t.item.id, 'FEAT-2')
+    expect(t.runner.reconcileOrphanedTasks()).toBe(0)
+  })
+
+  it('resetDependents leaves managed dependents untouched', () => {
+    const t = setup()
+    const dep = t.store.createItem({ type: 'task', title: 'Managed dep', component: 'infra' })
+    t.store.updateItem(dep.id, { status: 'review', dependsOn: [t.item.id] })
+    manage(t, dep.id)
+    t.runner.resetDependents(t.item.id)
+    expect(t.store.getItem(dep.id)?.status).toBe('review')
+    expect(t.git.removeWorktree).not.toHaveBeenCalledWith(dep.id)
+  })
+
+  it('resetDependents still resets unmanaged dependents', () => {
+    const t = setup()
+    const dep = t.store.createItem({ type: 'task', title: 'Plain dep', component: 'infra' })
+    t.store.updateItem(dep.id, { status: 'review', dependsOn: [t.item.id] })
+    t.runner.resetDependents(t.item.id)
+    expect(t.store.getItem(dep.id)?.status).toBe('ready')
+  })
+})

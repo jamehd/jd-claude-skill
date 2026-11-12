@@ -1,4 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { mkdirSync, writeFileSync } from 'node:fs'
+import path from 'node:path'
 import type { FastifyInstance } from 'fastify'
 import { buildServer } from './server.js'
 import { makeDeps } from './test-helpers.js'
@@ -748,5 +750,75 @@ describe('batch actions', () => {
     expect(res.json().results.find((r: { id: string }) => r.id === id).ok).toBe(false)
     const board = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
     expect(board.json().items.find((i: { id: string }) => i.id === id)).toBeDefined()
+  })
+})
+
+describe('feature-flow managed tasks', () => {
+  async function managedTask(status: string) {
+    await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
+      payload: { type: 'task', title: 'Managed', component: 'infra', body: 'detailed description' } })
+    mkdirSync(path.join(deps.store.dataDir, 'features', 'FEAT-1'), { recursive: true })
+    writeFileSync(path.join(deps.store.dataDir, 'features', 'FEAT-1', 'feature.md'), '---\nid: FEAT-1\n---\n')
+    deps.store.updateItem('TASK-001', { status: status as never, extra: { epic: 'FEAT-1' } })
+  }
+  const post = (url: string, payload?: unknown) => app.inject({ method: 'POST', url, cookies: cookie, payload: payload as never })
+
+  it('exposes managed on /api/board', async () => {
+    await managedTask('ready')
+    await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
+      payload: { type: 'task', title: 'Plain', component: 'infra', body: 'detailed description' } })
+    const res = await app.inject({ method: 'GET', url: '/api/board', cookies: cookie })
+    const items = res.json().items as { id: string; managed: boolean }[]
+    expect(items.find((i) => i.id === 'TASK-001')?.managed).toBe(true)
+    expect(items.find((i) => i.id === 'TASK-002')?.managed).toBe(false)
+  })
+
+  it('rejects manual dispatch with 409', async () => {
+    await managedTask('ready')
+    const res = await post('/api/tasks/TASK-001/dispatch')
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toEqual({ error: 'managed by feature-flow' })
+  })
+
+  it('rejects resolve, merge, pr, discard, finalize-pr, abandon-pr, patch and delete', async () => {
+    await managedTask('review')
+    for (const action of ['resolve', 'merge', 'pr', 'discard', 'finalize-pr']) {
+      const res = await post(`/api/tasks/TASK-001/${action}`)
+      expect(res.statusCode, action).toBe(409)
+      expect(res.json()).toEqual({ error: 'managed by feature-flow' })
+    }
+    const abandon = await post('/api/tasks/TASK-001/abandon-pr', { mode: 'reopen' })
+    expect(abandon.statusCode).toBe(409)
+    const patch = await app.inject({ method: 'PATCH', url: '/api/tasks/TASK-001', cookies: cookie, payload: { status: 'done' } })
+    expect(patch.statusCode).toBe(409)
+    expect(patch.json()).toEqual({ error: 'managed by feature-flow' })
+    const del = await app.inject({ method: 'DELETE', url: '/api/tasks/TASK-001', cookies: cookie })
+    expect(del.statusCode).toBe(409)
+    expect(deps.store.getItem('TASK-001')?.status).toBe('review')
+  })
+
+  it('batch reports managed tasks as failed without touching them', async () => {
+    await managedTask('ready')
+    const res = await post('/api/tasks/batch', { ids: ['TASK-001'], action: 'dispatch' })
+    expect(res.json().results[0]).toEqual({ id: 'TASK-001', ok: false, error: 'managed by feature-flow' })
+    const del = await post('/api/tasks/batch', { ids: ['TASK-001'], action: 'delete' })
+    expect(del.json().applied).toBe(0)
+    expect(deps.store.getItem('TASK-001')).toBeTruthy()
+  })
+
+  it('rejects messaging a job of a managed task', async () => {
+    await managedTask('ai_running')
+    const jobs = (deps.runner as unknown as { jobs: Map<string, unknown> }).jobs
+    jobs.set('job-077', { id: 'job-077', kind: 'task', taskId: 'TASK-001', state: 'running' })
+    const res = await post('/api/jobs/job-077/message', { text: 'hi', mode: 'steer' })
+    expect(res.statusCode).toBe(409)
+    expect(res.json()).toEqual({ error: 'managed by feature-flow' })
+  })
+
+  it('leaves unmanaged tasks unchanged', async () => {
+    await app.inject({ method: 'POST', url: '/api/tasks', cookies: cookie,
+      payload: { type: 'task', title: 'Plain', component: 'infra', body: 'detailed description' } })
+    const res = await app.inject({ method: 'PATCH', url: '/api/tasks/TASK-001', cookies: cookie, payload: { status: 'ready' } })
+    expect(res.statusCode).toBe(200)
   })
 })

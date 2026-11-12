@@ -17,6 +17,7 @@ export interface BoardItem {
   plan?: string
   dependsOn?: string[]
   extra?: Record<string, unknown>
+  managed?: boolean
   body: string
 }
 

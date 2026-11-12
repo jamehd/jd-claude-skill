@@ -18,6 +18,7 @@ export function TaskDrawer({ item, components, items, onClose, onOpenConsole }: 
 }) {
   const byId = indexById(items)
   const blocked = blockedBy(item, byId)
+  const managed = item.managed === true
   const [title, setTitle] = useState(item.title)
   const [description, setDescription] = useState(item.body.trim())
   const [priority, setPriority] = useState<Priority>(item.priority)
@@ -73,23 +74,23 @@ export function TaskDrawer({ item, components, items, onClose, onOpenConsole }: 
           <button onClick={onClose} className="text-text-muted hover:text-text-primary">✕</button>
         </div>
 
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Tiêu đề"
+        <input value={title} disabled={managed} onChange={(e) => setTitle(e.target.value)} placeholder="Tiêu đề"
           className="rounded-md border border-border bg-sunken px-3 py-2 text-lg font-semibold text-text-primary outline-none transition-colors duration-150 focus:border-accent" />
-        <textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={8}
+        <textarea value={description} disabled={managed} onChange={(e) => setDescription(e.target.value)} rows={8}
           placeholder="Mô tả chi tiết (bắt buộc)"
           className="resize-none rounded-md border border-border bg-sunken px-3 py-2 text-[14px] leading-[1.65] text-text-primary outline-none transition-colors duration-150 focus:border-accent" />
         <div className="flex gap-2">
-          <select value={priority} onChange={(e) => setPriority(e.target.value as Priority)}
+          <select value={priority} disabled={managed} onChange={(e) => setPriority(e.target.value as Priority)}
             className="flex-1 rounded-md border border-border bg-sunken px-2 py-2 text-text-primary">
             {PRIORITIES.map((p) => <option key={p}>{p}</option>)}
           </select>
-          <select value={component} onChange={(e) => setComponent(e.target.value)}
+          <select value={component} disabled={managed} onChange={(e) => setComponent(e.target.value)}
             className="flex-1 rounded-md border border-border bg-sunken px-2 py-2 text-text-primary">
             {components.map((c) => <option key={c.component}>{c.component}</option>)}
           </select>
         </div>
 
-        <button disabled={!canSave || busy}
+        <button disabled={!canSave || busy || managed}
           onClick={() => {
             const t = title.trim(), d = description.trim()
             void act(async () => { await api.patchTask(item.id, { title: t, body: d, priority, component }); setTitle(t); setDescription(d) }, false)
@@ -98,9 +99,13 @@ export function TaskDrawer({ item, components, items, onClose, onOpenConsole }: 
           {dirty ? 'Lưu thay đổi' : 'Đã lưu'}
         </button>
 
+        {managed && (
+          <p className="rounded-md border border-epic-border bg-epic-bg px-3 py-2 text-sm text-epic">🔒 Do feature-flow quản lý — chỉ xem, không thao tác từ board.</p>
+        )}
+
         {error && <p className="text-sm text-danger">{error}</p>}
 
-        {SHAPEABLE.includes(item.status) && (
+        {!managed && SHAPEABLE.includes(item.status) && (
           <div className="rounded-md border border-border bg-sunken p-3">
             <div className="flex items-center justify-between">
               <span className="text-sm text-text-secondary">
@@ -161,7 +166,7 @@ export function TaskDrawer({ item, components, items, onClose, onOpenConsole }: 
         )}
 
         <div className="border-t border-border pt-3">
-          {CAN_EXECUTE.includes(item.status) && (
+          {!managed && CAN_EXECUTE.includes(item.status) && (
             blocked.length > 0 ? (
               <button disabled={busy}
                 onClick={() => { if (confirm(`${item.id} đang bị chặn bởi: ${blocked.join(', ')}.\nGiao cho AI bất chấp phụ thuộc?`)) void act(() => api.dispatch(item.id, true), false) }}
@@ -179,7 +184,7 @@ export function TaskDrawer({ item, components, items, onClose, onOpenConsole }: 
             <button onClick={() => onOpenConsole(item.job!)}
               className="mt-2 w-full rounded-md border border-border py-2 text-sm text-text-secondary transition-colors duration-150 hover:bg-raised">Mở console</button>
           )}
-          {item.status === 'review' && (
+          {!managed && item.status === 'review' && (
             <>
               <div className="mt-2 flex gap-2">
                 <button disabled={busy}
@@ -204,7 +209,7 @@ export function TaskDrawer({ item, components, items, onClose, onOpenConsole }: 
               )}
             </>
           )}
-          {item.status === 'pr' && (
+          {!managed && item.status === 'pr' && (
             <div className="mt-2">
               {item.pr && (
                 <a href={item.pr} target="_blank" rel="noreferrer"
@@ -242,7 +247,7 @@ export function TaskDrawer({ item, components, items, onClose, onOpenConsole }: 
           </>
         )}
 
-        <div className="mt-auto border-t border-border pt-3">
+        <div className={`mt-auto border-t border-border pt-3${managed ? ' hidden' : ''}`}>
           {confirmDelete ? (
             <div className="space-y-2">
               <p className="text-sm text-danger">Xóa {item.id}? Không hoàn tác được.</p>

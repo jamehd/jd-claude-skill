@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { api } from '../api.js'
 import { epicOf, hasAnyEpic, groupByEpic } from '../filters.js'
 import { blockedBy, indexById } from '../deps.js'
+import { isDraggable } from '../managed.js'
 import type { BoardItem, ItemStatus } from '../types.js'
 
 const COLUMNS: { key: ItemStatus; label: string }[] = [
@@ -68,6 +69,7 @@ export function Kanban(
     if (status === 'ai_running' || status === 'pr') return
     const id = e.dataTransfer.getData('text/plain')
     if (!id) return
+    if (items.find((i) => i.id === id)?.managed) return
     setError('')
     if (status === 'ready') {
       const it = items.find((i) => i.id === id)
@@ -83,7 +85,7 @@ export function Kanban(
     const epic = epicOf(item)
     const blocked = item.status === 'ready' ? blockedBy(item, byId) : []
     return (
-      <div key={item.id} draggable={item.status !== 'ai_running' && item.status !== 'pr'}
+      <div key={item.id} draggable={isDraggable(item)}
         onDragStart={(e) => e.dataTransfer.setData('text/plain', item.id)}
         onClick={() => { if (selectMode) onToggle(item.id); else onSelect(item.id) }}
         className={`cursor-pointer rounded-lg border border-l-2 p-2 text-sm transition-colors duration-150 hover:border-y-border-strong hover:border-r-border-strong ${TYPE_CARD[item.type]} ${STATUS_EDGE[item.status]}`}>
@@ -110,6 +112,9 @@ export function Kanban(
           <span className="flex min-w-0 flex-wrap items-center justify-end gap-1">
             {epic && (
               <span className="whitespace-nowrap rounded-full border border-epic-border bg-epic-bg px-1.5 py-0.5 font-mono text-[11px] uppercase text-epic">🏷 {epic}</span>
+            )}
+            {item.managed && (
+              <span title="Do feature-flow quản lý, chỉ xem" className="whitespace-nowrap rounded-full border border-epic-border px-1.5 py-0.5 font-mono text-[11px] uppercase text-epic">🔒 feature-flow</span>
             )}
             {item.requiresShaping && !item.plan?.trim() && (
               <span className="rounded-full border border-shape-border px-1.5 py-0.5 font-mono text-[11px] uppercase text-shape">⚙ nắn</span>

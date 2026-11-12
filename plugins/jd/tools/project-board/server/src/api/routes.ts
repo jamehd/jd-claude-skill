@@ -5,6 +5,7 @@ import type { ServerDeps } from '../server.js'
 import type { ItemStatus, ItemType, Priority } from '../../../ui/src/types.js'
 import { PRIORITIES } from '../markdown.js'
 import { gatedReadyStatus } from '../store.js'
+import { isFeatureManaged, MANAGED_MESSAGE } from '../features.js'
 import { blockedBy, indexById } from '../../../ui/src/deps.js'
 import { SAFE_ID } from '../jobs/git.js'
 import { normalizeLine } from '../jobs/events.js'
@@ -27,9 +28,15 @@ const BATCH_ACTIONS: BatchAction[] = ['delete', 'dispatch', 'status', 'priority'
 
 export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
   const { store, hub } = deps
+  const isManaged = (item: Parameters<typeof isFeatureManaged>[0]) => isFeatureManaged(item, store.dataDir)
+
+  function boardScan() {
+    const scan = store.scan()
+    return { ...scan, items: scan.items.map((i) => ({ ...i, managed: isManaged(i) })) }
+  }
 
   app.get('/api/board', () => ({
-    ...store.scan(),
+    ...boardScan(),
     project: deps.config.project.project,
     components: store.componentStatuses(),
     jobs: deps.runner?.listJobs() ?? [],
@@ -54,6 +61,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     }
     const current = store.getItem(req.params.id)
     if (!current) return reply.code(404).send({ error: 'not found' })
+    if (isManaged(current)) return reply.code(409).send({ error: MANAGED_MESSAGE })
 
     const raw = req.body ?? {}
     const patch: Partial<Record<(typeof PATCH_WHITELIST)[number], unknown>> = {}
@@ -96,6 +104,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
   app.post<{ Params: { id: string }; Body: { override?: boolean } }>('/api/tasks/:id/dispatch', (req, reply) => {
     const item = store.getItem(req.params.id)
     if (!item) return reply.code(404).send({ error: 'not found' })
+    if (isManaged(item)) return reply.code(409).send({ error: MANAGED_MESSAGE })
     if (!['backlog', 'ready'].includes(item.status)) {
       return reply.code(409).send({ error: `cannot dispatch a task in '${item.status}'` })
     }
@@ -153,7 +162,10 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     if (!text || (mode !== 'queue' && mode !== 'steer')) {
       return reply.code(400).send({ error: 'text and mode (queue|steer) are required' })
     }
-    if (!deps.runner.getJob(req.params.id)) return reply.code(404).send({ error: 'not found' })
+    const job = deps.runner.getJob(req.params.id)
+    if (!job) return reply.code(404).send({ error: 'not found' })
+    const jobTask = job.taskId ? store.getItem(job.taskId) : undefined
+    if (jobTask && isManaged(jobTask)) return reply.code(409).send({ error: MANAGED_MESSAGE })
     try {
       deps.runner.message(req.params.id, text, mode)
     } catch (err) {
@@ -166,6 +178,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
   app.delete<{ Params: { id: string } }>('/api/tasks/:id', (req, reply) => {
     const item = store.getItem(req.params.id)
     if (!item) return reply.code(404).send({ error: 'not found' })
+    if (isManaged(item)) return reply.code(409).send({ error: MANAGED_MESSAGE })
     const liveJob = deps.runner.listJobs().some(
       (j) => (j.state === 'running' || j.state === 'queued') && j.taskId === item.id,
     )
@@ -199,6 +212,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
     const results = (ids as string[]).map((id) => {
       const item = store.getItem(id)
       if (!item) return { id, ok: false, error: 'not found' }
+      if (isManaged(item)) return { id, ok: false, error: MANAGED_MESSAGE }
       try {
         switch (action) {
           case 'delete': {
@@ -255,6 +269,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
   function requireReview(id: string, reply: { code: (n: number) => { send: (b: unknown) => unknown } }) {
     const item = store.getItem(id)
     if (!item) { reply.code(404).send({ error: 'not found' }); return undefined }
+    if (isManaged(item)) { reply.code(409).send({ error: MANAGED_MESSAGE }); return undefined }
     if (item.status !== 'review') { reply.code(409).send({ error: `task is ${item.status}, not review` }); return undefined }
     return item
   }
@@ -304,6 +319,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
   app.post<{ Params: { id: string } }>('/api/tasks/:id/finalize-pr', (req, reply) => {
     const item = store.getItem(req.params.id)
     if (!item) return reply.code(404).send({ error: 'not found' })
+    if (isManaged(item)) return reply.code(409).send({ error: MANAGED_MESSAGE })
     if (item.status !== 'pr') return reply.code(409).send({ error: `task is ${item.status}, not pr` })
     let merged: boolean
     try {
@@ -326,6 +342,7 @@ export function registerRoutes(app: FastifyInstance, deps: ServerDeps): void {
   app.post<{ Params: { id: string }; Body: { mode?: string } }>('/api/tasks/:id/abandon-pr', (req, reply) => {
     const item = store.getItem(req.params.id)
     if (!item) return reply.code(404).send({ error: 'not found' })
+    if (isManaged(item)) return reply.code(409).send({ error: MANAGED_MESSAGE })
     if (item.status !== 'pr') return reply.code(409).send({ error: `task is ${item.status}, not pr` })
     const mode = req.body?.mode
     if (mode !== 'reopen' && mode !== 'delete') {

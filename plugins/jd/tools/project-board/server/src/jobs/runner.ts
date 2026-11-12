@@ -2,8 +2,9 @@ import { appendFileSync, writeFileSync, readdirSync, readFileSync, renameSync, u
 import path from 'node:path'
 import { spawn, type ChildProcess } from 'node:child_process'
 import { gatedReadyStatus, type BoardStore } from '../store.js'
+import { isFeatureManaged } from '../features.js'
 import type { WsHub } from '../ws.js'
-import type { AutoState, ConsoleEvent, Job, JobKind, NoteType, RateLimitSnapshot, UsageReport, UsageBucket, JobUsage } from '../../../ui/src/types.js'
+import type { BoardItem, AutoState, ConsoleEvent, Job, JobKind, NoteType, RateLimitSnapshot, UsageReport, UsageBucket, JobUsage } from '../../../ui/src/types.js'
 import { isBlocked, indexById, unmergedDeps, transitiveDependents } from '../../../ui/src/deps.js'
 import { buildTaskPrompt, buildRescanPrompt, buildResolvePrompt, e2eReviewNote } from './prompt.js'
 import { parseRequirementsDir } from './requirements.js'
@@ -99,6 +100,10 @@ export class JobRunner {
     }
   }
 
+  private isManaged(item: BoardItem): boolean {
+    return !!this.deps && isFeatureManaged(item, this.deps.store.dataDir)
+  }
+
   private get project(): ProjectConfig {
     return this.deps?.project ?? (this.defaultProject ??= defaultProjectConfig())
   }
@@ -122,6 +127,7 @@ export class JobRunner {
     let resets = 0
     for (const item of this.deps.store.scan().items) {
       if (item.status !== 'ai_running') continue
+      if (this.isManaged(item)) continue
       if (hasLiveJob(item.id)) continue
       this.deps.store.updateItem(item.id, { status: gatedReadyStatus(item) })
       this.deps.store.appendToBody(item.id, 'Reset to ready: was ai_running with no live job (orphaned).')
@@ -172,6 +178,7 @@ export class JobRunner {
     const dependents = transitiveDependents(taskId, store.scan().items)
     let changed = false
     for (const d of dependents) {
+      if (this.isManaged(d)) continue
       if (d.status === 'ai_running') {
         const job = [...this.jobs.values()].find(
           (j) => (j.state === 'running' || j.state === 'queued') && j.taskId === d.id)
@@ -326,7 +333,7 @@ export class JobRunner {
     const ready = items
       // A task with unmet dependencies (a dep not yet `done`) stays in `ready` but
       // is never auto-dispatched until its deps land on main.
-      .filter((i) => i.status === 'ready' && !(i.requiresShaping && !i.plan?.trim()) && !isBlocked(i, byId) && !this.autoFailedTasks.has(i.id) && !this.hasActiveJob((j) => j.kind === 'task' && j.taskId === i.id))
+      .filter((i) => i.status === 'ready' && !this.isManaged(i) && !(i.requiresShaping && !i.plan?.trim()) && !isBlocked(i, byId) && !this.autoFailedTasks.has(i.id) && !this.hasActiveJob((j) => j.kind === 'task' && j.taskId === i.id))
       .sort((a, b) => (order[a.priority] - order[b.priority]) || a.created.localeCompare(b.created) || a.id.localeCompare(b.id))
     return ready[0]?.id
   }
@@ -890,7 +897,7 @@ export class JobRunner {
         job.error = 'server restarted mid-job; worktree kept for inspection'
         if (job.kind === 'task' && job.taskId) {
           const t = store.getItem(job.taskId)
-          if (t?.status === 'ai_running') store.updateItem(job.taskId, { status: gatedReadyStatus(t) })
+          if (t?.status === 'ai_running' && !this.isManaged(t)) store.updateItem(job.taskId, { status: gatedReadyStatus(t) })
         }
         this.persist(job)
       }
