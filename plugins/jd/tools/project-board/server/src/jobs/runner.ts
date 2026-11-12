@@ -9,16 +9,16 @@ import { buildTaskPrompt, buildRescanPrompt, buildResolvePrompt } from './prompt
 import { parseRequirementsDir } from './requirements.js'
 import { formatRequirementsTouched } from './requirements-touched.js'
 import { normalizeLine } from './events.js'
+import { planSpawn, gateCommand, type SpawnOpts } from './spawn-plan.js'
 
-export type SpawnFn = (bin: string, args: string[], opts: { cwd: string; shell?: boolean }) => ChildProcess
+export type SpawnFn = (bin: string, args: string[], opts: SpawnOpts) => ChildProcess
 
-function quoteForCmd(arg: string): string {
-  return /[\s"&|<>^%()]/.test(arg) || arg === '' ? `"${arg.replace(/"/g, '\\"')}"` : arg
+const defaultSpawn: SpawnFn = (bin, args, opts) => {
+  const plan = planSpawn(bin, args, opts, process.platform)
+  const proc = spawn(plan.command, plan.args, plan.options)
+  if (plan.stdinPayload !== undefined) proc.stdin?.end(plan.stdinPayload)
+  return proc
 }
-
-// With shell: true on Windows, Node joins args unquoted into a cmd.exe command line.
-const defaultSpawn: SpawnFn = (bin, args, opts) =>
-  opts.shell ? spawn(quoteForCmd(bin), args.map(quoteForCmd), opts) : spawn(bin, args, opts)
 
 export interface GitOps {
   createWorktree(taskId: string, baseBranches?: string[]): string
@@ -46,6 +46,7 @@ export interface RunnerDeps {
   maxConcurrent: number
   branchPrefix?: string
   integration?: 'pull-request' | 'merge-after-acceptance'
+  testShell?: string
   spawnFn?: SpawnFn
 }
 
@@ -716,8 +717,8 @@ export class JobRunner {
   private startTestGate(job: Job, cmd: string): void {
     this.note(job, 'info', `Test gate: ${cmd}`)
     const cwd = this.cwds.get(job.id) ?? this.deps!.git.worktreePath(job.taskId!)
-    const useCmd = process.platform === 'win32' && process.env.BOARD_TEST_SHELL !== 'bash'
-    const proc = useCmd ? this.spawnFn('cmd', ['/c', cmd], { cwd }) : this.spawnFn('bash', ['-lc', cmd], { cwd })
+    const gate = gateCommand(cmd, process.platform, this.deps!.testShell)
+    const proc = this.spawnFn(gate.bin, gate.args, { cwd, ...gate.opts })
     this.running.set(job.id, { proc, steering: false, buffer: '', gate: true })
     this.armTimer(job)
     const onChunk = (b: Buffer) => {

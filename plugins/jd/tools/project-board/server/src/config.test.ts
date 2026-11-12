@@ -91,4 +91,16 @@ describe('loadConfig', () => {
     writeYaml('project: Demo\n')
     expect(() => loadConfig({ BOARD_REPO_ROOT: repo, BOARD_ENV_FILE: path.join(repo, 'nope.env') })).toThrow(/BOARD_ENV_FILE/)
   })
+
+  it.each(['0', '70000', 'abc'])('rejects BOARD_PORT env %s', (bad) => {
+    writeYaml('project: Demo\n')
+    expect(() => loadConfig({ BOARD_REPO_ROOT: repo, BOARD_PORT: bad })).toThrow(/BOARD_PORT/)
+  })
+
+  it('takes testShell from BOARD_ENV_FILE values', () => {
+    writeYaml('project: Demo\n')
+    const envFile = path.join(repo, 'custom.env')
+    writeFileSync(envFile, 'BOARD_TEST_SHELL=bash\n')
+    expect(loadConfig({ BOARD_REPO_ROOT: repo, BOARD_ENV_FILE: envFile }).testShell).toBe('bash')
+  })
 })

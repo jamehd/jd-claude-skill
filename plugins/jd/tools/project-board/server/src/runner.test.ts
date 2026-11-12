@@ -825,8 +825,7 @@ describe('board test gate', () => {
   }
 
   it('pass gate → review', async () => {
-    vi.stubEnv('BOARD_TEST_SHELL', 'bash')
-    const t = setup()
+    const t = setup({ testShell: 'bash' })
     ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
     setCmd(t, { infra: 'echo ok' })
     const id = readyTask(t); t.runner.dispatchTask(id)
@@ -840,8 +839,7 @@ describe('board test gate', () => {
   })
 
   it('fail gate → not review', async () => {
-    vi.stubEnv('BOARD_TEST_SHELL', 'bash')
-    const t = setup()
+    const t = setup({ testShell: 'bash' })
     ;(t.git.changedFiles as ReturnType<typeof vi.fn>).mockReturnValue(['a.ts'])
     setCmd(t, { infra: 'exit 1' })
     const id = readyTask(t); t.runner.dispatchTask(id)
@@ -1016,13 +1014,13 @@ describe('Windows process spawning', () => {
     const t = setup()
     await runToGate(t)
     expect((t.spawnFn as ReturnType<typeof vi.fn>).mock.calls[1][0]).toBe('cmd')
-    expect(t.spawnCalls[1]).toEqual(['/c', 'echo ok'])
+    expect(t.spawnCalls[1]).toEqual(['/d', '/s', '/c', '"echo ok"'])
+    expect((t.spawnFn as ReturnType<typeof vi.fn>).mock.calls[1][2]).toMatchObject({ windowsVerbatimArguments: true })
   })
 
-  it('BOARD_TEST_SHELL=bash keeps bash -lc on win32', async () => {
+  it('testShell=bash keeps bash -lc on win32', async () => {
     restore = withPlatform('win32')
-    vi.stubEnv('BOARD_TEST_SHELL', 'bash')
-    const t = setup()
+    const t = setup({ testShell: 'bash' })
     await runToGate(t)
     expect((t.spawnFn as ReturnType<typeof vi.fn>).mock.calls[1][0]).toBe('bash')
     expect(t.spawnCalls[1]).toEqual(['-lc', 'echo ok'])

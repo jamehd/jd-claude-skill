@@ -108,7 +108,7 @@ export class BoardGit {
       // so `git merge --abort` won't work — reset --hard restores the pre-merge clean main
       // (the dirty-tree guard above proved it was clean) instead of leaving conflict markers.
       try { this.git(['reset', '--hard', 'HEAD']) } catch { /* best effort */ }
-      throw new Error(`merge conflict with ${this.settings.mainBranch} for ${this.branchName(taskId)}; main left unchanged — re-run the task (it rebranches from main) or merge manually`)
+      throw new Error(`merge conflict with ${this.settings.mainBranch} for ${this.branchName(taskId)}; ${this.settings.mainBranch} left unchanged — re-run the task (it rebranches from ${this.settings.mainBranch}) or merge manually`)
     }
     try {
       this.git(['commit', '-m', message])

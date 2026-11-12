@@ -32,6 +32,7 @@ const runner = new JobRunner({
   maxConcurrent: config.maxConcurrentJobs,
   branchPrefix: config.branchPrefix,
   integration: config.integration,
+  testShell: config.testShell,
 })
 
 store.watch(() => hub.broadcast({ type: 'board_update' }))

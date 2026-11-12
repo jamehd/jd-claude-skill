@@ -20,6 +20,7 @@ export interface Config {
   remoteName: string
   branchPrefix: string
   integration: Integration
+  testShell?: string
   cookieName: string
 }
 
@@ -61,6 +62,12 @@ export function loadConfig(processEnv: NodeJS.ProcessEnv = process.env): Config 
   }
   const project = loaded.config
   validPort(project.board.port, loaded.path)
+  if (env.BOARD_PORT !== undefined) {
+    const envPort = Number(env.BOARD_PORT)
+    if (!Number.isInteger(envPort) || envPort < 1 || envPort > 65535) {
+      throw new Error(`BOARD_PORT must be an integer between 1 and 65535, got "${env.BOARD_PORT}"`)
+    }
+  }
   const port = num(env.BOARD_PORT, project.board.port)
   return {
     port,
@@ -76,6 +83,7 @@ export function loadConfig(processEnv: NodeJS.ProcessEnv = process.env): Config 
     mainBranch: resolveMainBranch(repoRoot, project),
     remoteName: project.git.remote_name,
     branchPrefix: project.board.branch_prefix,
+    testShell: env.BOARD_TEST_SHELL,
     integration: validIntegration(project.git.integration, loaded.path),
     cookieName: `board_session_${port}`,
   }
