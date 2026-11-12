@@ -12,8 +12,9 @@ Only when the input explicitly accepts the feature.
    the build, rebase and re-run `build.md` step 7 (a counted cycle); a conflict that is not
    mechanical → stop with a stop report.
 3. Integrate according to `git.integration` (default `pull-request`):
-   - `pull-request`: open a PR from the feature branch into `git.main` with `gh pr create`, record
-     the PR link in `report.md`, and leave the feature `acceptance`. Do not merge. Tell the person
+   - `pull-request`: look up an existing open PR for the feature branch
+     (`gh pr list --head <branch> --state open --json url`) and reuse it; only when none exists open
+     one into `git.main` with `gh pr create`. Record the PR link in `report.md` once, and leave the feature `acceptance`. Do not merge. Tell the person
      to merge the PR. The feature becomes `done` only after the PR is merged: a later
      `/jd:accept <ID>` or `/jd:next` runs `gh pr view` and acts on the state:
      - `MERGED`: continue with steps 4-7.
