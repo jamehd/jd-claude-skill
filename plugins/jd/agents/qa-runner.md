@@ -22,24 +22,38 @@ you report it honestly. You do not judge code quality (that is `jd:error-audit`,
 
 ## Input
 
-The caller gives you the repository root and, optionally, a feature ID. Without a feature ID you run
-the regression suite only (nightly mode).
+The caller gives you the repository root, a mode, and for `gate` or `targeted` a feature ID and its
+risk tier:
+
+| Mode | Runs |
+|---|---|
+| `gate` (build verification) | gate suite + every scenario of the feature, the feature's actions, the quality actions its tier calls for |
+| `targeted` (inside a fix cycle) | only the named tests, through `actions.test_scenarios_only` |
+| `nightly` (no feature ID) | `actions.test_scenarios_nightly` (or `test_scenarios` when it does not exist), `test_bench`, `test_load`, `test_soak` |
+
+No mode given: `gate` with a feature ID, `nightly` without.
 
 ## Steps
 
 1. Read `project-board/project.yaml`. If it is missing, report `NO CONFIG` and stop.
-2. Read the scenario catalogue at `paths.scenarios`. Collect every scenario with status `active`.
-   With a feature ID, also read `paths.features/<ID>/acceptance.md` and collect its scenarios.
+2. Read the scenario catalogue at `paths.scenarios`. Collect every scenario with status `active`
+   whose suite the mode runs (`gate` mode: suite `gate`, or no suite column; `nightly`: all).
+   With a feature ID, also read `paths.features/<ID>/acceptance.md` and collect all its scenarios.
 3. Check coverage before running: every collected scenario must name an automated test. A scenario
    without one is `NO TEST` (counts as a failure).
 4. Run, from the repository root, each action that applies, in this order, and capture exit code
    and the last 60 lines of output for each:
-   - `actions.test_scenarios`
-   - with a feature ID: `actions.test_all`, `actions.test_integration`, `actions.lint`,
+   - `targeted`: `actions.test_scenarios_only` with the named tests, nothing else.
+   - `gate`: `actions.test_scenarios`; feature scenarios in suite `nightly` through
+     `actions.test_scenarios_only` (or `actions.test_scenarios_nightly` when that action is
+     missing); then `actions.test_all`, `actions.test_integration`, `actions.lint`,
      `actions.gen_check`, and any other action whose `when` condition the caller says holds.
-   - Quality actions, per the skill's `references/quality.md`: `actions.test_bench` on every run;
-     `actions.test_load` in nightly mode or when a collected `-Q` budget names it;
-     `actions.test_soak` in nightly mode, or when the caller asks for it.
+   - `nightly`: `actions.test_scenarios_nightly`, or `actions.test_scenarios` when it is missing.
+   - Quality actions, per the skill's `references/quality.md` and `references/tiers.md`:
+     `actions.test_bench` in `gate` and `nightly`; `actions.test_load` in nightly mode or when a
+     collected `-Q` budget names it and the tier is not `low`; `actions.test_soak_short` in `gate`
+     when a budget names `test_soak` and the tier is not `low`; `actions.test_soak` in nightly
+     mode, or when the caller asks for it.
 5. Map results to scenarios by test name. A test that fails: run that test alone once more. If it
    passes the second time, mark the scenario `FLAKY` (counts as a failure) and show both outputs.
    Do not run it a third time.
@@ -54,7 +68,8 @@ the regression suite only (nightly mode).
 
 ```
 QA RESULT: PASS | FAIL | BLOCKED | EMPTY
-Feature: <ID or "regression only">   Commit: <short sha>   Branch: <name>
+Mode: <gate | targeted | nightly>   Feature: <ID or "regression only">   Tier: <tier>
+Commit: <short sha>   Branch: <name>   Scenario suite time: <minutes>
 
 | Scenario | Test | Result | Evidence |
 |---|---|---|---|

@@ -5,6 +5,8 @@
 | Requested by | <person>, <date> |
 | Original request | "<owner's words, verbatim>" |
 | Branch | feat/<ID>-<slug> |
+| Risk tier | <low / medium / high> — <one-line reason> |
+| Size | <n> new scenarios (limit `limits.feature_new_scenarios`), about <n> tasks (limit `limits.feature_tasks`) |
 
 Approved by owner: —
 
@@ -33,20 +35,32 @@ Approved by owner: —
 |---|---|---|
 | <ID> | <what both touch> | <ID>-S<n> |
 
+## Owner steps
+
+What only the owner can provide, requested now so the build does not wait.
+
+| Step | Needed for | By when |
+|---|---|---|
+| <e.g. test account in the legacy dev system> | <ID>-S<n> | <before build / before acceptance> |
+
+Write "none" when the AI can do everything.
+
 ## Quality budgets
 
 Numbers, never adjectives. One row per budget; each becomes a `<ID>-Q<n>` row in acceptance.md.
 Write "none" with the reason when the feature has no performance, resource or stability risk.
 
-| Kind | What | Budget | Under what condition | Measured by |
-|---|---|---|---|---|
-| performance | <operation> | <e.g. p95 < 200 ms> | <load, data size, hardware> | <action: test_bench / test_load> |
-| resources | <process> | <e.g. CPU < 2 %, RAM < 100 MB> | <target hardware, duration> | <test_load / test_soak> |
-| stability | <process or app> | <e.g. no crash, memory and thread count flat> | <e.g. 24 h with simulated traffic> | <test_soak> |
+| Kind | What | Budget | Under what condition | Measured by | Suite |
+|---|---|---|---|---|---|
+| performance | <operation> | <e.g. p95 < 200 ms> | <load, data size, hardware> | <action: test_bench / test_load> | gate |
+| resources | <process> | <e.g. CPU < 2 %, RAM < 100 MB> | <target hardware, duration> | <test_load / test_soak> | gate / nightly |
+| stability | <process or app> | <e.g. no crash, memory and thread count flat> | <e.g. 24 h with simulated traffic> | <test_soak> | nightly |
+
+Long soak gate: <release / merge> (default from `quality.long_soak_gate`; `high` is always merge).
 
 ## Acceptance scenarios
 
-See [acceptance.md](acceptance.md). Count: <n> new, <n> intersection.
+See [acceptance.md](acceptance.md). Count: <n> new, <n> intersection; <n> in `gate`, <n> in `nightly`.
 
 ## Open questions for the owner
 

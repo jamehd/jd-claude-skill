@@ -6,8 +6,8 @@ description: Use only in repositories that contain project-board/project.yaml (o
 # Feature Flow
 
 People say **what** they want and check **whether it works**. AI does everything in between.
-Every accepted scenario is re-run on every build, forever. When a limit is hit the AI stops and
-asks instead of looping.
+Every accepted scenario stays in the regression suite forever; verification is proportional to risk
+(`references/tiers.md`). When a limit is hit the AI stops and asks instead of looping.
 
 ## Before anything
 
@@ -24,6 +24,9 @@ asks instead of looping.
 | `/jd:build <ID>` | `references/build.md` |
 | `/jd:accept <ID> ok or notes` | `references/accept.md` |
 | no `project.yaml` | `references/setup.md` |
+
+`references/tiers.md` (risk tiers, scenario suites, feature size, agent cost) applies to
+`/jd:feature` and `/jd:build`.
 
 Plain requests map to these commands. Talk to people in `language.owner`; write files in
 `language.docs`.
@@ -44,7 +47,7 @@ instructions):
 | Agent | Used for |
 |---|---|
 | `jd:qa-runner` | Build verification and nightly regression: runs scenarios and actions, read-only, reports pass/fail with evidence |
-| `jd:security-reviewer` | Independent security review when auth, personal data, payment or uploads changed |
+| `jd:security-reviewer` | Independent security review of `high` tasks and branches (auth, personal data, payment, uploads, `risk.high_paths`) |
 
 ## Data layout (all under the target repository)
 
@@ -103,8 +106,11 @@ anything in `acceptance.forbidden`; a missing tool, credential or service with n
 
 - Crashes, leaks and performance are numeric quality budgets in the brief, measured by actions
   (`references/quality.md`); a budget is a scenario like any other.
-- Every build re-runs every `active` scenario plus the feature's own, then runs every skill in
-  `audits.always` (and `audits.when_schema` when schema or queries changed).
+- Every build verifies once with the gate suite (every `active` scenario in suite `gate`) plus all of
+  the feature's own scenarios, then runs every skill in `audits.always` (and `audits.when_schema`
+  when schema or queries changed). `nightly` scenarios and the long soak run on the schedule in
+  `references/tiers.md`.
+- Each feature and task has a risk tier (`low`, `medium`, `high`) that sets its reviews and checks.
 - One branch per feature (`git.branch_pattern`); integrate only at Gate B: the PR is opened or the merge done by `/jd:accept`, and a merged PR is
   completed by `/jd:accept` or `/jd:next` (`git.integration`: `pull-request` by default, or
   `merge-after-acceptance`).

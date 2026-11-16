@@ -16,13 +16,19 @@ condition, written in the brief, checked by an action, and re-checked forever on
 | Action | When it runs | Pass rule |
 |---|---|---|
 | `actions.test_bench` | Every build | No benchmark slower than `git.main` by more than `quality.bench_regression_pct` |
-| `actions.test_load` | Every build of a feature with a `test_load` budget, and nightly | Every measured value within its budget |
-| `actions.test_soak` | Nightly; in a build only when the feature has a `test_soak` budget and no soak result exists for its branch | Every measured value within its budget; no crash |
+| `actions.test_load` | Every build of a `medium` or `high` feature with a `test_load` budget, and nightly | Every measured value within its budget |
+| `actions.test_soak_short` | Build step 7 of a `medium` or `high` feature with a `test_soak` budget | No crash; trends within budget over the short run |
+| `actions.test_soak` | Nightly on `git.main`; for a feature, at the gate `tiers.md` sets (before merge or before release) | Every measured value within its budget; no crash |
 
 Each action prints the measured values in its output so `jd:qa-runner` can compare them with the
 budgets. A budget whose value does not appear in the output is a failure (`NO MEASUREMENT`).
 A pending quality action is reported as not yet available; a feature whose own budgets depend on
-it cannot pass step 7 unless the feature delivers that action.
+it cannot pass step 7 unless the feature delivers that action. Without `test_soak_short`, step 7
+skips the soak and the long soak becomes a merge gate for that feature.
+
+A budget row names its full-length action (`test_soak`); the short soak is an early warning, not
+the measurement of record. A long soak that fails after acceptance reopens the feature as a counted
+cycle (`accept.md`) or, on `git.main`, becomes a P1 fix task.
 
 ## When a budget fails
 

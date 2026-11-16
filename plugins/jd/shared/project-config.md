@@ -36,6 +36,9 @@ Required by: `feature-flow`, `plan-batch`, board. Everything else runs on defaul
 | `language.docs` | `en` | docs, rescan output |
 | `models.large_task` / `models.small_task` | `opus` / `sonnet` | auto, feature-flow |
 | `limits.fix_attempts` / `rework_rounds` / `features_active` | `3` / `2` / `1` | feature-flow |
+| `limits.feature_new_scenarios` / `feature_tasks` | `8` / `6` | feature-flow (read by the skill, not the shared lib) |
+| `quality.gate_suite_minutes` / `long_soak_gate` | `15` / `release` | feature-flow (read by the skill) |
+| `risk.high_paths` / `risk.high_topics` | `[]` / money, authentication, personal data, uploads, writes to shared or legacy data | feature-flow (read by the skill) |
 | `board.port` | `4400` | board |
 | `board.data_dir` | `project-board/data` | board |
 | `board.branch_prefix` | `board/` | board |

@@ -11,6 +11,10 @@ Only when the input explicitly accepts the feature.
 2. Check the branch is pushed and the report's verification is green. If `git.main` moved since
    the build, rebase and re-run `build.md` step 7 (a counted cycle); a conflict that is not
    mechanical → stop with a stop report.
+   When the long soak gates the merge (`tiers.md`): still running → record the verdict, report when
+   it ends and stop; `/jd:next` continues here when it is done. Failed → a counted cycle: fix,
+   re-run `build.md` step 7, start the soak again, and ask the owner to re-check only the scenarios
+   the fix touched.
 3. Integrate according to `git.integration` (default `pull-request`):
    - `pull-request`: look up an existing open PR for the feature branch
      (`gh pr list --head <branch> --state open --json url`) and reuse it; only when none exists open

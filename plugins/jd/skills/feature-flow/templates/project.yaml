@@ -19,11 +19,14 @@ paths:
 actions:
   test_all: { run: "<unit test command>", pending: true }
   test_integration: { run: "<integration test command>", pending: true }
-  test_scenarios: { run: "<acceptance scenario suite command>", pending: true }
+  test_scenarios: { run: "<gate scenario suite: active scenarios in suite gate + the given feature's>", pending: true }
+  test_scenarios_nightly: { run: "<every scenario, gate and nightly>", pending: true }
+  test_scenarios_only: { run: "<run the named scenario tests: {tests}>", pending: true }
   lint: { run: "<lint command>", pending: true }
   gen_check: { run: "<generated code drift check>", pending: true }
   test_bench: { run: "<benchmarks, compared with git.main>", pending: true }
   test_load: { run: "<load test that prints the measured values>", pending: true }
+  test_soak_short: { run: "<the soak, shortened (e.g. 1 h), same printed values>", pending: true }
   test_soak: { run: "<long-running stability test that prints memory, threads, crashes>", pending: true }
   dev_up: { run: "<start dev dependencies>", pending: true }
   dev_seed: { run: "<load sample data>", pending: true }
@@ -43,11 +46,22 @@ acceptance:
 
 quality:
   bench_regression_pct: 10
+  gate_suite_minutes: 15
+  # When the full-length soak must pass for a medium feature: release (default) or merge.
+  # high features always wait before merge; build restores the old blocking soak.
+  long_soak_gate: release
+
+risk:
+  # A task touching these paths or topics is high risk.
+  high_paths: []
+  high_topics: [money, authentication, personal data, uploads, writes to shared or legacy data]
 
 limits:
   fix_attempts: 3
   rework_rounds: 2
   features_active: 1
+  feature_new_scenarios: 8
+  feature_tasks: 6
 
 git:
   remote: <host/owner/repo>

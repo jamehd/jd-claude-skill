@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: Independent security review of a change set (git range) — authentication, authorization, injection, secrets, personal data, payment integrity, uploads, dependencies and mobile client storage. Read-only; reports findings with severity, file:line, exploit scenario and fix. Use in jd:feature-flow builds when auth, personal data, payment or uploads changed, before merging security-sensitive work, or when asked for a security review.
+description: Independent security review of a change set (git range) — authentication, authorization, injection, secrets, personal data, payment integrity, uploads, dependencies and mobile client storage. Read-only; reports findings with severity, file:line, exploit scenario and fix. Use in jd:feature-flow builds for high-risk tasks and branches (auth, personal data, payment, uploads, risk.high_paths), before merging security-sensitive work, or when asked for a security review.
 tools: Read, Grep, Glob, Bash
 model: opus
 ---

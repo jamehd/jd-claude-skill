@@ -21,12 +21,19 @@
      stability on every user-facing path, long-running process and money path, each with its
      condition and the action that measures it; otherwise "none" with the reason. Add one
      `<ID>-Q<n>` row per budget to `acceptance.md`.
+   - Set the risk tier and its reason, and the suite (`gate` or `nightly`) of every scenario and
+     budget (`tiers.md`). A scenario that must observe a long real-time wait gets a scaled `gate`
+     version and the real-time check in `nightly`.
+   - Size check: more than `limits.feature_new_scenarios` new scenarios → split into features that
+     can each be accepted alone, and offer the split under Open questions.
+   - List every owner step (accounts, credentials, devices, real sites) under "Owner steps" with
+     the step it blocks, so the owner can prepare them at approval.
    - Every decision the docs do not settle goes under Open questions with a recommendation.
    - Use superpowers:brainstorming as self Q&A only; do not run its interactive questions.
 5. Add the scenario IDs to `paths.scenarios` with state `proposed`.
 6. Set `brief-review` in `feature.md` and the status file.
-7. Reply in `language.owner`: goal, scenarios in plain words, open questions; ask for an explicit
-   approval or corrections.
+7. Reply in `language.owner`: goal, risk tier, scenarios in plain words, owner steps, open
+   questions; ask for an explicit approval or corrections.
 
 On explicit approval (words, or the owner typing `/jd:build <ID>`): write
 `Approved by owner: <date>` in the brief and `approvedAt` in `feature.md`, set this feature's

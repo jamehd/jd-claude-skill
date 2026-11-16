@@ -18,7 +18,7 @@ A growing library of personal engineering skills that work across projects: proj
 | `jd:auto` | Autonomous end-to-end delivery: brainstorm, spec, plan, worktree, subagent TDD, review with domain audits, then integration per `git.integration` (PR by default), stopping only for architectural, hard-to-reverse or destructive decisions. Models, audits, design system and e2e notes come from `project.yaml`; runs on defaults without it. Board mode is commit-only. |
 | `jd:plan-batch` | Morning planning pass for the project board: shapes rough intents and backlog items into agent-ready tasks (scope, `needsE2e`, requirement IDs, locked decisions), promoting to `ready` only on explicit operator OK. Requires `project.yaml`. |
 | `jd:project-board` | Sets up and runs the Project Board dashboard (LAN web board that tracks tasks as markdown and dispatches them to headless Claude Code) for a repository, on Windows or Linux. Requires `project-board/project.yaml` and creates it from a template. |
-| `jd:feature-flow` | Feature lifecycle for AI-built projects: the owner gives requirements and accepts, the AI drafts briefs with numbered acceptance scenarios (Gate A), builds with subagents test-first, re-runs every accepted scenario and numeric quality budget (crashes, leaks, performance) plus `jd:error-audit` / `jd:ui-design-audit`, prepares a dev environment for acceptance (Gate B) and merges only after acceptance. Hard limits (3 fix attempts, 2 rework rounds, one active feature by default; configurable in `limits.*`) with stop reports instead of loops. `git.integration` chooses pull-request or merge-after-acceptance. Project values in `project-board/project.yaml`, state in `project-board/data/`. |
+| `jd:feature-flow` | Feature lifecycle for AI-built projects: the owner gives requirements and accepts, the AI drafts briefs with numbered acceptance scenarios (Gate A), builds with subagents test-first, verifies in proportion to risk (tiers `low` / `medium` / `high`: fast `gate` scenarios every build, `nightly` scenarios and the long soak on a schedule or before merge for high risk) with numeric quality budgets (crashes, leaks, performance) plus `jd:error-audit` / `jd:ui-design-audit`, records time and token use per build (`tools/usage-report`), prepares a dev environment for acceptance (Gate B) and merges only after acceptance. Hard limits (3 fix attempts, 2 rework rounds, one active feature by default; configurable in `limits.*`) with stop reports instead of loops. `git.integration` chooses pull-request or merge-after-acceptance. Project values in `project-board/project.yaml`, state in `project-board/data/`. |
 
 | Command | Description |
 |---------|-------------|
@@ -42,6 +42,19 @@ A growing library of personal engineering skills that work across projects: proj
 | `jd:security-reviewer` | Independent, read-only security review (Opus) of a git range: authentication, authorization, injection, secrets, personal data, payment integrity, uploads, client storage, dependencies. Severity-graded findings with exploit steps and fixes; verdict `BLOCK` on Critical/High. Used by `jd:feature-flow` when auth, personal data, payment or uploads change. |
 
 Agents ship in `plugins/jd/agents/` as subagent types `jd:<name>` and are available to any session that has the plugin installed.
+
+## Upgrading to 0.37.0
+
+`jd:feature-flow` verifies in proportion to risk (`references/tiers.md`):
+
+- Briefs and tasks carry a risk tier (`low`, `medium`, `high`); the owner approves the feature's tier at Gate A. `high` tasks get `jd:security-reviewer` at task review, not only at the end.
+- Implementers receive the review rules up front (`CLAUDE.md`, `error-standard.yaml`, matching `jd:security-reviewer` checklist rows) and record a "Self-check" in the task file before review; audits run before verification so findings are fixed in one cycle.
+- Scenarios and budgets carry a suite: `gate` (fast, every build) or `nightly`. New optional actions `test_scenarios_nightly` (all suites) and `test_scenarios_only` (named tests, `{tests}` placeholder) let implementers and fix cycles run only what they touch; `jd:qa-runner` gains `gate`, `targeted` and `nightly` modes and verifies once per build.
+- New action `test_soak_short` runs in builds; the full `test_soak` gates release (default) or merge (`quality.long_soak_gate`; `high` always merge, run while the owner accepts).
+- Briefs list owner steps up front and are split above `limits.feature_new_scenarios` (8) new scenarios or `limits.feature_tasks` (6) tasks.
+- Reports get a "Time and cost" section from `node plugins/jd/tools/usage-report/usage.mjs --repo <repo> --since <rev>`.
+
+Existing projects: add `Suite` columns (missing means `gate`), `risk` and the new `quality`/`limits` keys from `templates/project.yaml`; until the new actions exist, mark them `pending: true` and the old behaviour applies (all scenarios in every build).
 
 ## Upgrading to 0.36.0
 
