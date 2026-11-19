@@ -60,7 +60,14 @@ No mode given: `gate` with a feature ID, `nightly` without.
 6. Quality budgets (`-Q` rows): read the measured value for each budget from its action's output
    and compare it with the budget. A value missing from the output is `NO MEASUREMENT` (a failure).
    For `test_bench`, fail any benchmark slower than on `git.main` by more than
-   `quality.bench_regression_pct` (default 10). Never re-run a quality action to get a better number.
+   `quality.bench_regression_pct` (default 10). Never re-run a quality action to get a better number,
+   with one exception: a timing budget (latency, throughput, duration) that misses its limit by no
+   more than `quality.timing_retry_pct` (default 10) of the limit is measured twice more and judged
+   by the median of the three runs; report all three values. Any other miss fails on the first run.
+   A soak that stops early on a violation is `FAIL` with the values it printed and the hour it
+   stopped at.
+   Before a timing action, check `<paths.data>/measure.lock`: if another feature holds it, report
+   `BLOCKED` (machine busy) for that action instead of measuring on a loaded machine.
 7. If an action cannot start (missing tool, service not running), report `BLOCKED` with the exact
    error. Do not install tools or start services that are not part of a configured action.
 

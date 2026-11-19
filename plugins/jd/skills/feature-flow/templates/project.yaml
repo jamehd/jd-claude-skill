@@ -26,8 +26,8 @@ actions:
   gen_check: { run: "<generated code drift check>", pending: true }
   test_bench: { run: "<benchmarks, compared with git.main>", pending: true }
   test_load: { run: "<load test that prints the measured values>", pending: true }
-  test_soak_short: { run: "<the soak, shortened (e.g. 1 h), same printed values>", pending: true }
-  test_soak: { run: "<long-running stability test that prints memory, threads, crashes>", pending: true }
+  test_soak_short: { run: "<the soak, shortened to quality.soak_short_hours, same printed values>", pending: true }
+  test_soak: { run: "<long-running stability test that prints memory, threads, crashes and stops at the first violation>", pending: true }
   dev_up: { run: "<start dev dependencies>", pending: true }
   dev_seed: { run: "<load sample data>", pending: true }
   dev_run: { run: "<run the app for acceptance>", pending: true }
@@ -47,9 +47,14 @@ acceptance:
 quality:
   bench_regression_pct: 10
   gate_suite_minutes: 15
-  # When the full-length soak must pass for a medium feature: release (default) or merge.
-  # high features always wait before merge; build restores the old blocking soak.
+  # When the full-length soak must pass, for every tier: release (default), merge or build.
   long_soak_gate: release
+  soak_short_hours: 2
+  soak_check_minutes: 60
+  # A budget measured above this share of its limit is raised at Gate A.
+  headroom_pct: 80
+  # A timing budget missed by at most this share is re-measured twice and judged by the median.
+  timing_retry_pct: 10
 
 risk:
   # A task touching these paths or topics is high risk.
@@ -60,6 +65,7 @@ limits:
   fix_attempts: 3
   rework_rounds: 2
   features_active: 1
+  features_waiting: 2
   feature_new_scenarios: 8
   feature_tasks: 6
 

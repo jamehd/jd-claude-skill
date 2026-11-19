@@ -12,7 +12,9 @@ superpowers:using-git-worktrees, and never merge here. Merging happens only in `
   the owner typed `/jd:build <ID>` themselves, that is the approval: set `approvedAt`, write
   `Approved by owner: <date>` in the brief, set its scenarios to `approved`. Otherwise ask and stop.
 - `acceptance.md` exists and has at least one scenario.
-- No other feature is in `building`, `acceptance` or `stopped` (`limits.features_active`).
+- Fewer than `limits.features_active` other features are in `building` or `stopped`, and fewer than
+  `limits.features_waiting` are in `acceptance`, none of which this feature `needs`
+  (`tiers.md`, "Pipelining features").
 - Every `needs` ID is done.
 - An action with `pending: true` is allowed only when the brief's "Delivers" section names it.
 
@@ -42,6 +44,9 @@ Write "Current step: build <n>" to `paths.status` as each step starts.
      harnesses, load and soak tooling are their own tasks.
    - More than `limits.feature_tasks` tasks → stop and propose a split to the owner, unless the
      brief records that the owner kept the feature whole.
+   - Process debt first (`tiers.md`): a missing `test_scenarios_only` or `test_scenarios_nightly`,
+     a gate suite slower than `quality.gate_suite_minutes`, or a soak that cannot fail fast gets
+     its own task ahead of the product tasks, unless the brief records that the owner deferred it.
    Quote titles and values that contain `:` in the frontmatter, or the board skips the file.
 4. Write one automated test per scenario and per quality budget in `acceptance.md` first; confirm they fail; record test
    names in `acceptance.md` and `paths.scenarios`. Put each test in the suite its row names
@@ -63,13 +68,17 @@ Write "Current step: build <n>" to `paths.status` as each step starts.
    - On failure use superpowers:systematic-debugging and increment that task's `attempts`; check
      the limit before every new attempt.
    - When this feature creates an action named in "Delivers", run it once; if it works, set its
-     `pending: false` in `project.yaml` immediately so the following steps use it.
+     `pending: false` in `project.yaml` immediately so the following steps use it. A measuring tool
+     gets the short dry run in `quality.md` before its task is done.
 6. Whole-branch review, by the feature's tier: `low` skips it (task reviews suffice); `medium`
    runs superpowers:requesting-code-review once over the branch; `high` also dispatches
    `jd:security-reviewer` with the branch range (`git merge-base <git.main> HEAD`..`HEAD`) and the
    brief. Critical/High findings must be fixed; fixing findings is a counted cycle. Run the skills
    in `audits.always` here too, so all findings are fixed in one cycle before verification.
-7. Rebase on `git.main`, then verify once; all must pass:
+   Every review of this feature ends here: after step 6 the code is frozen except for fixes, and
+   each fix is reviewed on its own diff before anything is re-measured (`tiers.md`, "Order").
+7. Rebase on `git.main`, then verify once, fast checks before measurements (`tiers.md`, "Order");
+   take `measure.lock` for the measurements; all must pass:
    - Dispatch the `jd:qa-runner` agent in gate mode with this feature's ID, its tier and the `when`
      conditions that hold. It runs the gate suite plus every scenario of this feature, then
      `actions.test_all`, `actions.test_integration`, `actions.lint`, `actions.gen_check`, the
@@ -79,12 +88,15 @@ Write "Current step: build <n>" to `paths.status` as each step starts.
    - The audits from step 6 are already done; rerun them only on code changed since.
      The UI audit uses `design_system` and records "no UI surface in changes" when there is none.
      Skills in `audits.when_schema` when schema or queries changed.
-   - A failure is a counted cycle: fix, rerun the failed and touched scenarios with
-     `actions.test_scenarios_only`, then dispatch `jd:qa-runner` in gate mode once more.
+   - A failure is a counted cycle: fix, review the fix's diff (code review; plus
+     `jd:security-reviewer` when the feature or the touched task is `high`), rerun the failed and
+     touched scenarios with `actions.test_scenarios_only`, then dispatch `jd:qa-runner` in gate mode
+     once more. Measurements that passed and whose code path the fix did not touch are kept.
    - List Medium/Low findings in the report and add follow-up features or tasks.
    - A still-pending action is reported as not yet available, never as passed.
-   - When the long soak gates this feature (`tiers.md`), start `actions.test_soak` on the verified
-     commit in the background and continue; its result is checked in `accept.md`.
+   - The full `test_soak` does not run here by default: it runs nightly on `git.main` and gates the
+     release (`tiers.md`). Only when the brief chose `merge`, start it on the verified commit in the
+     background and continue; its result is checked in `accept.md`.
 8. Commit with `git.commit_footer`; push the branch.
 9. Start the acceptance environment (`actions.dev_up`, `actions.dev_seed`, `actions.dev_run`) and
    confirm the try-it steps work; any fix here is a counted cycle and repeats step 7.
@@ -96,3 +108,6 @@ Write "Current step: build <n>" to `paths.status` as each step starts.
 11. Set `acceptance` in `feature.md` and the status file. Reply with results, how to start the
     environment and the try-it guide; ask for `/jd:accept <ID> ok` or notes per scenario. When a
     long soak is running for this feature, say when it ends and that the merge waits for it.
+    Otherwise say that the full soak runs nightly after merge and gates the release. Then, when the
+    queue has a next feature whose brief is approved, continue with it (`tiers.md`, "Pipelining
+    features").

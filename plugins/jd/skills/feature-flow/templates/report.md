@@ -27,7 +27,9 @@
 
 Benchmark comparison with `git.main`: <worst change in %, threshold `quality.bench_regression_pct`>.
 
-Long soak: <not required / passed <date> / running, ends <time> / gate: release>.
+Short soak: <not required / passed, <hours> h, <date>>.
+Long soak: <not required / gate: release, runs nightly after merge / passed <date> / running, ends <time>>.
+Measurements kept after a fix: <none / action: why the fix did not touch its path>.
 
 ## Time and cost
 

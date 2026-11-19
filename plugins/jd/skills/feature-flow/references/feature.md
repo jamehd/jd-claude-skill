@@ -20,7 +20,11 @@
    - Fill "Quality budgets" (see `quality.md`): numeric budgets for latency, resources and
      stability on every user-facing path, long-running process and money path, each with its
      condition and the action that measures it; otherwise "none" with the reason. Add one
-     `<ID>-Q<n>` row per budget to `acceptance.md`.
+     `<ID>-Q<n>` row per budget to `acceptance.md`. A budget whose earlier measurement is above
+     `quality.headroom_pct` of its limit goes under Open questions (`quality.md`).
+   - Long soak gate: `release` unless the owner asks for `merge`. When the feature touches money,
+     shared or legacy data, name the feature flag or switch that keeps it off in production until
+     its release gate passes, or write that the project has none.
    - Set the risk tier and its reason, and the suite (`gate` or `nightly`) of every scenario and
      budget (`tiers.md`). A scenario that must observe a long real-time wait gets a scaled `gate`
      version and the real-time check in `nightly`.

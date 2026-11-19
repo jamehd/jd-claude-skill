@@ -18,7 +18,7 @@ A growing library of personal engineering skills that work across projects: proj
 | `jd:auto` | Autonomous end-to-end delivery: brainstorm, spec, plan, worktree, subagent TDD, review with domain audits, then integration per `git.integration` (PR by default), stopping only for architectural, hard-to-reverse or destructive decisions. Models, audits, design system and e2e notes come from `project.yaml`; runs on defaults without it. Board mode is commit-only. |
 | `jd:plan-batch` | Morning planning pass for the project board: shapes rough intents and backlog items into agent-ready tasks (scope, `needsE2e`, requirement IDs, locked decisions), promoting to `ready` only on explicit operator OK. Requires `project.yaml`. |
 | `jd:project-board` | Sets up and runs the Project Board dashboard (LAN web board that tracks tasks as markdown and dispatches them to headless Claude Code) for a repository, on Windows or Linux. Requires `project-board/project.yaml` and creates it from a template. |
-| `jd:feature-flow` | Feature lifecycle for AI-built projects: the owner gives requirements and accepts, the AI drafts briefs with numbered acceptance scenarios (Gate A), builds with subagents test-first, verifies in proportion to risk (tiers `low` / `medium` / `high`: fast `gate` scenarios every build, `nightly` scenarios and the long soak on a schedule or before merge for high risk) with numeric quality budgets (crashes, leaks, performance) plus `jd:error-audit` / `jd:ui-design-audit`, records time and token use per build (`tools/usage-report`), prepares a dev environment for acceptance (Gate B) and merges only after acceptance. Hard limits (3 fix attempts, 2 rework rounds, one active feature by default; configurable in `limits.*`) with stop reports instead of loops. `git.integration` chooses pull-request or merge-after-acceptance. Project values in `project-board/project.yaml`, state in `project-board/data/`. |
+| `jd:feature-flow` | Feature lifecycle for AI-built projects: the owner gives requirements and accepts, the AI drafts briefs with numbered acceptance scenarios (Gate A), builds with subagents test-first, verifies in proportion to risk (tiers `low` / `medium` / `high`: fast `gate` scenarios and a short fail-fast soak every build; `nightly` scenarios and the full soak gate the release, not the merge; reviews finish before long runs) with numeric quality budgets (crashes, leaks, performance) plus `jd:error-audit` / `jd:ui-design-audit`, records time and token use per build (`tools/usage-report`), prepares a dev environment for acceptance (Gate B) and merges only after acceptance. Hard limits (3 fix attempts, 2 rework rounds, one active feature by default; configurable in `limits.*`) with stop reports instead of loops. `git.integration` chooses pull-request or merge-after-acceptance. Project values in `project-board/project.yaml`, state in `project-board/data/`. |
 
 | Command | Description |
 |---------|-------------|
@@ -42,6 +42,19 @@ A growing library of personal engineering skills that work across projects: proj
 | `jd:security-reviewer` | Independent, read-only security review (Opus) of a git range: authentication, authorization, injection, secrets, personal data, payment integrity, uploads, client storage, dependencies. Severity-graded findings with exploit steps and fixes; verdict `BLOCK` on Critical/High. Used by `jd:feature-flow` when auth, personal data, payment or uploads change. |
 
 Agents ship in `plugins/jd/agents/` as subagent types `jd:<name>` and are available to any session that has the plugin installed.
+
+## Upgrading to 0.38.0
+
+`jd:feature-flow` is fast to merge and strict to release (`references/tiers.md`, `references/quality.md`):
+
+- The full `test_soak` gates the **release** for every tier, `high` included; merge needs the gate suite, reviews and `test_soak_short` (at least `quality.soak_short_hours`, default 2). New "Release gate" section: a release needs a passing nightly run and full soak on the release commit; failures on `git.main` become release-blocking tasks listed under "Release readiness" in the status file. A brief can still choose `merge` with the owner's approval and names the production switch for money or legacy paths.
+- Soaks fail fast: budgets are checked every `quality.soak_check_minutes` (default 60) and the run stops at the first violation.
+- Order is enforced: all reviews finish before load and soak runs; a fix is reviewed on its own diff before anything is re-measured, and passed measurements on untouched paths are kept.
+- Measuring tools get a short dry run in the task that builds them; budgets measured above `quality.headroom_pct` (80) of their limit are raised at Gate A; a timing budget missed by at most `quality.timing_retry_pct` (10) is re-measured twice and judged by the median (`jd:qa-runner`).
+- Missing `test_scenarios_only` / `test_scenarios_nightly` or a slow gate suite becomes a first task of the next build.
+- Pipelining: `limits.features_active` counts only `building` and `stopped`; up to `limits.features_waiting` (2) features may wait in `acceptance` while the next one builds. Timing measurements take `<paths.data>/measure.lock` so they never run on a busy machine.
+
+Existing projects: add the new `quality` keys and `limits.features_waiting` from `templates/project.yaml`, a "Release readiness" section to the status file, and make `test_soak_short` run for `soak_short_hours`.
 
 ## Upgrading to 0.37.0
 

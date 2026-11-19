@@ -12,7 +12,7 @@ Read `project.yaml`, `paths.status` and every `feature.md`. Decide from files on
 | A feature `building` | Continue `build.md` from "Current step" and the first unfinished task |
 | A feature `acceptance` whose ok verdict waits for a long soak | Read the soak result and continue `accept.md` step 2; still running → report when it ends |
 | A feature `acceptance` with a PR link in its report (`git.integration: pull-request`) | Run `gh pr view` and act as `accept.md` step 3 says: `MERGED` finish steps 4-7; `OPEN` report it; `CLOSED` unmerged stop with a stop report; `gh` unavailable ask the person to confirm the merge |
-| A feature `acceptance` | Remind how to try it and that `/jd:accept` is needed; then, if the next feature in the queue is `idea`, run `feature.md` for it (drafting only) |
+| A feature `acceptance` | Remind how to try it and that `/jd:accept` is needed; then take the next feature in the queue that does not `need` it: approved → continue `build.md` (within the limits in `tiers.md`, "Pipelining features"); `idea` → run `feature.md` (drafting only) |
 | A feature `brief-review` | Remind the owner what needs approval; do not build |
 | Nothing active | Take the first `idea` in the queue whose `needs` are all done and run `feature.md` |
 | Queue empty | Run `status.md` and ask for the next requirement |
@@ -23,4 +23,7 @@ in the stop report. Counters themselves are never reset. `Rework round` resets o
 was corrected and re-approved.
 
 Never infer approval or acceptance from vague messages. A `stopped` feature still counts toward
-`limits.features_active`. Update `paths.status` before ending.
+`limits.features_active`; an `acceptance` feature counts toward `limits.features_waiting` only.
+When a nightly or full-soak result on `git.main` arrived since the last run, update "Release
+readiness" in the status file and create release-blocking tasks for failures (`tiers.md`, "Release
+gate"). Update `paths.status` before ending.

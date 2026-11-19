@@ -14,6 +14,13 @@ Read this first in every conversation. Updated at the end of every feature-flow 
 | Item | Who | What is needed |
 |---|---|---|
 
+## Release readiness
+
+Last nightly on `git.main`: <commit, date, PASS / FAIL>. Last full soak: <commit, date, PASS / FAIL>.
+
+| Item | State | Blocks release |
+|---|---|---|
+
 ## Last stop report
 
 None.

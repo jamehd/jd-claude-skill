@@ -96,7 +96,8 @@ and owner-action IDs that must be done first.
 | Fix attempts per technical task (`attempts` vs `attemptLimit`) | `limits.fix_attempts` | Stop with a stop report |
 | Feature fix-and-verify cycles (`featureFixAttempts` vs `featureFixLimit`) | `limits.fix_attempts` | Stop with a stop report |
 | Rework rounds after owner rejection | `limits.rework_rounds` | Re-examine the brief with the owner instead of changing code |
-| Features in `building`, `acceptance` or `stopped` at once | `limits.features_active` | Draft the next brief only |
+| Features in `building` or `stopped` at once | `limits.features_active` | Draft the next brief only |
+| Features in `acceptance` at once (waiting for owner, PR or soak) | `limits.features_waiting` (2) | Draft the next brief only |
 
 Stop immediately, regardless of counters, for: architecture or contracts not fixed by the
 project's design docs; irreversible data actions; deleting work not created in this run;
@@ -110,6 +111,9 @@ anything in `acceptance.forbidden`; a missing tool, credential or service with n
   the feature's own scenarios, then runs every skill in `audits.always` (and `audits.when_schema`
   when schema or queries changed). `nightly` scenarios and the long soak run on the schedule in
   `references/tiers.md`.
+- Fast to merge, strict to release: merge needs the gate suite, reviews and short measurements;
+  the nightly suite and the full soak gate the release (`references/tiers.md`, "Release gate").
+  Reviews finish before long runs; a fix is reviewed before anything is re-measured.
 - Each feature and task has a risk tier (`low`, `medium`, `high`) that sets its reviews and checks.
 - One branch per feature (`git.branch_pattern`); integrate only at Gate B: the PR is opened or the merge done by `/jd:accept`, and a merged PR is
   completed by `/jd:accept` or `/jd:next` (`git.integration`: `pull-request` by default, or

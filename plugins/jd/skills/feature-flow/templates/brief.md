@@ -56,7 +56,8 @@ Write "none" with the reason when the feature has no performance, resource or st
 | resources | <process> | <e.g. CPU < 2 %, RAM < 100 MB> | <target hardware, duration> | <test_load / test_soak> | gate / nightly |
 | stability | <process or app> | <e.g. no crash, memory and thread count flat> | <e.g. 24 h with simulated traffic> | <test_soak> | nightly |
 
-Long soak gate: <release / merge> (default from `quality.long_soak_gate`; `high` is always merge).
+Long soak gate: <release / merge> (default from `quality.long_soak_gate`; `merge` only when the owner asks).
+Production switch: <feature flag or switch that keeps this off in production until the release gate passes / none>.
 
 ## Acceptance scenarios
 
