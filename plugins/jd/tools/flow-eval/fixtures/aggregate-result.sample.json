@@ -1,0 +1,152 @@
+{
+  "schemaVersion": 1,
+  "claudeVersion": "2.1.310",
+  "startedAt": "2026-11-20T16:30:11.087Z",
+  "durationSeconds": 33,
+  "costUsd": 0.11867269999999999,
+  "partial": false,
+  "suite": {
+    "root": "/mnt/c/eval-staging/jd",
+    "ablation": "with-without",
+    "threshold": 0,
+    "concurrency": 1,
+    "plugins": [
+      {
+        "name": "jd",
+        "version": "0.38.0",
+        "path": "/mnt/c/eval-staging/jd"
+      },
+      {
+        "name": "superpowers",
+        "version": "7.0.2",
+        "path": "/mnt/c/eval-staging/jd/.eval-deps/superpowers"
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "smoke",
+      "dir": "evals/smoke",
+      "source": "mixed",
+      "promptMarkdown": "Which superpowers skill reviews a finished task? Answer with its name.",
+      "runsPerCase": 1,
+      "timeoutSeconds": 300,
+      "maxTurns": 6,
+      "graders": [
+        {
+          "name": "states-skill-name",
+          "type": "llm",
+          "weight": 1,
+          "graderMarkdown": "PASS if the response states the name of a skill that reviews a finished task (for example requesting-code-review).\nFAIL if the response names no skill or says it does not know.\n",
+          "config": {
+            "criteria": "PASS if the response states the name of a skill that reviews a finished task (for example requesting-code-review).\nFAIL if the response names no skill or says it does not know.\n",
+            "focus": "last_message"
+          }
+        },
+        {
+          "name": "mentions-skill",
+          "type": "regex",
+          "weight": 1,
+          "config": {
+            "target": "last_message",
+            "pattern": "requesting-code-review",
+            "flags": "",
+            "match": "contains"
+          }
+        }
+      ],
+      "arms": {
+        "with": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 1,
+            "costUsd": 0.072264,
+            "judgeCostUsd": 0.000072,
+            "durationSeconds": 16,
+            "startedAt": "2026-11-20T16:30:11.478Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-akPMUG/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "states-skill-name",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [
+                  true,
+                  true,
+                  true
+                ],
+                "evidence": "The skill is **superpowers:requesting-code-review**. Use it when you finish a task or major feature, or before merging, to check that the work meets requirements."
+              },
+              {
+                "name": "mentions-skill",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched requesting-code-review",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ],
+        "without": [
+          {
+            "score": 1,
+            "passed": true,
+            "turns": 1,
+            "costUsd": 0.0464087,
+            "judgeCostUsd": 0.00009269999999999999,
+            "durationSeconds": 17,
+            "startedAt": "2026-11-20T16:30:27.697Z",
+            "error": null,
+            "tracePath": "/tmp/claude-eval-WHrfAq/out/trace.jsonl",
+            "skippedPaidGraders": false,
+            "graders": [
+              {
+                "name": "states-skill-name",
+                "passed": true,
+                "weight": 1,
+                "explanation": "judge votes: PASS PASS PASS",
+                "withOnly": false,
+                "scored": true,
+                "judgeVotes": [
+                  true,
+                  true,
+                  true
+                ],
+                "evidence": "The skill is **`requesting-code-review`**. Its description says to use it when you finish a task or major feature, or before merging. It sends a code-reviewer subagent to check that the work meets the requirements.\n\nThe superpowers plugin isn't installed in this session, so I can't run it here. I'm answering from memory of the obra/superpowers plugin, not from the installed version."
+              },
+              {
+                "name": "mentions-skill",
+                "passed": true,
+                "weight": 1,
+                "explanation": "matched requesting-code-review",
+                "withOnly": false,
+                "scored": true
+              }
+            ]
+          }
+        ]
+      },
+      "aggregates": {
+        "score": 1,
+        "passRate": 1,
+        "scoreWithout": 1,
+        "passRateWithout": 1,
+        "delta": 0
+      }
+    }
+  ],
+  "aggregates": {
+    "casesTotal": 1,
+    "casesPassed": 1,
+    "overallScore": 1,
+    "overallPassRate": 1,
+    "meanDelta": 0
+  }
+}
