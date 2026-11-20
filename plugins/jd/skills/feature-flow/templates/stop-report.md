@@ -3,6 +3,7 @@
 | Field | Value |
 |---|---|
 | Reason | <limit reached / STOP decision / missing tool or credential> |
+| Reason category | <slug from references/reasons.md> |
 | Who must act | <owner / developer / tester> |
 | Counter | <Fix attempts 3/3, or Rework round 2/2> |
 

@@ -34,13 +34,15 @@ Only when the input explicitly accepts the feature.
 6. `feature.md` → `done`; the status file names the next feature in the queue. When the feature has
    a `test_soak` budget and its soak gates the release, add it under "Release readiness" as
    waiting for the nightly full soak.
-7. Reply with a one-line confirmation (and the PR link when one was opened) and the suggested next
+7. Run `node <plugin>/tools/flow-metrics/metrics.mjs --repo <repository root>` (`<plugin>` is two folders
+   above this skill) and commit the updated `metrics.md`.
+8. Reply with a one-line confirmation (and the PR link when one was opened) and the suggested next
    command.
 
 ## Verdict with notes
 
-1. Record each note against its scenario; increment `reworkRound` in `feature.md` and the report.
-2. Within `limits.rework_rounds`: add a rework history row, set `building`, continue with
+1. Record each note against its scenario, with a reason slug from `references/reasons.md`; increment `reworkRound` in `feature.md` and the report.
+2. Within `limits.rework_rounds`: add a rework history row (including its Reason column), set `building`, continue with
    `build.md` limited to the notes. Under `pull-request`, keep the existing PR open: push the
    rework commits to the same feature branch and note the round in the PR.
 3. Beyond `limits.rework_rounds`: change no code. Set `stopped`, write a stop report comparing the

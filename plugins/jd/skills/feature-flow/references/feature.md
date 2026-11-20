@@ -10,7 +10,8 @@
 3. Check `needs`. Each ID is looked up among features and owner actions; an **unknown** ID →
    report it and stop. A need that is not done → report what is missing, propose an order, stop.
    Exception: a feature need in `building` or `acceptance` allows drafting (never building).
-4. Draft `brief.md` and `acceptance.md` from the templates. If a `brief.md` already exists,
+4. Write `pluginVersion` in `feature.md` from `<plugin>/.claude-plugin/plugin.json` (`<plugin>` is two folders above
+   this skill). Draft `brief.md` and `acceptance.md` from the templates. If a `brief.md` already exists,
    keep its content (goal, checks, "Delivers", needs) and merge it into the template structure
    instead of overwriting it.
    - Use the owner's words, the design docs in `paths.design_docs`, and existing scenarios.
@@ -38,6 +39,9 @@
 6. Set `brief-review` in `feature.md` and the status file.
 7. Reply in `language.owner`: goal, risk tier, scenarios in plain words, owner steps, open
    questions; ask for an explicit approval or corrections.
+
+Every owner correction before approval adds a row to `## Brief revisions` in `feature.md`
+(round, date, the correction, a slug from `references/reasons.md`).
 
 On explicit approval (words, or the owner typing `/jd:build <ID>`): write
 `Approved by owner: <date>` in the brief and `approvedAt` in `feature.md`, set this feature's

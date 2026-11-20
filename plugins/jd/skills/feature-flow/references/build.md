@@ -28,12 +28,15 @@ superpowers:using-git-worktrees, and never merge here. Merging happens only in `
 - Counters are never reset. When a counter reaches its limit: write a stop report
   (`templates/stop-report.md`) into the task file or report and into `paths.status`, set
   `stoppedFrom` to the current status, set `stopped`, tell the person named in it, and end.
+- Every stop report names a reason category from `references/reasons.md` and adds a row to
+  `## Stops` in `feature.md` (date, step, slug, counter).
 
 ## Steps
 
 Write "Current step: build <n>" to `paths.status` as each step starts.
 
-1. Set `building` in `feature.md` and the status file. On rework, read the report's verdict table
+1. Set `building` in `feature.md` and the status file; refresh `pluginVersion` from
+   `<plugin>/.claude-plugin/plugin.json` (`<plugin>` is two folders above this skill). On rework, read the report's verdict table
    and rework history first; change only what the notes require.
 2. Git: if the folder is not a repository, initialise it on `git.main`, commit the existing files,
    push to `git.remote`. Then create or switch to `git.branch_pattern`, based on `git.main`.
@@ -104,7 +107,7 @@ Write "Current step: build <n>" to `paths.status` as each step starts.
     update it in place and keep `Rework round` and the rework history. Fill "Time and cost" with
     `node <plugin>/tools/usage-report/usage.mjs --repo <repository root> --since <first commit of the branch>`
     (`<plugin>` is two folders above this skill), and the gate suite duration against
-    `quality.gate_suite_minutes`.
+    `quality.gate_suite_minutes`. Fill the `Plugin version` row from `pluginVersion`.
 11. Set `acceptance` in `feature.md` and the status file. Reply with results, how to start the
     environment and the try-it guide; ask for `/jd:accept <ID> ok` or notes per scenario. When a
     long soak is running for this feature, say when it ends and that the merge waits for it.

@@ -1,7 +1,7 @@
 {
   "name": "jd",
   "description": "Personal engineering skill library by jamehd: audits (UI, errors, database), error-system architect, autonomous delivery (jd:auto), feature lifecycle with acceptance gates (jd:feature-flow), a project board with batch planning, and a requirements-drift hook. Project values come from project-board/project.yaml.",
-  "version": "0.38.0",
+  "version": "0.39.0",
   "author": {
     "name": "jamehd"
   },

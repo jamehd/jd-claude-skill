@@ -5,6 +5,7 @@
 | Rework round | 0/<limits.rework_rounds> |
 | Feature fix attempts | 0/<featureFixLimit> |
 | Branch | feat/<ID>-<slug> |
+| Plugin version | <jd version> |
 | Build date | <date> |
 | Environment | <from acceptance.environment in project.yaml> |
 
@@ -74,5 +75,5 @@ Copied from [acceptance.md](acceptance.md), one block per scenario.
 
 Rework history:
 
-| Round | Date | Notes from owner | Change made |
-|---|---|---|---|
+| Round | Date | Notes from owner | Reason | Change made |
+|---|---|---|---|---|
