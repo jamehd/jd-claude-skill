@@ -16,8 +16,7 @@ function git(repo, args) {
 
 function earliestCommit(repo, file, needle) {
   try {
-    const first = git(repo, ['log', '--reverse', '--format=%cI', `-S${needle}`, '--', file]).split('
-')[0].trim();
+    const first = git(repo, ['log', '--reverse', '--format=%cI', `-S${needle}`, '--', file]).split('\n')[0].trim();
     return first || null;
   } catch { return null; }
 }
@@ -152,7 +151,7 @@ export function featureUsage(repo, main, id, projectsDir, doneAt) {
   let since;
   let lastCommitAt;
   try {
-    since = git(repo, ['log', `${main}..${branch}`, '--reverse', '--format=%cI']).split(String.fromCharCode(10))[0].trim();
+    since = git(repo, ['log', `${main}..${branch}`, '--reverse', '--format=%cI']).split('\n')[0].trim();
     lastCommitAt = git(repo, ['log', '-1', '--format=%cI', branch]).trim();
   } catch { return null; }
   if (!since) return null;
