@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { statusDates, postMergeFixes, summarize, renderMarkdown } from './metrics.mjs';
+import { statusDates, postMergeFixes, findBranch, mentionsId, parseApprovedAt, summarize, renderMarkdown } from './metrics.mjs';
 
 let hasGit = true;
 try { execFileSync('git', ['--version'], { stdio: 'ignore' }); } catch { hasGit = false; }
@@ -85,4 +85,25 @@ test('renders both tables', () => {
   const md = renderMarkdown({ rows, summary: summarize(rows) });
   assert.match(md, /\| FND-9 \|/);
   assert.match(md, /\| 0\.39\.0 \|/);
+});
+
+gitTest('does not match a longer id in post-merge fixes', () => {
+  const repo = newRepo();
+  commit(repo, 'a.txt', '1', 'feat: merge', '2026-01-01T00:00:00+00:00');
+  commit(repo, 'a.txt', '2', 'fix: FND-10 other', '2026-01-02T00:00:00+00:00');
+  assert.equal(postMergeFixes(repo, 'main', 'FND-1', '2026-01-01T00:00:00+00:00'), 0);
+  assert.equal(mentionsId('fix(x): FND-1 thing', 'FND-1'), true);
+});
+
+gitTest('picks the exact feature branch', () => {
+  const repo = newRepo();
+  commit(repo, 'a.txt', '1', 'init', '2026-01-01T00:00:00+00:00');
+  git(repo, ['branch', 'feat/FND-10-y']);
+  git(repo, ['branch', 'feat/FND-1-x']);
+  assert.equal(findBranch(repo, 'FND-1'), 'feat/FND-1-x');
+  assert.equal(findBranch(repo, 'FND-2'), null);
+});
+
+test('treats a date-only approvedAt as local midnight', () => {
+  assert.equal(parseApprovedAt('2026-11-13'), new Date(2026, 10, 13).getTime());
 });

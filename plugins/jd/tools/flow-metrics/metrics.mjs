@@ -28,6 +28,16 @@ export function statusDates(repo, featureFile) {
   };
 }
 
+export function mentionsId(text, id) {
+  const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return new RegExp(`(^|[^A-Za-z0-9])${escaped}($|[^A-Za-z0-9])`, 'i').test(text);
+}
+
+export function parseApprovedAt(value) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value ?? '').trim());
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() : Date.parse(value);
+}
+
 export function postMergeFixes(repo, main, id, doneAt) {
   if (!doneAt) return 0;
   const after = Date.parse(doneAt);
@@ -36,7 +46,7 @@ export function postMergeFixes(repo, main, id, doneAt) {
   return out.split('\n').filter(Boolean).filter((line) => {
     const [when, ...rest] = line.split('\t');
     const subject = rest.join('\t');
-    return Date.parse(when) > after && /^fix/i.test(subject) && subject.includes(id);
+    return Date.parse(when) > after && /^fix/i.test(subject) && mentionsId(subject, id);
   }).length;
 }
 
@@ -89,10 +99,15 @@ function readIfExists(file) {
   return existsSync(file) ? readFileSync(file, 'utf8') : undefined;
 }
 
-function findBranch(repo, id) {
+export function findBranch(repo, id) {
   try {
-    const names = git(repo, ['branch', '-a', '--format=%(refname:short)']).split('\n').map((s) => s.trim()).filter(Boolean);
-    return names.find((n) => n.toLowerCase().includes(id.toLowerCase())) ?? null;
+    const refs = git(repo, ['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/remotes']).split('
+').map((r) => r.trim()).filter(Boolean);
+    const matches = (prefix) => refs.filter((r) => r.startsWith(prefix) && !r.endsWith('/HEAD')).map((r) => r.slice(prefix.length)).filter((n) => mentionsId(n, id)).sort();
+    const local = matches('refs/heads/');
+    if (local.length) return local[0];
+    const remote = matches('refs/remotes/');
+    return remote.length ? remote[0] : null;
   } catch { return null; }
 }
 
@@ -124,7 +139,7 @@ export function buildRows(repo, config, projectsDir) {
     if (!row.id) row.id = id;
     const rel = `${config.paths.features}/${id}/feature.md`.replace(/\\/g, '/');
     const { acceptanceAt, doneAt } = statusDates(repo, rel);
-    const approved = Date.parse(row.approvedAt);
+    const approved = parseApprovedAt(row.approvedAt);
     row.acceptanceAt = acceptanceAt;
     row.doneAt = doneAt;
     row.hoursToAcceptance = acceptanceAt && !Number.isNaN(approved) ? (Date.parse(acceptanceAt) - approved) / 3.6e6 : null;
