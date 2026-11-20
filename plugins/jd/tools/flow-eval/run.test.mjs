@@ -28,6 +28,13 @@ test('a new superpowers version changes the key', () => {
   assert.notEqual(historyKey(base), historyKey({ ...base, superpowersVersion: '7.0.3' }));
 });
 
+test('a different model changes the key and is never reused', () => {
+  const a = historyKey({ ...base, model: 'sonnet' });
+  assert.notEqual(a, historyKey(base));
+  assert.equal(historyKey(base), historyKey({ ...base, model: undefined }));
+  assert.equal(findReusable([{ key: historyKey(base), partial: false }], a), undefined);
+});
+
 test('appendHistory creates the file and appends', () => {
   const file = join(tmp('fe-h-'), 'nested', 'history.json');
   appendHistory(file, { key: 'a' });

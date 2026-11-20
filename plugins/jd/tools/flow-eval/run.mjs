@@ -10,8 +10,8 @@ const WSL_DISTRO = 'Ubuntu-24.04';
 const EVAL_TIMEOUT_MS = 2 * 60 * 60 * 1000;
 const HERE = fileURLToPath(import.meta.url);
 
-export function historyKey({ pluginRef, pluginVersion, superpowersVersion, casesHash }) {
-  return [pluginRef, pluginVersion, superpowersVersion, casesHash].join('|');
+export function historyKey({ pluginRef, pluginVersion, superpowersVersion, casesHash, model }) {
+  return [pluginRef, pluginVersion, superpowersVersion, casesHash, model ?? 'default'].join('|');
 }
 
 export function findReusable(history, key) {
@@ -110,8 +110,8 @@ function resultsFolder(evalsRoot, version) {
   return dir;
 }
 
-function entryFor(ref, staged, superpowers, result) {
-  const base = { pluginRef: ref, pluginVersion: staged.pluginVersion, superpowersVersion: superpowers.version, casesHash: staged.casesHash };
+function entryFor(ref, staged, superpowers, model, result) {
+  const base = { pluginRef: ref, pluginVersion: staged.pluginVersion, superpowersVersion: superpowers.version, casesHash: staged.casesHash, model: model ?? 'default' };
   const incomplete = result.partial || Object.values(result.cases).some((c) => c.error);
   return { key: historyKey(base), ...base, date: new Date().toISOString(), ...result, partial: incomplete };
 }
@@ -139,7 +139,7 @@ export async function main(argv, deps = {}) {
 
   try {
     const oldStage = stageRef(oldRef);
-    const oldKey = historyKey({ pluginRef: oldRef, pluginVersion: oldStage.pluginVersion, superpowersVersion: superpowers.version, casesHash: oldStage.casesHash });
+    const oldKey = historyKey({ pluginRef: oldRef, pluginVersion: oldStage.pluginVersion, superpowersVersion: superpowers.version, casesHash: oldStage.casesHash, model: o.model });
     const reused = findReusable(loadHistory(historyFile), oldKey);
     let oldResult;
     if (reused) {
@@ -151,7 +151,7 @@ export async function main(argv, deps = {}) {
       const oldJson = runEval(oldStage.dir, oldOut);
       oldResult = readResult(oldJson);
       writeFileSync(join(oldOut, 'aggregate-result.json'), JSON.stringify(oldJson, null, 2) + '\n');
-      appendHistory(historyFile, entryFor(oldRef, oldStage, superpowers, oldResult));
+      appendHistory(historyFile, entryFor(oldRef, oldStage, superpowers, o.model, oldResult));
     }
 
     const newStage = stageRef(newRef);
@@ -159,7 +159,7 @@ export async function main(argv, deps = {}) {
     const resultsDir = resultsFolder(evalsRoot, newStage.pluginVersion);
     const newJson = runEval(newStage.dir, resultsDir);
     const newResult = readResult(newJson);
-    appendHistory(historyFile, entryFor(newRef, newStage, superpowers, newResult));
+    appendHistory(historyFile, entryFor(newRef, newStage, superpowers, o.model, newResult));
 
     const rows = compareResults(oldResult, newResult);
     const md = renderComparison(rows, {
