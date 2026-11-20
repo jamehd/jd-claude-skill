@@ -1,6 +1,6 @@
 ## Stop report — <ID> / <T-NNN> — <date>
 
-Also add a row to `## Stops` in `feature.md`: Date, Step (`<command> <step>`, e.g. `build 7`, `accept 3`), Reason (slug from `references/reasons.md`), Counter.
+<!-- Also add a row to `## Stops` in `feature.md`: Date, Step (`<command> <step>`, e.g. `build 7`, `accept 3`), Reason (slug from `references/reasons.md`), Counter. -->
 
 | Field | Value |
 |---|---|

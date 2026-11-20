@@ -1,6 +1,6 @@
 # Reason categories
 
-Every brief correction, rework note and stop gets exactly one slug. Metrics group by it.
+Every brief correction, rework note and stop gets one slug; a rework round may list several, comma-separated. Metrics group by it.
 
 | Slug | Meaning |
 |---|---|

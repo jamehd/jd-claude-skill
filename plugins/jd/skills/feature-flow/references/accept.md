@@ -37,7 +37,7 @@ Only when the input explicitly accepts the feature.
 7. Run `node <plugin>/tools/flow-metrics/metrics.mjs --repo <repository root>` (`<plugin>` is two folders
    above this skill); it writes `<paths.data>/metrics/metrics.json` and `metrics.md`. Skip the commit when
    unchanged. `pull-request`: never commit to `git.main`; commit them with the next feature branch's first
-   commit (or the current rework/PR branch). `merge-after-acceptance`: include them in the push to `git.main`.
+   commit (or the current rework/PR branch); the just-accepted feature then shows no done time until its `status: done` commit reaches the branch metrics read. `merge-after-acceptance`: include them in the push to `git.main`.
 8. Reply with a one-line confirmation (and the PR link when one was opened) and the suggested next
    command.
 
