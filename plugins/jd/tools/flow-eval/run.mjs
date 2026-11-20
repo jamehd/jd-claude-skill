@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
-import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { stage, cleanup, findSuperpowers, toWslPath } from './stage.mjs';
@@ -44,27 +43,41 @@ function latestTagOrMain(pluginRepo) {
   }
 }
 
+export function shQuote(arg) {
+  return `'${String(arg).split("'").join("'\\''")}'`;
+}
+
+export function buildEvalCommand(stagedDir, outDir, { maxCostUsd, runs }) {
+  const args = [
+    'claude', 'plugin', 'eval', toWslPath(stagedDir),
+    '--json', toWslPath(join(outDir, 'aggregate-result.json')), '--output-dir', toWslPath(outDir),
+    '--ablation', 'none', '--threshold', '0',
+    '--max-cost-usd', String(maxCostUsd), '--runs', String(runs),
+    '--trust-plugin', '--no-publish',
+  ];
+  return args.map(shQuote).join(' ');
+}
+
+export function readEvalJson(jsonFile, stagedDir, exitCode) {
+  if (!existsSync(jsonFile)) throw new Error(`claude plugin eval failed for ${stagedDir} (exit ${exitCode}); no result JSON written`);
+  try {
+    return JSON.parse(readFileSync(jsonFile, 'utf8'));
+  } catch {
+    throw new Error(`claude plugin eval failed for ${stagedDir} (exit ${exitCode}); result JSON unreadable`);
+  }
+}
+
 export function makeRunEval({ maxCostUsd, runs }) {
-  return (stagedDir) => {
-    const out = mkdtempSync(join(tmpdir(), 'flow-eval-out-'));
+  return (stagedDir, outDir) => {
+    mkdirSync(outDir, { recursive: true });
+    const args = ['-d', WSL_DISTRO, '--', 'bash', '-lc', buildEvalCommand(stagedDir, outDir, { maxCostUsd, runs })];
+    let exitCode = 0;
     try {
-      const jsonFile = join(out, 'aggregate-result.json');
-      const args = [
-        '-d', WSL_DISTRO, '--', 'claude', 'plugin', 'eval', toWslPath(stagedDir),
-        '--json', toWslPath(jsonFile), '--output-dir', toWslPath(join(out, 'run')),
-        '--ablation', 'none', '--threshold', '0',
-        '--max-cost-usd', String(maxCostUsd), '--runs', String(runs),
-        '--trust-plugin', '--no-publish',
-      ];
-      try {
-        execFileSync('wsl.exe', args, { timeout: EVAL_TIMEOUT_MS, stdio: ['ignore', 'inherit', 'inherit'] });
-      } catch (e) {
-        if (!existsSync(jsonFile)) throw e;
-      }
-      return JSON.parse(readFileSync(jsonFile, 'utf8'));
-    } finally {
-      rmSync(out, { recursive: true, force: true });
+      execFileSync('wsl.exe', args, { timeout: EVAL_TIMEOUT_MS, stdio: ['ignore', 'inherit', 'inherit'] });
+    } catch (e) {
+      exitCode = e.status ?? 'unknown';
     }
+    return readEvalJson(join(outDir, 'aggregate-result.json'), stagedDir, exitCode);
   };
 }
 
@@ -72,14 +85,28 @@ function parseArgs(argv) {
   const o = {};
   for (let i = 0; i < argv.length; i += 2) {
     if (!argv[i].startsWith('--')) throw new Error(`unexpected argument ${argv[i]}`);
+    if (i + 1 >= argv.length || argv[i + 1].startsWith('--')) throw new Error(`missing value for ${argv[i]}`);
     o[argv[i].slice(2)] = argv[i + 1];
+  }
+  for (const k of ['runs', 'max-cost-usd']) {
+    if (k in o && !(Number(o[k]) > 0)) throw new Error(`--${k} must be a positive number`);
   }
   return o;
 }
 
+function resultsFolder(evalsRoot, version) {
+  const parent = join(evalsRoot, 'results', version);
+  const base = stamp();
+  let dir = join(parent, base);
+  for (let n = 2; existsSync(dir); n++) dir = join(parent, `${base}-${n}`);
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
 function entryFor(ref, staged, superpowers, result) {
   const base = { pluginRef: ref, pluginVersion: staged.pluginVersion, superpowersVersion: superpowers.version, casesHash: staged.casesHash };
-  return { key: historyKey(base), ...base, date: new Date().toISOString(), ...result };
+  const incomplete = result.partial || Object.values(result.cases).some((c) => c.error);
+  return { key: historyKey(base), ...base, date: new Date().toISOString(), ...result, partial: incomplete };
 }
 
 export async function main(argv, deps = {}) {
@@ -113,13 +140,17 @@ export async function main(argv, deps = {}) {
       oldResult = reused;
     } else {
       log(`Running eval for ${oldRef} (${oldStage.pluginVersion})`);
-      oldResult = readResult(runEval(oldStage.dir));
+      const oldOut = resultsFolder(evalsRoot, oldStage.pluginVersion);
+      const oldJson = runEval(oldStage.dir, oldOut);
+      oldResult = readResult(oldJson);
+      writeFileSync(join(oldOut, 'aggregate-result.json'), JSON.stringify(oldJson, null, 2) + '\n');
       appendHistory(historyFile, entryFor(oldRef, oldStage, superpowers, oldResult));
     }
 
     const newStage = stageRef(newRef);
     log(`Running eval for ${newRef} (${newStage.pluginVersion})`);
-    const newJson = runEval(newStage.dir);
+    const resultsDir = resultsFolder(evalsRoot, newStage.pluginVersion);
+    const newJson = runEval(newStage.dir, resultsDir);
     const newResult = readResult(newJson);
     appendHistory(historyFile, entryFor(newRef, newStage, superpowers, newResult));
 
@@ -128,8 +159,6 @@ export async function main(argv, deps = {}) {
       oldLabel: `${oldRef} (${oldStage.pluginVersion})`, newLabel: `${newRef} (${newStage.pluginVersion})`,
       oldCost: oldResult.costUsd, newCost: newResult.costUsd, oldDuration: oldResult.durationSeconds, newDuration: newResult.durationSeconds,
     });
-    const resultsDir = join(evalsRoot, 'results', newStage.pluginVersion, stamp());
-    mkdirSync(resultsDir, { recursive: true });
     writeFileSync(join(resultsDir, 'aggregate-result.json'), JSON.stringify(newJson, null, 2) + '\n');
     writeFileSync(join(resultsDir, 'comparison.md'), md);
     log(md);
