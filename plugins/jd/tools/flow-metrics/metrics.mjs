@@ -16,7 +16,8 @@ function git(repo, args) {
 
 function earliestCommit(repo, file, needle) {
   try {
-    const first = git(repo, ['log', '--reverse', '--format=%cI', `-S${needle}`, '--', file]).split('\n')[0].trim();
+    const first = git(repo, ['log', '--reverse', '--format=%cI', `-S${needle}`, '--', file]).split('
+')[0].trim();
     return first || null;
   } catch { return null; }
 }
@@ -145,18 +146,19 @@ export function findBranch(repo, id) {
   } catch { return null; }
 }
 
-function featureUsage(repo, main, id, projectsDir, doneAt) {
+export function featureUsage(repo, main, id, projectsDir, doneAt) {
   const branch = findBranch(repo, id);
   if (!branch) return null;
   let since;
-  try { since = git(repo, ['log', `${main}..${branch}`, '--reverse', '--format=%cI']).split('\n')[0].trim(); } catch { return null; }
+  let lastCommitAt;
+  try {
+    since = git(repo, ['log', `${main}..${branch}`, '--reverse', '--format=%cI']).split(String.fromCharCode(10))[0].trim();
+    lastCommitAt = git(repo, ['log', '-1', '--format=%cI', branch]).trim();
+  } catch { return null; }
   if (!since) return null;
   try {
-    const { rows } = collect({ repo, since, until: new Date().toISOString(), projectsDir });
-    return {
-      tokensIn: rows.reduce((a, r) => a + r.input + r.cacheRead, 0),
-      tokensOut: rows.reduce((a, r) => a + r.output, 0),
-    };
+    const { rows } = collect({ repo, since, until: windowEnd(doneAt, lastCommitAt), projectsDir });
+    return usageTotals(rows);
   } catch { return null; }
 }
 

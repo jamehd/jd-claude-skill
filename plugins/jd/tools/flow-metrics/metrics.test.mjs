@@ -4,7 +4,8 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { statusDates, postMergeFixes, findBranch, mentionsId, parseApprovedAt, summarize, renderMarkdown, countReasons, usageTotals, windowEnd } from './metrics.mjs';
+import { encodeProjectDir } from '../usage-report/usage.mjs';
+import { statusDates, postMergeFixes, findBranch, mentionsId, parseApprovedAt, summarize, renderMarkdown, countReasons, usageTotals, windowEnd, featureUsage } from './metrics.mjs';
 
 let hasGit = true;
 try { execFileSync('git', ['--version'], { stdio: 'ignore' }); } catch { hasGit = false; }
@@ -145,4 +146,24 @@ test('usage totals split fresh input from cache reads like usage-report', () => 
 test('usage window ends at done, else at the last branch commit', () => {
   assert.equal(windowEnd('2026-01-03T00:00:00Z', '2026-01-02T00:00:00Z'), '2026-01-03T00:00:00Z');
   assert.equal(windowEnd(null, '2026-01-02T00:00:00Z'), '2026-01-02T00:00:00Z');
+});
+
+gitTest('featureUsage ends the window at doneAt and splits fresh input from cache reads', () => {
+  const repo = newRepo();
+  commit(repo, 'a.txt', '0', 'init', '2026-01-01T00:00:00+00:00');
+  git(repo, ['checkout', '-q', '-b', 'feat/FND-7-x']);
+  commit(repo, 'a.txt', '1', 'work', '2026-01-02T00:00:00+00:00');
+  commit(repo, 'a.txt', '2', 'more', '2026-01-04T00:00:00+00:00');
+  const projectsDir = mkdtempSync(join(tmpdir(), 'flow-metrics-proj-'));
+  const dir = join(projectsDir, encodeProjectDir(repo));
+  mkdirSync(dir, { recursive: true });
+  const msg = (id, ts, usage) => JSON.stringify({ type: 'assistant', timestamp: ts, message: { id, usage } });
+  writeFileSync(join(dir, 's.jsonl'), [
+    msg('m1', '2026-01-02T12:00:00Z', { input_tokens: 10, cache_creation_input_tokens: 5, cache_read_input_tokens: 100, output_tokens: 7 }),
+    msg('m2', '2026-01-03T12:00:00Z', { input_tokens: 1, cache_creation_input_tokens: 2, cache_read_input_tokens: 50, output_tokens: 3 }),
+    msg('m3', '2026-01-03T20:00:00Z', { input_tokens: 1000, cache_creation_input_tokens: 1000, cache_read_input_tokens: 1000, output_tokens: 1000 }),
+  ].join(String.fromCharCode(10)) + String.fromCharCode(10));
+  assert.deepEqual(featureUsage(repo, 'main', 'FND-7', projectsDir, '2026-01-03T13:00:00Z'), { tokensIn: 18, tokensCacheRead: 150, tokensOut: 10 });
+  const open = featureUsage(repo, 'main', 'FND-7', projectsDir, null);
+  assert.equal(open.tokensIn, 2018);
 });
