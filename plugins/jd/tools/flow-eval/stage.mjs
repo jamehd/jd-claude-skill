@@ -2,20 +2,20 @@
 // Builds a throwaway copy of one jd plugin version plus a project's private eval cases,
 // with the installed superpowers beside it, ready for `claude plugin eval`.
 import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, writeFileSync, existsSync, renameSync, rmSync, statSync } from 'node:fs';
-import { join, resolve, relative } from 'node:path';
+import { join, resolve, relative, dirname, basename, isAbsolute } from 'node:path';
 import { tmpdir, homedir } from 'node:os';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-const sep = String.fromCharCode(92);
+const STAGE_PREFIX = 'jd-stage-';
 const SUPERPOWERS_KEY = 'superpowers@claude-plugins-official';
 const PLUGIN_LINES = ['plugins:', '  - "../.."', '  - "../../.eval-deps/superpowers"'];
 
 export function toWslPath(winPath) {
   const m = /^([A-Za-z]):[\\/]*(.*)$/.exec(winPath);
-  if (!m) return winPath.split(sep).join('/');
-  return `/mnt/${m[1].toLowerCase()}/${m[2].split(sep).join('/')}`;
+  if (!m) return winPath.split('\\').join('/');
+  return `/mnt/${m[1].toLowerCase()}/${m[2].split('\\').join('/')}`;
 }
 
 export function findSuperpowers(installedPluginsFile = join(homedir(), '.claude', 'plugins', 'installed_plugins.json')) {
@@ -40,12 +40,21 @@ function listFiles(dir) {
   return out;
 }
 
+function caseFolders(casesDir) {
+  return readdirSync(casesDir).filter((n) => statSync(join(casesDir, n)).isDirectory());
+}
+
 function hashCases(casesDir) {
   const h = createHash('sha256');
-  const files = listFiles(casesDir).map((p) => relative(casesDir, p).split(sep).join('/')).sort();
+  const files = caseFolders(casesDir)
+    .flatMap((n) => listFiles(join(casesDir, n)))
+    .map((p) => relative(casesDir, p).split('\\').join('/'))
+    .sort();
   for (const rel of files) {
     h.update(rel);
+    h.update('\0');
     h.update(readFileSync(join(casesDir, rel)));
+    h.update('\0');
   }
   return h.digest('hex');
 }
@@ -76,8 +85,9 @@ function extractRef(pluginRepo, ref, dest) {
 }
 
 export function stage({ pluginRepo, ref, casesDir, superpowers, outDir }) {
-  const dir = join(resolve(outDir), 'jd');
-  mkdirSync(resolve(outDir), { recursive: true });
+  const base = resolve(outDir ?? tmpdir());
+  mkdirSync(base, { recursive: true });
+  const dir = join(mkdtempSync(join(base, STAGE_PREFIX)), 'jd');
   if (ref === 'WORKTREE') cpSync(join(pluginRepo, 'plugins', 'jd'), dir, { recursive: true });
   else extractRef(pluginRepo, ref, dir);
 
@@ -101,7 +111,9 @@ export function stage({ pluginRepo, ref, casesDir, superpowers, outDir }) {
 }
 
 export function cleanup(dir) {
-  rmSync(resolve(dir, '..'), { recursive: true, force: true });
+  const holder = dirname(resolve(dir));
+  if (!basename(holder).startsWith(STAGE_PREFIX)) throw new Error(`refusing to clean ${holder}: not a flow-eval staging folder`);
+  rmSync(holder, { recursive: true, force: true });
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
@@ -111,7 +123,11 @@ if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.ur
     const repo = opt('repo');
     const casesDir = opt('cases');
     if (!repo || !casesDir) throw new Error('usage: stage.mjs --repo <plugin repo> --cases <dir> [--ref <git ref|WORKTREE>] [--out <dir>]');
-    const out = opt('out') || mkdtempSync(join(tmpdir(), 'flow-eval-'));
+    const out = opt('out') ? resolve(opt('out')) : undefined;
+    if (out) {
+      const rel = relative(resolve(repo), out);
+      if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))) throw new Error('--out must not be inside --repo; private cases must never land in the plugin repo');
+    }
     console.log(JSON.stringify(stage({ pluginRepo: resolve(repo), ref: opt('ref') || 'WORKTREE', casesDir: resolve(casesDir), superpowers: findSuperpowers(), outDir: out }), null, 2));
   } catch (e) {
     console.error(`flow-eval stage: ${e.message}`);

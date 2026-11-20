@@ -80,3 +80,18 @@ test('same cases give the same hash; an edited case changes it', () => {
   writeFileSync(join(f.cases, 'case-a/prompt.md'), 'changed');
   assert.notEqual(run(), h1);
 });
+
+test('cleanup removes only its own staging folder', () => {
+  const f = fixture();
+  write(join(f.out, 'unrelated.txt'), 'keep');
+  const r = stage({ pluginRepo: f.repo, ref: 'WORKTREE', casesDir: f.cases, superpowers: { path: f.sp, version: '7' }, outDir: f.out });
+  cleanup(r.dir);
+  assert.ok(!existsSync(r.dir));
+  assert.ok(existsSync(join(f.out, 'unrelated.txt')));
+  assert.throws(() => cleanup(join(f.out, 'jd')), /refusing/);
+});
+
+test('stage-only CLI refuses an --out inside the plugin repo', () => {
+  const f = fixture();
+  assert.throws(() => execFileSync('node', [new URL('./stage.mjs', import.meta.url).pathname.replace(/^\/(\w:)/, '$1'), '--repo', f.repo, '--cases', f.cases, '--out', join(f.repo, 'staged')], { stdio: 'pipe' }), /must not be inside/);
+});
