@@ -28,15 +28,14 @@ superpowers:using-git-worktrees, and never merge here. Merging happens only in `
 - Counters are never reset. When a counter reaches its limit: write a stop report
   (`templates/stop-report.md`) into the task file or report and into `paths.status`, set
   `stoppedFrom` to the current status, set `stopped`, tell the person named in it, and end.
-- Every stop report names a reason category from `references/reasons.md` and adds a row to
-  `## Stops` in `feature.md` (date, step, slug, counter).
+- Every stop report follows `templates/stop-report.md`, including its `## Stops` row.
 
 ## Steps
 
 Write "Current step: build <n>" to `paths.status` as each step starts.
 
-1. Set `building` in `feature.md` and the status file; refresh `pluginVersion` from
-   `<plugin>/.claude-plugin/plugin.json` (`<plugin>` is two folders above this skill). On rework, read the report's verdict table
+1. Set `building` in `feature.md` and the status file; on the first build (from `brief-review`) overwrite `pluginVersion` from
+   `<plugin>/.claude-plugin/plugin.json` (`<plugin>` is two folders above this skill); rework keeps it. On rework, read the report's verdict table
    and rework history first; change only what the notes require.
 2. Git: if the folder is not a repository, initialise it on `git.main`, commit the existing files,
    push to `git.remote`. Then create or switch to `git.branch_pattern`, based on `git.main`.

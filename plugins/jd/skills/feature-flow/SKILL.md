@@ -105,7 +105,7 @@ anything in `acceptance.forbidden`; a missing tool, credential or service with n
 
 ## Always
 
-- Record a reason slug (`references/reasons.md`) for every brief correction, rework and stop.
+- Record a reason slug (`references/reasons.md`) for every brief correction and rework; every stop report adds a `## Stops` row to `feature.md`.
 - Crashes, leaks and performance are numeric quality budgets in the brief, measured by actions
   (`references/quality.md`); a budget is a scenario like any other.
 - Every build verifies once with the gate suite (every `active` scenario in suite `gate`) plus all of

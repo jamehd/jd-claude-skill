@@ -21,12 +21,12 @@ Only when the input explicitly accepts the feature.
      one into `git.main` with `gh pr create`. Record the PR link in `report.md` once, and leave the feature `acceptance`. Do not merge. Tell the person
      to merge the PR. The feature becomes `done` only after the PR is merged: a later
      `/jd:accept <ID>` or `/jd:next` runs `gh pr view` and acts on the state:
-     - `MERGED`: continue with steps 4-7.
+     - `MERGED`: continue with steps 4-8.
      - `OPEN`: report that the PR awaits merge and stop.
      - `CLOSED` without merge: set `stopped` with `stoppedFrom: acceptance`, write a stop report
        (PR closed unmerged), and ask the owner whether to reopen, recreate or abandon.
      - `gh` unavailable or not authenticated: ask the person to confirm explicitly that the PR was
-       merged, record the confirmation and its date in `report.md`, then continue with steps 4-7.
+       merged, record the confirmation and its date in `report.md`, then continue with steps 4-8.
    - `merge-after-acceptance`: merge the feature branch into `git.main` (merge commit or
      fast-forward, not squash), push `git.main`, delete the remote feature branch.
 4. `paths.scenarios`: this feature's scenarios → `active` (they now run in every build).
@@ -35,13 +35,15 @@ Only when the input explicitly accepts the feature.
    a `test_soak` budget and its soak gates the release, add it under "Release readiness" as
    waiting for the nightly full soak.
 7. Run `node <plugin>/tools/flow-metrics/metrics.mjs --repo <repository root>` (`<plugin>` is two folders
-   above this skill) and commit the updated `metrics.md`.
+   above this skill); it writes `<paths.data>/metrics/metrics.json` and `metrics.md`. Skip the commit when
+   unchanged. `pull-request`: never commit to `git.main`; commit them with the next feature branch's first
+   commit (or the current rework/PR branch). `merge-after-acceptance`: include them in the push to `git.main`.
 8. Reply with a one-line confirmation (and the PR link when one was opened) and the suggested next
    command.
 
 ## Verdict with notes
 
-1. Record each note against its scenario, with a reason slug from `references/reasons.md`; increment `reworkRound` in `feature.md` and the report.
+1. Record each note against its scenario, with a reason slug from `references/reasons.md` (several distinct slugs, comma-separated, when the round's notes differ); increment `reworkRound` in `feature.md` and the report.
 2. Within `limits.rework_rounds`: add a rework history row (including its Reason column), set `building`, continue with
    `build.md` limited to the notes. Under `pull-request`, keep the existing PR open: push the
    rework commits to the same feature branch and note the round in the PR.
