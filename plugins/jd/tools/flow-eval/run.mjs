@@ -47,13 +47,15 @@ export function shQuote(arg) {
   return `'${String(arg).split("'").join("'\\''")}'`;
 }
 
-export function buildEvalCommand(stagedDir, outDir, { maxCostUsd, runs }) {
+export function buildEvalCommand(stagedDir, outDir, { maxCostUsd, runs, model }) {
   const args = [
     'claude', 'plugin', 'eval', toWslPath(stagedDir),
     '--json', toWslPath(join(outDir, 'aggregate-result.json')), '--output-dir', toWslPath(outDir),
     '--ablation', 'none', '--threshold', '0',
     '--max-cost-usd', String(maxCostUsd), '--runs', String(runs),
+    '--scaffold', '--allow-tools', 'Write', 'Edit',
     '--trust-plugin', '--no-publish',
+    ...(model ? ['--model', model] : []),
   ];
   return args.map(shQuote).join(' ');
 }
@@ -72,10 +74,10 @@ export function wslBashArgs(command) {
   return ['-d', WSL_DISTRO, '--exec', 'bash', '-lc', command];
 }
 
-export function makeRunEval({ maxCostUsd, runs }) {
+export function makeRunEval({ maxCostUsd, runs, model }) {
   return (stagedDir, outDir) => {
     mkdirSync(outDir, { recursive: true });
-    const args = wslBashArgs(buildEvalCommand(stagedDir, outDir, { maxCostUsd, runs }));
+    const args = wslBashArgs(buildEvalCommand(stagedDir, outDir, { maxCostUsd, runs, model }));
     let exitCode = 0;
     try {
       execFileSync('wsl.exe', args, { timeout: EVAL_TIMEOUT_MS, stdio: ['ignore', 'inherit', 'inherit'] });
@@ -116,7 +118,7 @@ function entryFor(ref, staged, superpowers, result) {
 
 export async function main(argv, deps = {}) {
   const o = parseArgs(argv);
-  if (!o.project) throw new Error('usage: run.mjs --project <repo> [--old <ref>] [--new WORKTREE] [--plugin-repo <path>] [--max-cost-usd 15] [--runs 3] [--cases <dir>]');
+  if (!o.project) throw new Error('usage: run.mjs --project <repo> [--old <ref>] [--new WORKTREE] [--plugin-repo <path>] [--max-cost-usd 15] [--runs 3] [--model <name>] [--cases <dir>]');
   const log = deps.log ?? ((m) => console.log(m));
   const project = resolve(o.project);
   const pluginRepo = resolve(o['plugin-repo'] ?? join(HERE, '..', '..', '..', '..', '..'));
@@ -125,7 +127,7 @@ export async function main(argv, deps = {}) {
   const historyFile = join(evalsRoot, 'history.json');
   const oldRef = o.old ?? latestTagOrMain(pluginRepo);
   const newRef = o.new ?? 'WORKTREE';
-  const runEval = deps.runEval ?? makeRunEval({ maxCostUsd: Number(o['max-cost-usd'] ?? 15), runs: Number(o.runs ?? 3) });
+  const runEval = deps.runEval ?? makeRunEval({ maxCostUsd: Number(o['max-cost-usd'] ?? 15), runs: Number(o.runs ?? 3), model: o.model });
   const superpowers = findSuperpowers(deps.installedPluginsFile);
 
   const staged = [];

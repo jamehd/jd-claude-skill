@@ -121,6 +121,9 @@ test('buildEvalCommand quotes every argument', () => {
   const cmd = buildEvalCommand('D:\\a b\\jd', 'D:\\o', { maxCostUsd: 15, runs: 3 });
   assert.match(cmd, /^'claude' 'plugin' 'eval' '\/mnt\/d\/a b\/jd' '--json'/);
   assert.match(cmd, /'--runs' '3'/);
+  assert.match(cmd, /'--scaffold' '--allow-tools' 'Write' 'Edit' '--trust-plugin'/);
+  assert.doesNotMatch(cmd, /Bash|--model/);
+  assert.match(buildEvalCommand('D:/x', 'D:/o', { maxCostUsd: 1, runs: 1, model: 'sonnet' }), /'--model' 'sonnet'$/);
 });
 
 test('readEvalJson reports a missing or unreadable result clearly', () => {

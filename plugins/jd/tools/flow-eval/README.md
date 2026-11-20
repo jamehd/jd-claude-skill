@@ -21,11 +21,12 @@ Cases live in the project, never in this repo: `<project>/project-board/evals/<c
 ## Running
 
 ```bash
-node <plugin>/tools/flow-eval/run.mjs --project <repo> [--old <ref>] [--new WORKTREE] [--max-cost-usd 15] [--runs 3]
+node <plugin>/tools/flow-eval/run.mjs --project <repo> [--old <ref>] [--new WORKTREE] [--max-cost-usd 15] [--runs 3] [--model <name>]
 ```
 
 - `--old` defaults to the last released version; `--new WORKTREE` uses the working copy.
-- Runs use `--ablation none`.
+- Runs use `--ablation none`, `--scaffold` (cases build their workspace with `context.scaffold_script`) and `--allow-tools Write Edit`. Bash is never granted: WSL has no sandbox tools, so a Bash grant makes runs be refused.
+- `--model <name>` is passed through to `claude plugin eval` when given (e.g. `--model sonnet`).
 - An empty `cases` array in the result means the cases failed to load; check the case folder and `case.yaml`.
 - Staging fails before any paid run when superpowers is missing from `~/.claude/plugins/installed_plugins.json`.
 
