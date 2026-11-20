@@ -101,8 +101,7 @@ function readIfExists(file) {
 
 export function findBranch(repo, id) {
   try {
-    const refs = git(repo, ['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/remotes']).split('
-').map((r) => r.trim()).filter(Boolean);
+    const refs = git(repo, ['for-each-ref', '--format=%(refname)', 'refs/heads', 'refs/remotes']).split('\n').map((r) => r.trim()).filter(Boolean);
     const matches = (prefix) => refs.filter((r) => r.startsWith(prefix) && !r.endsWith('/HEAD')).map((r) => r.slice(prefix.length)).filter((n) => mentionsId(n, id)).sort();
     const local = matches('refs/heads/');
     if (local.length) return local[0];
