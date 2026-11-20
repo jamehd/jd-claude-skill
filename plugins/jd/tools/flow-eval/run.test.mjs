@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdi
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
-import { historyKey, findReusable, appendHistory, main, shQuote, buildEvalCommand, readEvalJson } from './run.mjs';
+import { historyKey, findReusable, appendHistory, main, shQuote, wslBashArgs, buildEvalCommand, readEvalJson } from './run.mjs';
 
 const sample = JSON.parse(readFileSync(new URL('./fixtures/aggregate-result.sample.json', import.meta.url), 'utf8'));
 const clone = (x) => JSON.parse(JSON.stringify(x));
@@ -166,4 +166,13 @@ test('per-run artifacts are kept for both old and new', async () => {
     assert.ok(existsSync(join(results, v, s, 'run-1', 'trace.txt')));
     assert.ok(existsSync(join(results, v, s, 'aggregate-result.json')));
   }
+});
+
+const hasWsl = (() => { try { execFileSync('wsl.exe', ['-d', 'Ubuntu-24.04', '--exec', 'true'], { stdio: 'ignore' }); return true; } catch { return false; } })();
+
+test('arguments survive the real wsl.exe hop literally', { skip: !hasWsl }, () => {
+  const nasty = ["/mnt/d/My Dir/it's", '$HOME', '`x`', 'say "hi"'];
+  const command = ['printf', '[%s]|', ...nasty].map(shQuote).join(' ');
+  const out = execFileSync('wsl.exe', wslBashArgs(command), { encoding: 'utf8' });
+  assert.equal(out, nasty.map((a) => `[${a}]|`).join(''));
 });

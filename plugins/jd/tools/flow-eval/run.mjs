@@ -67,10 +67,15 @@ export function readEvalJson(jsonFile, stagedDir, exitCode) {
   }
 }
 
+// --exec skips the distro's default shell, which would otherwise expand $HOME, backticks and quotes in the command a second time.
+export function wslBashArgs(command) {
+  return ['-d', WSL_DISTRO, '--exec', 'bash', '-lc', command];
+}
+
 export function makeRunEval({ maxCostUsd, runs }) {
   return (stagedDir, outDir) => {
     mkdirSync(outDir, { recursive: true });
-    const args = ['-d', WSL_DISTRO, '--', 'bash', '-lc', buildEvalCommand(stagedDir, outDir, { maxCostUsd, runs })];
+    const args = wslBashArgs(buildEvalCommand(stagedDir, outDir, { maxCostUsd, runs }));
     let exitCode = 0;
     try {
       execFileSync('wsl.exe', args, { timeout: EVAL_TIMEOUT_MS, stdio: ['ignore', 'inherit', 'inherit'] });
