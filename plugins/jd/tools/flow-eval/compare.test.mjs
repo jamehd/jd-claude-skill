@@ -106,3 +106,10 @@ test('renders a table and summary', () => {
   assert.match(md, /\| a \| 1\.00 \| 0\.67 \| worse \|/);
   assert.match(md, /1 worse, 0 better/);
 });
+
+test('summary counts incomplete, new and removed', () => {
+  const o = readResult(build([{ name: 'a', runs: three(3) }, { name: 'gone', runs: three(3) }, { name: 'b', runs: three(3), error: true }]));
+  const n = readResult(build([{ name: 'a', runs: three(3) }, { name: 'fresh', runs: three(3) }, { name: 'b', runs: three(3) }]));
+  const md = renderComparison(compareResults(o, n), { oldLabel: 'o', newLabel: 'n' });
+  assert.match(md, /0 worse, 0 better, 1 incomplete, 1 new, 1 removed/);
+});

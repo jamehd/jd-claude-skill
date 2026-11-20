@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 
 const STAGE_PREFIX = 'jd-stage-';
 const SUPERPOWERS_KEY = 'superpowers@claude-plugins-official';
+const NON_CASE_DIRS = new Set(['results', 'sources']);
 const PLUGIN_LINES = ['plugins:', '  - "../.."', '  - "../../.eval-deps/superpowers"'];
 
 export function toWslPath(winPath) {
@@ -41,7 +42,7 @@ function listFiles(dir) {
 }
 
 function caseFolders(casesDir) {
-  return readdirSync(casesDir).filter((n) => statSync(join(casesDir, n)).isDirectory());
+  return readdirSync(casesDir).filter((n) => !NON_CASE_DIRS.has(n) && statSync(join(casesDir, n)).isDirectory());
 }
 
 function hashCases(casesDir) {
@@ -97,9 +98,8 @@ export function stage({ pluginRepo, ref, casesDir, superpowers, outDir }) {
 
   const evals = join(dir, 'evals');
   mkdirSync(evals, { recursive: true });
-  for (const name of readdirSync(casesDir)) {
+  for (const name of caseFolders(casesDir)) {
     const src = join(casesDir, name);
-    if (!statSync(src).isDirectory()) continue;
     const dst = join(evals, name);
     cpSync(src, dst, { recursive: true });
     const yamlFile = join(dst, 'case.yaml');

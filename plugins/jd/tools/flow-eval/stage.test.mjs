@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
@@ -94,4 +94,19 @@ test('cleanup removes only its own staging folder', () => {
 test('stage-only CLI refuses an --out inside the plugin repo', () => {
   const f = fixture();
   assert.throws(() => execFileSync('node', [new URL('./stage.mjs', import.meta.url).pathname.replace(/^\/(\w:)/, '$1'), '--repo', f.repo, '--cases', f.cases, '--out', join(f.repo, 'staged')], { stdio: 'pipe' }), /must not be inside/);
+});
+
+test('skips the results and sources folders of the evals directory', () => {
+  const f = fixture();
+  write(join(f.cases, 'results/0.38.0/x/aggregate-result.json'), '{}');
+  write(join(f.cases, 'sources/notes.md'), 'n');
+  write(join(f.cases, 'history.json'), '[]');
+  const sp = { path: f.sp, version: '1' };
+  const a = stage({ pluginRepo: f.repo, ref: 'WORKTREE', casesDir: f.cases, superpowers: sp, outDir: f.out });
+  assert.deepEqual(readdirSync(join(a.dir, 'evals')).sort(), ['case-a', 'case-b']);
+  write(join(f.cases, 'results/0.39.0/y/aggregate-result.json'), '{"more":1}');
+  write(join(f.cases, 'history.json'), '[1]');
+  const b = stage({ pluginRepo: f.repo, ref: 'WORKTREE', casesDir: f.cases, superpowers: sp, outDir: f.out });
+  assert.equal(a.casesHash, b.casesHash);
+  cleanup(a.dir); cleanup(b.dir);
 });

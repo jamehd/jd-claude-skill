@@ -77,7 +77,7 @@ export function renderComparison(rows, meta) {
     '| --- | --- | --- | --- | --- | --- | --- |',
     ...rows.map((r) => `| ${r.case} | ${fmt(r.old)} | ${fmt(r.new)} | ${r.verdict} | ${list(r.gained)} | ${list(r.lost)} | ${fmt(r.oldNoise)}→${fmt(r.newNoise)} |`),
     '',
-    `${rows.filter((r) => r.verdict === 'worse').length} worse, ${rows.filter((r) => r.verdict === 'better').length} better`,
+    ['worse', 'better', 'incomplete', 'new', 'removed'].map((v) => `${rows.filter((r) => r.verdict === v).length} ${v}`).join(', '),
   ];
   return lines.join('\n') + '\n';
 }
