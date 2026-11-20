@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const MARGIN = 0.34;
-const EPS = 1e-9;
+const EPS = 0.01;
 
 const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const isNoise = (name) => name.startsWith('noise-');
