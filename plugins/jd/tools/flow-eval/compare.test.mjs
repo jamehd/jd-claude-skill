@@ -113,3 +113,18 @@ test('summary counts incomplete, new and removed', () => {
   const md = renderComparison(compareResults(o, n), { oldLabel: 'o', newLabel: 'n' });
   assert.match(md, /0 worse, 0 better, 1 incomplete, 1 new, 1 removed/);
 });
+
+test('score is the weighted mean of scored graders', () => {
+  const r = clone(sample);
+  const template = r.cases[0];
+  r.cases = [{
+    ...clone(template),
+    name: 'w',
+    arms: { with: [{ ...clone(template.arms.with[0]), error: null, graders: [
+      { name: 'heavy', passed: true, scored: true, weight: 2 },
+      { name: 'light', passed: false, scored: true, weight: 1 },
+      { name: 'noise-x', passed: false, scored: true, weight: 5 },
+    ] }] },
+  }];
+  assert.ok(Math.abs(readResult(r).cases.w.score - 2 / 3) < 1e-9);
+});

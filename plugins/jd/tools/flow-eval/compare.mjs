@@ -5,6 +5,10 @@ const MARGIN = 0.34;
 const EPS = 0.01;
 
 const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
+const weightedMean = (xs) => {
+  const total = xs.reduce((a, x) => a + x.weight, 0);
+  return total ? xs.reduce((a, x) => a + x.share * x.weight, 0) / total : null;
+};
 const isNoise = (name) => name.startsWith('noise-');
 
 export function readResult(json) {
@@ -16,9 +20,10 @@ export function readResult(json) {
     const tally = new Map();
     for (const run of runs) {
       for (const g of run.graders ?? []) {
-        const t = tally.get(g.name) ?? { passed: 0, unscored: false };
+        const t = tally.get(g.name) ?? { passed: 0, unscored: false, weight: 1 };
         if (g.passed) t.passed += 1;
         if (g.scored === false) t.unscored = true;
+        if (typeof g.weight === 'number' && g.weight > 0) t.weight = g.weight;
         tally.set(g.name, t);
       }
     }
@@ -29,10 +34,10 @@ export function readResult(json) {
       const share = t.passed / runs.length;
       graders[name] = share;
       if (isNoise(name)) noiseShares.push(share);
-      else if (!t.unscored) scoredShares.push(share);
+      else if (!t.unscored) scoredShares.push({ share, weight: t.weight });
     }
     out[c.name] = {
-      score: mean(scoredShares),
+      score: weightedMean(scoredShares),
       error: runs.length === 0 || runs.some((r) => r.error != null),
       graders,
       noise: mean(noiseShares),

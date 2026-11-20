@@ -11,7 +11,7 @@ const clone = (x) => JSON.parse(JSON.stringify(x));
 const tmp = (p) => mkdtempSync(join(tmpdir(), p));
 const write = (file, text) => { mkdirSync(join(file, '..'), { recursive: true }); writeFileSync(file, text); };
 
-const base = { pluginRef: 'v1', pluginVersion: '1.0.0', superpowersVersion: '7.0.2', casesHash: 'abc' };
+const base = { commit: 'c1', pluginVersion: '1.0.0', superpowersVersion: '7.0.2', casesHash: 'abc' };
 
 test('reuses a complete old result with the same key', () => {
   const key = historyKey(base);
@@ -185,4 +185,34 @@ test('arguments survive the real wsl.exe hop literally', { skip: !hasWsl }, () =
   const command = ['printf', '[%s]|', ...nasty].map(shQuote).join(' ');
   const out = execFileSync('wsl.exe', wslBashArgs(command), { encoding: 'utf8' });
   assert.equal(out, nasty.map((a) => `[${a}]|`).join(''));
+});
+
+test('default --old is main, history key carries the commit sha and the tag is ignored', async () => {
+  const w = world();
+  execFileSync('git', ['-C', w.repo, 'tag', 'zzz-backup'], { stdio: 'pipe' });
+  const sha = execFileSync('git', ['-C', w.repo, 'rev-parse', 'main'], { encoding: 'utf8' }).trim();
+  await main(['--project', w.project, '--plugin-repo', w.repo], deps(w, []));
+  const history = JSON.parse(readFileSync(join(w.project, 'project-board/evals/history.json'), 'utf8'));
+  const old = history.find((h) => h.pluginVersion === '1.0.0');
+  assert.equal(old.pluginRef, 'main');
+  assert.equal(old.commit, sha);
+  assert.ok(old.key.startsWith(`${sha}|`));
+});
+
+test('an old side of WORKTREE is never reused', async () => {
+  const w = world();
+  const args = ['--project', w.project, '--plugin-repo', w.repo, '--old', 'WORKTREE'];
+  const first = [];
+  await main(args, deps(w, first));
+  const second = [];
+  await main(args, deps(w, second));
+  assert.equal(second.length, 2);
+});
+
+test('exits 3 when a case is incomplete and nothing is worse', async () => {
+  const w = world();
+  const errored = clone(sample);
+  errored.cases[0].arms.with[0].error = 'boom';
+  const d = { ...deps(w, []), runEval: (dir) => JSON.parse(readFileSync(join(dir, '.claude-plugin/plugin.json'), 'utf8')).version === '1.0.0' ? clone(sample) : clone(errored) };
+  assert.equal(await main(['--project', w.project, '--plugin-repo', w.repo], d), 3);
 });

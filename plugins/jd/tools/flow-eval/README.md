@@ -21,10 +21,14 @@ Cases live in the project, never in this repo: `<project>/project-board/evals/<c
 ## Running
 
 ```bash
-node <plugin>/tools/flow-eval/run.mjs --project <repo> [--old <ref>] [--new WORKTREE] [--max-cost-usd 15] [--runs 3] [--model <name>]
+node <plugin>/tools/flow-eval/run.mjs --project <repo> [--old <ref>] [--new WORKTREE] [--plugin-repo <path>] [--cases <dir>] [--max-cost-usd 15] [--runs 3] [--model <name>]
 ```
 
-- `--old` defaults to the last released version; `--new WORKTREE` uses the working copy.
+- `--old` defaults to `main`; `--new WORKTREE` uses the working copy. Refs are resolved to a commit sha for the history key; a `WORKTREE` side always runs.
+- `--plugin-repo` must be a checkout of the plugin repo; the default (the repo containing this script) works only when run from that checkout.
+- `--cases <dir>` overrides the case folder (default `<project>/project-board/evals`).
+- Exit codes: `0` no regression, `1` at least one case is `worse`, `3` no case is worse but at least one is `incomplete` (partial result or errored run), `2` error.
+- A run may take up to 6 hours. On timeout or Ctrl-C the staged copy can be left in the system temp folder (`%TEMP%\jd-stage-*`); delete it.
 - Runs use `--ablation none`, `--scaffold` (cases build their workspace with `context.scaffold_script`) and `--allow-tools Write Edit`. Bash is never granted: WSL has no sandbox tools, so a Bash grant makes runs be refused.
 - `--model <name>` is passed through to `claude plugin eval` when given (e.g. `--model sonnet`).
 - An empty `cases` array in the result means the cases failed to load; check the case folder and `case.yaml`.
@@ -51,7 +55,7 @@ The method that works:
 4. Run from Windows through WSL with `/mnt/<drive>/...` paths:
 
    ```bash
-   wsl.exe -d Ubuntu-24.04 -- claude plugin eval /mnt/c/.../staging/jd --json <out>.json --max-cost-usd <usd> --threshold 0 --trust-plugin --no-publish
+   wsl.exe -d Ubuntu-24.04 --exec bash -lc '<claude plugin eval /mnt/c/.../staging/jd --json <out>.json --output-dir <out dir> --scaffold --allow-tools Write Edit --ablation none --threshold 0 --max-cost-usd <usd> --runs <n> --trust-plugin --no-publish>'
    ```
 
-`suite.plugins[]` in `aggregate-result.json` then lists both `jd` and `superpowers` with their versions, and the with-arm session sees superpowers skills under their `superpowers:` namespace. The no-plugin baseline arm (default `--ablation with-without`) runs with neither plugin.
+`suite.plugins[]` in `aggregate-result.json` then lists both `jd` and `superpowers` with their versions, and the with-arm session sees superpowers skills under their `superpowers:` namespace.

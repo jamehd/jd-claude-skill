@@ -7,11 +7,11 @@ import { stage, cleanup, findSuperpowers, toWslPath } from './stage.mjs';
 import { readResult, compareResults, renderComparison } from './compare.mjs';
 
 const WSL_DISTRO = 'Ubuntu-24.04';
-const EVAL_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+const EVAL_TIMEOUT_MS = 6 * 60 * 60 * 1000;
 const HERE = fileURLToPath(import.meta.url);
 
-export function historyKey({ pluginRef, pluginVersion, superpowersVersion, casesHash, model }) {
-  return [pluginRef, pluginVersion, superpowersVersion, casesHash, model ?? 'default'].join('|');
+export function historyKey({ commit, pluginVersion, superpowersVersion, casesHash, model }) {
+  return [commit, pluginVersion, superpowersVersion, casesHash, model ?? 'default'].join('|');
 }
 
 export function findReusable(history, key) {
@@ -34,12 +34,12 @@ function stamp(d = new Date()) {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`;
 }
 
-function latestTagOrMain(pluginRepo) {
+function resolveCommit(pluginRepo, ref) {
+  if (ref === 'WORKTREE') return 'WORKTREE';
   try {
-    const tag = execFileSync('git', ['-C', pluginRepo, 'tag', '--sort=-v:refname'], { encoding: 'utf8' }).split(/\r?\n/).find(Boolean);
-    return tag || 'main';
+    return execFileSync('git', ['-C', pluginRepo, 'rev-parse', '--verify', '--quiet', `${ref}^{commit}`], { encoding: 'utf8' }).trim();
   } catch {
-    return 'main';
+    throw new Error(`cannot resolve ref ${ref} in ${pluginRepo}`);
   }
 }
 
@@ -110,8 +110,8 @@ function resultsFolder(evalsRoot, version) {
   return dir;
 }
 
-function entryFor(ref, staged, superpowers, model, result) {
-  const base = { pluginRef: ref, pluginVersion: staged.pluginVersion, superpowersVersion: superpowers.version, casesHash: staged.casesHash, model: model ?? 'default' };
+function entryFor(ref, commit, staged, superpowers, model, result) {
+  const base = { commit, pluginRef: ref, pluginVersion: staged.pluginVersion, superpowersVersion: superpowers.version, casesHash: staged.casesHash, model: model ?? 'default' };
   const incomplete = result.partial || Object.values(result.cases).some((c) => c.error);
   return { key: historyKey(base), ...base, date: new Date().toISOString(), ...result, partial: incomplete };
 }
@@ -125,8 +125,10 @@ export async function main(argv, deps = {}) {
   const evalsRoot = join(project, 'project-board', 'evals');
   const casesDir = resolve(o.cases ?? evalsRoot);
   const historyFile = join(evalsRoot, 'history.json');
-  const oldRef = o.old ?? latestTagOrMain(pluginRepo);
+  const oldRef = o.old ?? 'main';
   const newRef = o.new ?? 'WORKTREE';
+  const oldCommit = resolveCommit(pluginRepo, oldRef);
+  const newCommit = resolveCommit(pluginRepo, newRef);
   const runEval = deps.runEval ?? makeRunEval({ maxCostUsd: Number(o['max-cost-usd'] ?? 15), runs: Number(o.runs ?? 3), model: o.model });
   const superpowers = findSuperpowers(deps.installedPluginsFile);
 
@@ -139,8 +141,8 @@ export async function main(argv, deps = {}) {
 
   try {
     const oldStage = stageRef(oldRef);
-    const oldKey = historyKey({ pluginRef: oldRef, pluginVersion: oldStage.pluginVersion, superpowersVersion: superpowers.version, casesHash: oldStage.casesHash, model: o.model });
-    const reused = findReusable(loadHistory(historyFile), oldKey);
+    const oldKey = historyKey({ commit: oldCommit, pluginVersion: oldStage.pluginVersion, superpowersVersion: superpowers.version, casesHash: oldStage.casesHash, model: o.model });
+    const reused = oldCommit === 'WORKTREE' ? undefined : findReusable(loadHistory(historyFile), oldKey);
     let oldResult;
     if (reused) {
       log(`Reusing recorded result for ${oldRef} (${oldStage.pluginVersion})`);
@@ -151,7 +153,7 @@ export async function main(argv, deps = {}) {
       const oldJson = runEval(oldStage.dir, oldOut);
       oldResult = readResult(oldJson);
       writeFileSync(join(oldOut, 'aggregate-result.json'), JSON.stringify(oldJson, null, 2) + '\n');
-      appendHistory(historyFile, entryFor(oldRef, oldStage, superpowers, o.model, oldResult));
+      appendHistory(historyFile, entryFor(oldRef, oldCommit, oldStage, superpowers, o.model, oldResult));
     }
 
     const newStage = stageRef(newRef);
@@ -159,7 +161,7 @@ export async function main(argv, deps = {}) {
     const resultsDir = resultsFolder(evalsRoot, newStage.pluginVersion);
     const newJson = runEval(newStage.dir, resultsDir);
     const newResult = readResult(newJson);
-    appendHistory(historyFile, entryFor(newRef, newStage, superpowers, o.model, newResult));
+    appendHistory(historyFile, entryFor(newRef, newCommit, newStage, superpowers, o.model, newResult));
 
     const rows = compareResults(oldResult, newResult);
     const md = renderComparison(rows, {
@@ -170,7 +172,8 @@ export async function main(argv, deps = {}) {
     writeFileSync(join(resultsDir, 'comparison.md'), md);
     log(md);
     log(`Results: ${resultsDir}`);
-    return rows.some((r) => r.verdict === 'worse') ? 1 : 0;
+    if (rows.some((r) => r.verdict === 'worse')) return 1;
+    return rows.some((r) => r.verdict === 'incomplete') ? 3 : 0;
   } finally {
     for (const dir of staged) cleanup(dir);
   }
