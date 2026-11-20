@@ -50,6 +50,21 @@ export function postMergeFixes(repo, main, id, doneAt) {
   }).length;
 }
 
+export const REASON_SLUGS = ['missed-requirement', 'wrong-scope', 'wrong-assumption', 'quality-budget', 'ux-wording', 'defect', 'environment', 'other'];
+
+export function countReasons(list) {
+  const counts = Object.fromEntries(REASON_SLUGS.map((s) => [s, 0]));
+  for (const r of list) {
+    for (const item of [...r.briefRevisions, ...r.reworks, ...r.stops]) {
+      for (const raw of String(item.reason ?? '').split(',')) {
+        const slug = raw.trim();
+        if (slug) counts[slug in counts ? slug : 'other'] += 1;
+      }
+    }
+  }
+  return counts;
+}
+
 function median(values) {
   if (!values.length) return null;
   const s = [...values].sort((a, b) => a - b);
@@ -68,10 +83,12 @@ export function summarize(rows) {
     pluginVersion,
     features: list.length,
     medianHoursToAcceptance: median(list.map((r) => r.hoursToAcceptance).filter((h) => typeof h === 'number')),
+    medianHoursToDone: median(list.map((r) => r.hoursToDone).filter((h) => typeof h === 'number')),
     briefRevisions: sum(list, (r) => r.briefRevisions.length),
     reworks: sum(list, (r) => r.reworks.length),
     stops: sum(list, (r) => r.stops.length),
     postMergeFixes: sum(list, (r) => r.postMergeFixes),
+    reasons: countReasons(list),
   }));
 }
 
@@ -79,18 +96,36 @@ const cell = (v) => (v === null || v === undefined ? '' : String(v));
 const hours = (h) => (typeof h === 'number' ? h.toFixed(1) : '');
 const mtok = (n) => (n ? (n / 1e6).toFixed(1) + 'M' : '');
 
+export function usageTotals(rows) {
+  return {
+    tokensIn: rows.reduce((a, r) => a + r.input + r.cacheWrite, 0),
+    tokensCacheRead: rows.reduce((a, r) => a + r.cacheRead, 0),
+    tokensOut: rows.reduce((a, r) => a + r.output, 0),
+  };
+}
+
+export function windowEnd(doneAt, lastCommitAt) {
+  return doneAt ?? lastCommitAt ?? null;
+}
+
 export function renderMarkdown({ rows, summary }) {
   const out = ['## Per feature', '',
-    '| Feature | Title | Status | Plugin | Tier | Hours to acceptance | Brief revisions | Reworks | Stops | Fix attempts | Post-merge fixes | Tokens in | Tokens out |',
-    '|---|---|---|---|---|---|---|---|---|---|---|---|---|'];
+    '| Feature | Title | Status | Plugin | Tier | Hours to acceptance | Hours to done | Brief revisions | Reworks | Stops | Fix attempts | Post-merge fixes | Tokens in | Tokens cache read | Tokens out |',
+    '|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|'];
   for (const r of rows) {
-    out.push(`| ${r.id} | ${cell(r.title).replace(/\|/g, '\\|')} | ${cell(r.status)} | ${r.pluginVersion} | ${cell(r.tier)} | ${hours(r.hoursToAcceptance)} | ${r.briefRevisions.length} | ${r.reworks.length} | ${r.stops.length} | ${r.featureFixAttempts} | ${r.postMergeFixes} | ${mtok(r.usage?.tokensIn)} | ${mtok(r.usage?.tokensOut)} |`);
+    out.push(`| ${r.id} | ${cell(r.title).replace(/\|/g, '\\|')} | ${cell(r.status)} | ${r.pluginVersion} | ${cell(r.tier)} | ${hours(r.hoursToAcceptance)} | ${hours(r.hoursToDone)} | ${r.briefRevisions.length} | ${r.reworks.length} | ${r.stops.length} | ${r.featureFixAttempts} | ${r.postMergeFixes} | ${mtok(r.usage?.tokensIn)} | ${mtok(r.usage?.tokensCacheRead)} | ${mtok(r.usage?.tokensOut)} |`);
   }
   out.push('', '## Per plugin version', '',
-    '| Plugin | Features | Median hours to acceptance | Brief revisions | Reworks | Stops | Post-merge fixes |',
-    '|---|---|---|---|---|---|---|');
+    '| Plugin | Features | Median hours to acceptance | Median hours to done | Brief revisions | Reworks | Stops | Post-merge fixes |',
+    '|---|---|---|---|---|---|---|---|');
   for (const s of summary) {
-    out.push(`| ${s.pluginVersion} | ${s.features} | ${hours(s.medianHoursToAcceptance)} | ${s.briefRevisions} | ${s.reworks} | ${s.stops} | ${s.postMergeFixes} |`);
+    out.push(`| ${s.pluginVersion} | ${s.features} | ${hours(s.medianHoursToAcceptance)} | ${hours(s.medianHoursToDone)} | ${s.briefRevisions} | ${s.reworks} | ${s.stops} | ${s.postMergeFixes} |`);
+  }
+  out.push('', '## Reasons by plugin version', '',
+    `| Plugin | ${REASON_SLUGS.join(' | ')} |`,
+    `|---|${REASON_SLUGS.map(() => '---').join('|')}|`);
+  for (const s of summary) {
+    out.push(`| ${s.pluginVersion} | ${REASON_SLUGS.map((slug) => s.reasons?.[slug] ?? 0).join(' | ')} |`);
   }
   return out.join('\n') + '\n';
 }
@@ -110,7 +145,7 @@ export function findBranch(repo, id) {
   } catch { return null; }
 }
 
-function featureUsage(repo, main, id, projectsDir) {
+function featureUsage(repo, main, id, projectsDir, doneAt) {
   const branch = findBranch(repo, id);
   if (!branch) return null;
   let since;
@@ -142,8 +177,9 @@ export function buildRows(repo, config, projectsDir) {
     row.acceptanceAt = acceptanceAt;
     row.doneAt = doneAt;
     row.hoursToAcceptance = acceptanceAt && !Number.isNaN(approved) ? (Date.parse(acceptanceAt) - approved) / 3.6e6 : null;
+    row.hoursToDone = doneAt && !Number.isNaN(approved) ? (Date.parse(doneAt) - approved) / 3.6e6 : null;
     row.postMergeFixes = postMergeFixes(repo, main, row.id, doneAt);
-    row.usage = featureUsage(repo, main, row.id, projectsDir);
+    row.usage = featureUsage(repo, main, row.id, projectsDir, doneAt);
     rows.push(row);
   }
   return rows;

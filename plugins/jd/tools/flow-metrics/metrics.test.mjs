@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { statusDates, postMergeFixes, findBranch, mentionsId, parseApprovedAt, summarize, renderMarkdown } from './metrics.mjs';
+import { statusDates, postMergeFixes, findBranch, mentionsId, parseApprovedAt, summarize, renderMarkdown, countReasons, usageTotals, windowEnd } from './metrics.mjs';
 
 let hasGit = true;
 try { execFileSync('git', ['--version'], { stdio: 'ignore' }); } catch { hasGit = false; }
@@ -106,4 +106,43 @@ gitTest('picks the exact feature branch', () => {
 
 test('treats a date-only approvedAt as local midnight', () => {
   assert.equal(parseApprovedAt('2026-11-13'), new Date(2026, 10, 13).getTime());
+});
+
+test('counts reasons per slug, splitting comma-separated cells', () => {
+  const counts = countReasons([{
+    briefRevisions: [{ reason: 'wrong-scope' }],
+    reworks: [{ reason: 'missed-requirement, ux-wording' }, { reason: '' }],
+    stops: [{ reason: 'environment' }, { reason: 'mystery' }],
+  }]);
+  assert.equal(counts['wrong-scope'], 1);
+  assert.equal(counts['missed-requirement'], 1);
+  assert.equal(counts['ux-wording'], 1);
+  assert.equal(counts.environment, 1);
+  assert.equal(counts.other, 1);
+  assert.equal(counts.defect, 0);
+});
+
+test('renders reasons by version and hours to done', () => {
+  const rows = [
+    { id: 'A', title: 'T', status: 'done', pluginVersion: '0.39.0', tier: '', hoursToAcceptance: 5, hoursToDone: 10, briefRevisions: [{ reason: 'defect' }], reworks: [], stops: [], postMergeFixes: 0, featureFixAttempts: 0, usage: null },
+    { id: 'B', title: 'T', status: 'done', pluginVersion: '0.39.0', tier: '', hoursToAcceptance: 5, hoursToDone: 20, briefRevisions: [], reworks: [{ reason: 'defect,wrong-scope' }], stops: [], postMergeFixes: 0, featureFixAttempts: 0, usage: null },
+  ];
+  const summary = summarize(rows);
+  assert.equal(summary[0].medianHoursToDone, 15);
+  const md = renderMarkdown({ rows, summary });
+  assert.match(md, /## Reasons by plugin version/);
+  assert.match(md, /\| Plugin \| missed-requirement \| wrong-scope \| wrong-assumption \| quality-budget \| ux-wording \| defect \| environment \| other \|/);
+  assert.match(md, /\| 0\.39\.0 \| 0 \| 1 \| 0 \| 0 \| 0 \| 2 \| 0 \| 0 \|/);
+  assert.match(md, /Hours to done/);
+  assert.match(md, /\| 10\.0 \|/);
+});
+
+test('usage totals split fresh input from cache reads like usage-report', () => {
+  const t = usageTotals([{ input: 10, cacheWrite: 5, cacheRead: 100, output: 7 }, { input: 1, cacheWrite: 0, cacheRead: 50, output: 3 }]);
+  assert.deepEqual(t, { tokensIn: 16, tokensCacheRead: 150, tokensOut: 10 });
+});
+
+test('usage window ends at done, else at the last branch commit', () => {
+  assert.equal(windowEnd('2026-01-03T00:00:00Z', '2026-01-02T00:00:00Z'), '2026-01-03T00:00:00Z');
+  assert.equal(windowEnd(null, '2026-01-02T00:00:00Z'), '2026-01-02T00:00:00Z');
 });
