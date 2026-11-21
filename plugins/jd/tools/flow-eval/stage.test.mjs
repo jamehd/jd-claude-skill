@@ -4,6 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, readdi
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { toWslPath, findSuperpowers, stage, cleanup } from './stage.mjs';
 
 const tmp = (p) => mkdtempSync(join(tmpdir(), p));
@@ -93,7 +94,7 @@ test('cleanup removes only its own staging folder', () => {
 
 test('stage-only CLI refuses an --out inside the plugin repo', () => {
   const f = fixture();
-  assert.throws(() => execFileSync('node', [new URL('./stage.mjs', import.meta.url).pathname.replace(/^\/(\w:)/, '$1'), '--repo', f.repo, '--cases', f.cases, '--out', join(f.repo, 'staged')], { stdio: 'pipe' }), /must not be inside/);
+  assert.throws(() => execFileSync('node', [fileURLToPath(new URL('./stage.mjs', import.meta.url)), '--repo', f.repo, '--cases', f.cases, '--out', join(f.repo, 'staged')], { stdio: 'pipe' }), /must not be inside/);
 });
 
 test('skips the results and sources folders of the evals directory', () => {
