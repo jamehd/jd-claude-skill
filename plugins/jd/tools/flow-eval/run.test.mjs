@@ -35,6 +35,11 @@ test('a different model changes the key and is never reused', () => {
   assert.equal(findReusable([{ key: historyKey(base), partial: false }], a), undefined);
 });
 
+test('a different run count changes the key; 3 is the default', () => {
+  assert.notEqual(historyKey({ ...base, runs: 5 }), historyKey(base));
+  assert.equal(historyKey({ ...base, runs: 3 }), historyKey(base));
+});
+
 test('appendHistory creates the file and appends', () => {
   const file = join(tmp('fe-h-'), 'nested', 'history.json');
   appendHistory(file, { key: 'a' });
@@ -57,6 +62,7 @@ function world() {
   write(join(repo, 'plugins/jd/.claude-plugin/plugin.json'), JSON.stringify({ name: 'jd', version: '1.1.0' }));
   const project = tmp('fe-proj-');
   write(join(project, 'project-board/evals/case-a/prompt.md'), 'do it');
+  write(join(project, 'project-board/evals/case-a/case.yaml'), 'name: smoke\n');
   write(join(project, 'project-board/evals/sources/n.md'), 'n');
   const spDir = tmp('fe-sp-');
   write(join(spDir, '.claude-plugin/plugin.json'), '{"name":"superpowers"}');
@@ -87,7 +93,7 @@ function deps(w, calls) {
 test('end to end with a fake eval', async () => {
   const w = world();
   const calls = [];
-  const code = await main(['--project', w.project, '--plugin-repo', w.repo, '--new', 'WORKTREE'], deps(w, calls));
+  const code = await main(['--project', w.project, '--plugin-repo', w.repo, '--runs', '1', '--new', 'WORKTREE'], deps(w, calls));
   assert.equal(code, 1);
   assert.equal(calls.length, 2);
   const evals = join(w.project, 'project-board/evals');
@@ -102,7 +108,7 @@ test('end to end with a fake eval', async () => {
   assert.deepEqual(readdirSync(w.stageDir), []);
 
   const again = [];
-  const code2 = await main(['--project', w.project, '--plugin-repo', w.repo], deps(w, again));
+  const code2 = await main(['--project', w.project, '--plugin-repo', w.repo, '--runs', '1'], deps(w, again));
   assert.equal(code2, 1);
   assert.equal(again.length, 1);
 });
@@ -110,10 +116,10 @@ test('end to end with a fake eval', async () => {
 test('exits 0 when nothing is worse and cleans staging on failure', async () => {
   const w = world();
   const ok = { ...deps(w, []), runEval: () => clone(sample) };
-  assert.equal(await main(['--project', w.project, '--plugin-repo', w.repo], ok), 0);
+  assert.equal(await main(['--project', w.project, '--plugin-repo', w.repo, '--runs', '1'], ok), 0);
   const w2 = world();
   const boom = { ...deps(w2, []), runEval: () => { throw new Error('boom'); } };
-  await assert.rejects(main(['--project', w2.project, '--plugin-repo', w2.repo], boom), /boom/);
+  await assert.rejects(main(['--project', w2.project, '--plugin-repo', w2.repo, '--runs', '1'], boom), /boom/);
   assert.deepEqual(readdirSync(w2.stageDir), []);
 });
 
@@ -155,11 +161,11 @@ test('an old run with an errored case is recorded as partial and re-run next tim
     return JSON.parse(readFileSync(join(dir, '.claude-plugin/plugin.json'), 'utf8')).version === '1.0.0' ? clone(errored) : clone(sample);
   } });
   const first = [];
-  await main(['--project', w.project, '--plugin-repo', w.repo], mk(first));
+  await main(['--project', w.project, '--plugin-repo', w.repo, '--runs', '1'], mk(first));
   const history = JSON.parse(readFileSync(join(w.project, 'project-board/evals/history.json'), 'utf8'));
   assert.equal(history.find((h) => h.pluginVersion === '1.0.0').partial, true);
   const second = [];
-  await main(['--project', w.project, '--plugin-repo', w.repo], mk(second));
+  await main(['--project', w.project, '--plugin-repo', w.repo, '--runs', '1'], mk(second));
   assert.equal(second.length, 2);
 });
 
@@ -169,7 +175,7 @@ test('per-run artifacts are kept for both old and new', async () => {
     write(join(out, 'run-1', 'trace.txt'), 't');
     return JSON.parse(readFileSync(join(dir, '.claude-plugin/plugin.json'), 'utf8')).version === '1.0.0' ? clone(sample) : lowered(sample);
   } };
-  await main(['--project', w.project, '--plugin-repo', w.repo], d);
+  await main(['--project', w.project, '--plugin-repo', w.repo, '--runs', '1'], d);
   const results = join(w.project, 'project-board/evals/results');
   for (const v of ['1.0.0', '1.1.0']) {
     const [s] = readdirSync(join(results, v));
@@ -191,7 +197,7 @@ test('default --old is main, history key carries the commit sha and the tag is i
   const w = world();
   execFileSync('git', ['-C', w.repo, 'tag', 'zzz-backup'], { stdio: 'pipe' });
   const sha = execFileSync('git', ['-C', w.repo, 'rev-parse', 'main'], { encoding: 'utf8' }).trim();
-  await main(['--project', w.project, '--plugin-repo', w.repo], deps(w, []));
+  await main(['--project', w.project, '--plugin-repo', w.repo, '--runs', '1'], deps(w, []));
   const history = JSON.parse(readFileSync(join(w.project, 'project-board/evals/history.json'), 'utf8'));
   const old = history.find((h) => h.pluginVersion === '1.0.0');
   assert.equal(old.pluginRef, 'main');
@@ -201,7 +207,7 @@ test('default --old is main, history key carries the commit sha and the tag is i
 
 test('an old side of WORKTREE is never reused', async () => {
   const w = world();
-  const args = ['--project', w.project, '--plugin-repo', w.repo, '--old', 'WORKTREE'];
+  const args = ['--project', w.project, '--plugin-repo', w.repo, '--runs', '1', '--old', 'WORKTREE'];
   const first = [];
   await main(args, deps(w, first));
   const second = [];
@@ -209,10 +215,32 @@ test('an old side of WORKTREE is never reused', async () => {
   assert.equal(second.length, 2);
 });
 
+test('a partial result whose cases all finished still exits 0', async () => {
+  const w = world();
+  const d = { ...deps(w, []), runEval: () => Object.assign(clone(sample), { partial: true }) };
+  assert.equal(await main(['--project', w.project, '--plugin-repo', w.repo, '--runs', '1'], d), 0);
+});
+
+test('a case that never ran exits 3 and is recorded as partial', async () => {
+  const w = world();
+  write(join(w.project, 'project-board/evals/case-z/case.yaml'), 'name: never-ran\n');
+  const d = { ...deps(w, []), runEval: () => Object.assign(clone(sample), { partial: true }) };
+  assert.equal(await main(['--project', w.project, '--plugin-repo', w.repo, '--runs', '1'], d), 3);
+  assert.match(readFileSync(join(w.project, 'project-board/evals/results/1.1.0', readdirSync(join(w.project, 'project-board/evals/results/1.1.0'))[0], 'comparison.md'), 'utf8'), /never-ran \| - \| - \| incomplete/);
+});
+
+test('a case with fewer runs than --runs is incomplete and recorded as partial', async () => {
+  const w = world();
+  const d = { ...deps(w, []), runEval: () => clone(sample) };
+  assert.equal(await main(['--project', w.project, '--plugin-repo', w.repo, '--runs', '3'], d), 3);
+  const history = JSON.parse(readFileSync(join(w.project, 'project-board/evals/history.json'), 'utf8'));
+  assert.ok(history.every((h) => h.partial === true && h.runs === 3));
+});
+
 test('exits 3 when a case is incomplete and nothing is worse', async () => {
   const w = world();
   const errored = clone(sample);
   errored.cases[0].arms.with[0].error = 'boom';
   const d = { ...deps(w, []), runEval: (dir) => JSON.parse(readFileSync(join(dir, '.claude-plugin/plugin.json'), 'utf8')).version === '1.0.0' ? clone(sample) : clone(errored) };
-  assert.equal(await main(['--project', w.project, '--plugin-repo', w.repo], d), 3);
+  assert.equal(await main(['--project', w.project, '--plugin-repo', w.repo, '--runs', '1'], d), 3);
 });

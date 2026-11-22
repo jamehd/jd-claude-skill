@@ -38,35 +38,79 @@ test('throws when there are no cases', () => {
   assert.throws(() => readResult({ ...clone(sample), cases: [] }), /no cases/);
 });
 
-test('flags a drop of one run in three as worse', () => {
+test('a drop of one run in three is same but lists the lost grader', () => {
   const o = readResult(build([{ name: 'a', runs: three(3) }]));
   const n = readResult(build([{ name: 'a', runs: three(2) }]));
   const [row] = compareResults(o, n);
-  assert.equal(row.verdict, 'worse');
+  assert.equal(row.verdict, 'same');
   assert.deepEqual(row.lost, ['g']);
   assert.deepEqual(row.gained, []);
 });
 
-test('flags a rise of one run in three as better', () => {
+test('flags a drop of two runs in three as worse', () => {
+  const o = readResult(build([{ name: 'a', runs: three(3) }]));
+  const n = readResult(build([{ name: 'a', runs: three(1) }]));
+  assert.equal(compareResults(o, n)[0].verdict, 'worse');
+});
+
+test('flags a rise of two runs in three as better', () => {
   const o = readResult(build([{ name: 'a', runs: three(1) }]));
-  const n = readResult(build([{ name: 'a', runs: three(2) }]));
+  const n = readResult(build([{ name: 'a', runs: three(3) }]));
   const [row] = compareResults(o, n);
   assert.equal(row.verdict, 'better');
   assert.deepEqual(row.gained, ['g']);
+});
+
+test('noise graders are never listed as gained or lost', () => {
+  const o = readResult(build([{ name: 'a', runs: [0, 1, 2].map(() => ({ g: true, 'noise-1': true })) }]));
+  const n = readResult(build([{ name: 'a', runs: [0, 1, 2].map(() => ({ g: true, 'noise-1': false })) }]));
+  const [row] = compareResults(o, n);
+  assert.deepEqual([row.gained, row.lost], [[], []]);
+  assert.equal(row.newNoise, 0);
 });
 
 test('same within the margin', () => {
   const o = readResult(build([{ name: 'a', runs: three(2) }]));
   const ten = Array.from({ length: 10 }, (_, i) => ({ g: i < 9 }));
   const n = readResult(build([{ name: 'a', runs: ten }]));
-  assert.equal(compareResults(o, n)[0].verdict, 'same');
+  assert.equal(compareResults(o, n, { expectedRuns: 3 })[0].verdict, 'same');
 });
 
-test('partial results are incomplete', () => {
+test('a partial result still compares cases that finished every run', () => {
+  const o = readResult(build([{ name: 'a', runs: three(3) }, { name: 'b', runs: three(3) }]));
+  const n = readResult(build([{ name: 'a', runs: three(1) }, { name: 'b', runs: three(1).slice(0, 1) }], { partial: true }));
+  const rows = compareResults(o, n, { expectedRuns: 3 });
+  assert.equal(rows.find((r) => r.case === 'a').verdict, 'worse');
+  assert.equal(rows.find((r) => r.case === 'b').verdict, 'incomplete');
+});
+
+test('expected runs default to the most runs any case has', () => {
+  const o = readResult(build([{ name: 'a', runs: three(3) }, { name: 'b', runs: three(3) }]));
+  const n = readResult(build([{ name: 'a', runs: three(3) }, { name: 'b', runs: three(3).slice(0, 2) }], { partial: true }));
+  const rows = compareResults(o, n);
+  assert.equal(rows.find((r) => r.case === 'a').verdict, 'same');
+  assert.equal(rows.find((r) => r.case === 'b').verdict, 'incomplete');
+});
+
+test('a case missing from a partial side is incomplete, not new or removed', () => {
+  const full = readResult(build([{ name: 'a', runs: three(3) }, { name: 'b', runs: three(3) }]));
+  const cut = readResult(build([{ name: 'a', runs: three(3) }], { partial: true }));
+  assert.equal(compareResults(full, cut).find((r) => r.case === 'b').verdict, 'incomplete');
+  assert.equal(compareResults(cut, full).find((r) => r.case === 'b').verdict, 'incomplete');
+});
+
+test('an expected case that ran on neither side is listed as incomplete', () => {
   const o = readResult(build([{ name: 'a', runs: three(3) }], { partial: true }));
+  const n = readResult(build([{ name: 'a', runs: three(3) }], { partial: true }));
+  const rows = compareResults(o, n, { expectedCases: ['a', 'z'] });
+  assert.deepEqual(rows.map((r) => [r.case, r.verdict]), [['a', 'same'], ['z', 'incomplete']]);
+});
+
+test('a case with fewer runs than expected is incomplete on either side', () => {
+  const o = readResult(build([{ name: 'a', runs: three(3).slice(0, 1) }], { partial: true }));
   const n = readResult(build([{ name: 'a', runs: three(0) }]));
-  assert.equal(compareResults(o, n)[0].verdict, 'incomplete');
-  assert.equal(compareResults(n, o)[0].verdict, 'incomplete');
+  assert.equal(compareResults(o, n, { expectedRuns: 3 })[0].verdict, 'incomplete');
+  assert.equal(compareResults(n, o, { expectedRuns: 3 })[0].verdict, 'incomplete');
 });
 
 test('a run error makes the case incomplete', () => {
@@ -99,11 +143,11 @@ test('noise does not change the score', () => {
 
 test('renders a table and summary', () => {
   const o = readResult(build([{ name: 'a', runs: three(3) }]));
-  const n = readResult(build([{ name: 'a', runs: three(2) }]));
+  const n = readResult(build([{ name: 'a', runs: three(1) }]));
   const md = renderComparison(compareResults(o, n), { oldLabel: '0.38.0', newLabel: '0.39.0', oldCost: 1, newCost: 2, oldDuration: 10, newDuration: 20 });
   assert.match(md, /0\.38\.0/);
   assert.match(md, /\| Case \| Old \| New \| Verdict \| Gained \| Lost \| Noise old→new \|/);
-  assert.match(md, /\| a \| 1\.00 \| 0\.67 \| worse \|/);
+  assert.match(md, /\| a \| 1\.00 \| 0\.33 \| worse \|/);
   assert.match(md, /1 worse, 0 better/);
 });
 

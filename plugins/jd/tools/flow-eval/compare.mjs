@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
-const MARGIN = 0.34;
-const EPS = 0.01;
+const VERDICT_MARGIN = 0.34;
+const GRADER_SHIFT = 0.33;
 
 const mean = (xs) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : null);
 const weightedMean = (xs) => {
@@ -38,6 +38,7 @@ export function readResult(json) {
     }
     out[c.name] = {
       score: weightedMean(scoredShares),
+      runs: runs.length,
       error: runs.length === 0 || runs.some((r) => r.error != null),
       graders,
       noise: mean(noiseShares),
@@ -48,21 +49,25 @@ export function readResult(json) {
 
 function shift(oldC, newC, sign) {
   return Object.keys(newC.graders)
-    .filter((g) => g in oldC.graders && sign * (newC.graders[g] - oldC.graders[g]) >= MARGIN - EPS)
+    .filter((g) => !isNoise(g) && g in oldC.graders && sign * (newC.graders[g] - oldC.graders[g]) >= GRADER_SHIFT)
     .sort();
 }
 
-export function compareResults(oldR, newR) {
-  const names = [...new Set([...Object.keys(oldR.cases), ...Object.keys(newR.cases)])];
+export function compareResults(oldR, newR, { expectedRuns, expectedCases = [] } = {}) {
+  const all = [...Object.values(oldR.cases), ...Object.values(newR.cases)];
+  const wanted = expectedRuns ?? Math.max(0, ...all.map((c) => c.runs ?? 0));
+  const unfinished = (c) => c.error || c.score == null || (c.runs ?? wanted) < wanted;
+  const names = [...new Set([...Object.keys(oldR.cases), ...Object.keys(newR.cases), ...expectedCases])];
   return names.map((name) => {
     const o = oldR.cases[name];
     const n = newR.cases[name];
     const row = { case: name, old: o?.score ?? null, new: n?.score ?? null, oldNoise: o?.noise ?? null, newNoise: n?.noise ?? null, verdict: 'same', gained: [], lost: [] };
-    if (!o) return { ...row, verdict: 'new' };
-    if (!n) return { ...row, verdict: 'removed' };
-    if (oldR.partial || newR.partial || o.error || n.error || o.score == null || n.score == null) return { ...row, verdict: 'incomplete' };
+    if (!o && !n) return { ...row, verdict: 'incomplete' };
+    if (!o) return { ...row, verdict: oldR.partial ? 'incomplete' : 'new' };
+    if (!n) return { ...row, verdict: newR.partial ? 'incomplete' : 'removed' };
+    if (unfinished(o) || unfinished(n)) return { ...row, verdict: 'incomplete' };
     const diff = n.score - o.score;
-    row.verdict = -diff >= MARGIN - EPS ? 'worse' : diff >= MARGIN - EPS ? 'better' : 'same';
+    row.verdict = -diff >= VERDICT_MARGIN ? 'worse' : diff >= VERDICT_MARGIN ? 'better' : 'same';
     row.gained = shift(o, n, 1);
     row.lost = shift(o, n, -1);
     return row;

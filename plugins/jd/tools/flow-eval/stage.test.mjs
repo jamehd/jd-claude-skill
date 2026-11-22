@@ -57,6 +57,7 @@ test('stages the working copy with cases', () => {
   assert.match(b, /name: b/);
   assert.match(b, /runs: 3/);
   assert.equal((b.match(/plugins:/g) || []).length, 1);
+  assert.deepEqual(r.cases.sort(), ['b', 'case-a']);
   cleanup(r.dir);
   assert.ok(!existsSync(r.dir));
 });

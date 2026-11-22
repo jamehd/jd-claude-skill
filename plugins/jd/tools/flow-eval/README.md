@@ -21,13 +21,17 @@ Cases live in the project, never in this repo: `<project>/project-board/evals/<c
 ## Running
 
 ```bash
-node <plugin>/tools/flow-eval/run.mjs --project <repo> [--old <ref>] [--new WORKTREE] [--plugin-repo <path>] [--cases <dir>] [--max-cost-usd 15] [--runs 3] [--model <name>]
+node <plugin>/tools/flow-eval/run.mjs --project <repo> [--old <ref>] [--new WORKTREE] [--plugin-repo <path>] [--cases <dir>] [--max-cost-usd 25] [--runs 3] [--model <name>]
 ```
 
 - `--old` defaults to `main`; `--new WORKTREE` uses the working copy. Refs are resolved to a commit sha for the history key; a `WORKTREE` side always runs.
 - `--plugin-repo` must be a checkout of the plugin repo; the default (the repo containing this script) works only when run from that checkout.
 - `--cases <dir>` overrides the case folder (default `<project>/project-board/evals`).
-- Exit codes: `0` no regression, `1` at least one case is `worse`, `3` no case is worse but at least one is `incomplete` (partial result or errored run), `2` error.
+- A case is `incomplete` when it errored, has no scored grader, finished fewer than `--runs` runs, or never ran (it is in the case folder but missing from a result). Cases that finished every run are compared even when the cost cap stopped the run early.
+- `--max-cost-usd` defaults to 25 per version; ten cases at three runs on sonnet cost about $19.
+- The history key includes `--runs`; a result recorded with another run count is not reused.
+- A case is `worse` (or `better`) when its score moves by 0.34 or more, two runs in three for a one-finding case. A single flipped run is normal noise: it shows in Gained/Lost but keeps the verdict `same`. Noise graders never appear in Gained/Lost.
+- Exit codes: `0` no regression, `1` at least one case is `worse`, `3` no case is worse but at least one is `incomplete`, `2` error.
 - A run may take up to 6 hours. On timeout or Ctrl-C the staged copy can be left in the system temp folder (`%TEMP%\jd-stage-*`); delete it.
 - Runs use `--ablation none`, `--scaffold` (cases build their workspace with `context.scaffold_script`) and `--allow-tools Write Edit`. Bash is never granted: WSL has no sandbox tools, so a Bash grant makes runs be refused.
 - `--model <name>` is passed through to `claude plugin eval` when given (e.g. `--model sonnet`).

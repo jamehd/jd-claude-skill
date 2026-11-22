@@ -43,6 +43,10 @@ A growing library of personal engineering skills that work across projects: proj
 
 Agents ship in `plugins/jd/agents/` as subagent types `jd:<name>` and are available to any session that has the plugin installed.
 
+## Upgrading to 0.39.1
+
+`tools/flow-eval` compares every case that finished all its runs, even when the cost cap stopped the run; only cases with an error, missing runs or no result are `incomplete`. A case is `worse` only when its score drops by 0.34 or more (two runs in three); one flipped run stays `same`. The default cost cap is now $25 per version, and the history key includes `--runs`. No project changes needed.
+
 ## Upgrading to 0.39.0
 
 `jd:feature-flow` records which plugin version built a feature and why it was corrected or stopped (`references/reasons.md`):
@@ -50,7 +54,7 @@ Agents ship in `plugins/jd/agents/` as subagent types `jd:<name>` and are availa
 - `feature.md` gets `pluginVersion`, a `## Brief revisions` table and a `## Stops` table; `report.md` gets a `Plugin version` row and a Reason column in the rework history; stop reports get a `Reason category` row.
 - Reasons are one of `missed-requirement`, `wrong-scope`, `wrong-assumption`, `quality-budget`, `ux-wording`, `defect`, `environment`, `other`.
 - `jd:accept ok` runs `tools/flow-metrics` and commits the updated `metrics.md`.
-- New tool `tools/flow-eval` replays a project's eval cases against two plugin versions: `node plugins/jd/tools/flow-eval/run.mjs --project <repo> [--old main] [--new WORKTREE] [--plugin-repo <checkout of this repo>] [--cases <dir>] [--max-cost-usd 15] [--runs 3] [--model <name>]`. `--old` defaults to `main`; `--plugin-repo` must be a checkout of the plugin repo (the default works only when run from that checkout). Exit codes: 0 no regression, 1 a case got worse, 2 error, 3 a case was incomplete.
+- New tool `tools/flow-eval` replays a project's eval cases against two plugin versions: `node plugins/jd/tools/flow-eval/run.mjs --project <repo> [--old main] [--new WORKTREE] [--plugin-repo <checkout of this repo>] [--cases <dir>] [--max-cost-usd 25] [--runs 3] [--model <name>]`. `--old` defaults to `main`; `--plugin-repo` must be a checkout of the plugin repo (the default works only when run from that checkout). Exit codes: 0 no regression, 1 a case got worse, 2 error, 3 a case was incomplete.
 
 Existing projects: add `pluginVersion:` to open `feature.md` files, the two tables to `feature.md`, and the Reason column to the rework history in `report.md` (older features without them show as `before-0.39`). Create `project-board/evals/` and git-ignore `evals/results/` and `evals/sources/`.
 

@@ -98,6 +98,7 @@ export function stage({ pluginRepo, ref, casesDir, superpowers, outDir }) {
 
   const evals = join(dir, 'evals');
   mkdirSync(evals, { recursive: true });
+  const cases = [];
   for (const name of caseFolders(casesDir)) {
     const src = join(casesDir, name);
     const dst = join(evals, name);
@@ -105,9 +106,10 @@ export function stage({ pluginRepo, ref, casesDir, superpowers, outDir }) {
     const yamlFile = join(dst, 'case.yaml');
     const current = existsSync(yamlFile) ? readFileSync(yamlFile, 'utf8') : '';
     writeFileSync(yamlFile, withPlugins(current));
+    cases.push(current.match(/^name:\s*["']?([^"'\r\n]+?)["']?\s*$/m)?.[1] ?? name);
   }
 
-  return { dir, pluginVersion, casesHash: hashCases(casesDir) };
+  return { dir, pluginVersion, casesHash: hashCases(casesDir), cases };
 }
 
 export function cleanup(dir) {

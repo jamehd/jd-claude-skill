@@ -7,11 +7,13 @@ import { stage, cleanup, findSuperpowers, toWslPath } from './stage.mjs';
 import { readResult, compareResults, renderComparison } from './compare.mjs';
 
 const WSL_DISTRO = 'Ubuntu-24.04';
+const DEFAULT_RUNS = 3;
+const DEFAULT_MAX_COST_USD = 25;
 const EVAL_TIMEOUT_MS = 6 * 60 * 60 * 1000;
 const HERE = fileURLToPath(import.meta.url);
 
-export function historyKey({ commit, pluginVersion, superpowersVersion, casesHash, model }) {
-  return [commit, pluginVersion, superpowersVersion, casesHash, model ?? 'default'].join('|');
+export function historyKey({ commit, pluginVersion, superpowersVersion, casesHash, model, runs }) {
+  return [commit, pluginVersion, superpowersVersion, casesHash, model ?? 'default', runs ?? DEFAULT_RUNS].join('|');
 }
 
 export function findReusable(history, key) {
@@ -110,15 +112,15 @@ function resultsFolder(evalsRoot, version) {
   return dir;
 }
 
-function entryFor(ref, commit, staged, superpowers, model, result) {
-  const base = { commit, pluginRef: ref, pluginVersion: staged.pluginVersion, superpowersVersion: superpowers.version, casesHash: staged.casesHash, model: model ?? 'default' };
-  const incomplete = result.partial || Object.values(result.cases).some((c) => c.error);
+function entryFor(ref, commit, staged, superpowers, model, runs, result) {
+  const base = { commit, pluginRef: ref, pluginVersion: staged.pluginVersion, superpowersVersion: superpowers.version, casesHash: staged.casesHash, model: model ?? 'default', runs };
+  const incomplete = result.partial || Object.values(result.cases).some((c) => c.error || c.runs < runs);
   return { key: historyKey(base), ...base, date: new Date().toISOString(), ...result, partial: incomplete };
 }
 
 export async function main(argv, deps = {}) {
   const o = parseArgs(argv);
-  if (!o.project) throw new Error('usage: run.mjs --project <repo> [--old <ref>] [--new WORKTREE] [--plugin-repo <path>] [--max-cost-usd 15] [--runs 3] [--model <name>] [--cases <dir>]');
+  if (!o.project) throw new Error('usage: run.mjs --project <repo> [--old <ref>] [--new WORKTREE] [--plugin-repo <path>] [--max-cost-usd 25] [--runs 3] [--model <name>] [--cases <dir>]');
   const log = deps.log ?? ((m) => console.log(m));
   const project = resolve(o.project);
   const pluginRepo = resolve(o['plugin-repo'] ?? join(HERE, '..', '..', '..', '..', '..'));
@@ -129,7 +131,8 @@ export async function main(argv, deps = {}) {
   const newRef = o.new ?? 'WORKTREE';
   const oldCommit = resolveCommit(pluginRepo, oldRef);
   const newCommit = resolveCommit(pluginRepo, newRef);
-  const runEval = deps.runEval ?? makeRunEval({ maxCostUsd: Number(o['max-cost-usd'] ?? 15), runs: Number(o.runs ?? 3), model: o.model });
+  const runs = Number(o.runs ?? DEFAULT_RUNS);
+  const runEval = deps.runEval ?? makeRunEval({ maxCostUsd: Number(o['max-cost-usd'] ?? DEFAULT_MAX_COST_USD), runs, model: o.model });
   const superpowers = findSuperpowers(deps.installedPluginsFile);
 
   const staged = [];
@@ -141,7 +144,7 @@ export async function main(argv, deps = {}) {
 
   try {
     const oldStage = stageRef(oldRef);
-    const oldKey = historyKey({ commit: oldCommit, pluginVersion: oldStage.pluginVersion, superpowersVersion: superpowers.version, casesHash: oldStage.casesHash, model: o.model });
+    const oldKey = historyKey({ commit: oldCommit, pluginVersion: oldStage.pluginVersion, superpowersVersion: superpowers.version, casesHash: oldStage.casesHash, model: o.model, runs });
     const reused = oldCommit === 'WORKTREE' ? undefined : findReusable(loadHistory(historyFile), oldKey);
     let oldResult;
     if (reused) {
@@ -153,7 +156,7 @@ export async function main(argv, deps = {}) {
       const oldJson = runEval(oldStage.dir, oldOut);
       oldResult = readResult(oldJson);
       writeFileSync(join(oldOut, 'aggregate-result.json'), JSON.stringify(oldJson, null, 2) + '\n');
-      appendHistory(historyFile, entryFor(oldRef, oldCommit, oldStage, superpowers, o.model, oldResult));
+      appendHistory(historyFile, entryFor(oldRef, oldCommit, oldStage, superpowers, o.model, runs, oldResult));
     }
 
     const newStage = stageRef(newRef);
@@ -161,9 +164,9 @@ export async function main(argv, deps = {}) {
     const resultsDir = resultsFolder(evalsRoot, newStage.pluginVersion);
     const newJson = runEval(newStage.dir, resultsDir);
     const newResult = readResult(newJson);
-    appendHistory(historyFile, entryFor(newRef, newCommit, newStage, superpowers, o.model, newResult));
+    appendHistory(historyFile, entryFor(newRef, newCommit, newStage, superpowers, o.model, runs, newResult));
 
-    const rows = compareResults(oldResult, newResult);
+    const rows = compareResults(oldResult, newResult, { expectedRuns: runs, expectedCases: newStage.cases });
     const md = renderComparison(rows, {
       oldLabel: `${oldRef} (${oldStage.pluginVersion})`, newLabel: `${newRef} (${newStage.pluginVersion})`,
       oldCost: oldResult.costUsd, newCost: newResult.costUsd, oldDuration: oldResult.durationSeconds, newDuration: newResult.durationSeconds,
