@@ -71,6 +71,13 @@ export function readEvalJson(jsonFile, stagedDir, exitCode) {
   }
 }
 
+export function checkAuth(json) {
+  if (json.partialReason === 'auth_failed') {
+    throw new Error(`claude in WSL is not logged in; run: wsl.exe -d ${WSL_DISTRO} --exec bash -lc claude, then /login, and start again`);
+  }
+  return json;
+}
+
 // --exec skips the distro's default shell, which would otherwise expand $HOME, backticks and quotes in the command a second time.
 export function wslBashArgs(command) {
   return ['-d', WSL_DISTRO, '--exec', 'bash', '-lc', command];
@@ -153,7 +160,7 @@ export async function main(argv, deps = {}) {
     } else {
       log(`Running eval for ${oldRef} (${oldStage.pluginVersion})`);
       const oldOut = resultsFolder(evalsRoot, oldStage.pluginVersion);
-      const oldJson = runEval(oldStage.dir, oldOut);
+      const oldJson = checkAuth(runEval(oldStage.dir, oldOut));
       oldResult = readResult(oldJson);
       writeFileSync(join(oldOut, 'aggregate-result.json'), JSON.stringify(oldJson, null, 2) + '\n');
       appendHistory(historyFile, entryFor(oldRef, oldCommit, oldStage, superpowers, o.model, runs, oldResult));
@@ -162,7 +169,7 @@ export async function main(argv, deps = {}) {
     const newStage = stageRef(newRef);
     log(`Running eval for ${newRef} (${newStage.pluginVersion})`);
     const resultsDir = resultsFolder(evalsRoot, newStage.pluginVersion);
-    const newJson = runEval(newStage.dir, resultsDir);
+    const newJson = checkAuth(runEval(newStage.dir, resultsDir));
     const newResult = readResult(newJson);
     appendHistory(historyFile, entryFor(newRef, newCommit, newStage, superpowers, o.model, runs, newResult));
 

@@ -31,6 +31,7 @@ node <plugin>/tools/flow-eval/run.mjs --project <repo> [--old <ref>] [--new WORK
 - `--max-cost-usd` defaults to 25 per version; ten cases at three runs on sonnet cost about $19.
 - The history key includes `--runs`; a result recorded with another run count is not reused.
 - A case is `worse` (or `better`) when its score moves by 0.34 or more, two runs in three for a one-finding case. A single flipped run is normal noise: it shows in Gained/Lost but keeps the verdict `same`. Noise graders never appear in Gained/Lost.
+- When `claude` inside WSL is not logged in, the run stops with exit `2` and a login hint and records nothing in history. Log in with `wsl.exe -d Ubuntu-24.04 --exec bash -lc claude` and `/login`.
 - Exit codes: `0` no regression, `1` at least one case is `worse`, `3` no case is worse but at least one is `incomplete`, `2` error.
 - A run may take up to 6 hours. On timeout or Ctrl-C the staged copy can be left in the system temp folder (`%TEMP%\jd-stage-*`); delete it.
 - Runs use `--ablation none`, `--scaffold` (cases build their workspace with `context.scaffold_script`) and `--allow-tools Write Edit`. Bash is never granted: WSL has no sandbox tools, so a Bash grant makes runs be refused.

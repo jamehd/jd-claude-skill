@@ -244,3 +244,10 @@ test('exits 3 when a case is incomplete and nothing is worse', async () => {
   const d = { ...deps(w, []), runEval: (dir) => JSON.parse(readFileSync(join(dir, '.claude-plugin/plugin.json'), 'utf8')).version === '1.0.0' ? clone(sample) : clone(errored) };
   assert.equal(await main(['--project', w.project, '--plugin-repo', w.repo, '--runs', '1'], d), 3);
 });
+
+test('stops with a login hint when claude in WSL is not logged in', async () => {
+  const w = world();
+  const d = { ...deps(w, []), runEval: () => Object.assign(clone(sample), { partial: true, partialReason: 'auth_failed' }) };
+  await assert.rejects(main(['--project', w.project, '--plugin-repo', w.repo, '--runs', '1'], d), /not logged in.*\/login/);
+  assert.ok(!existsSync(join(w.project, 'project-board/evals/history.json')));
+});
