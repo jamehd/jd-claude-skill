@@ -25,7 +25,7 @@ only; the long, slow evidence (full soak, nightly suite) gates the release, neve
 
 | Check | `low` | `medium` | `high` |
 |---|---|---|---|
-| Rules given to the implementer, self-checked before done | `CLAUDE.md` rules + error contract | + matching security checklist rows | + every security checklist row |
+| Rules given to the implementer, self-checked before done | `CLAUDE.md` rules + comment rule + error contract | + matching security checklist rows | + every security checklist row |
 | Inner loop, per task and per fix (implementer) | `test_all` + the task's own scenarios | same | same |
 | Review per task | spec + quality review | same | same + `jd:security-reviewer` on the task's commits |
 | Whole-branch code review (build step 6) | none | once | once + `jd:security-reviewer` on the branch |

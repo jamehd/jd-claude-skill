@@ -33,9 +33,10 @@ Out:
 
 ## Self-check
 
-Filled by the implementer against the rules it was given (`CLAUDE.md`, error contract, security
-checklist rows for this task's area): each item ok, or what is still open and why.
+Filled by the implementer against the rules it was given (`CLAUDE.md`, comment rule, error
+contract, security checklist rows for this task's area): each item ok, or what is still open and why.
 
+- [ ] Comment rule: no forbidden comment added (restating code, banners, change history, empty docstrings, commented-out code): <ok / open: reason>
 - [ ] <rule or checklist row>: <ok / open: reason>
 
 ## Result

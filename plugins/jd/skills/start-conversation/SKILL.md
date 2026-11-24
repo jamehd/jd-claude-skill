@@ -1,6 +1,6 @@
 ---
 name: start-conversation
-description: Use at the start of every conversation and before any reply (including clarifying questions) to apply jamehd's baseline working conventions — English-only docs/code, no redundant code comments, and mirror the user's conversation language (reply in Vietnamese when the user writes Vietnamese).
+description: Use at the start of every conversation and before any reply (including clarifying questions) to apply jamehd's baseline working conventions — English-only docs/code, no code comments by default (only WHY the code cannot say), and mirror the user's conversation language (reply in Vietnamese when the user writes Vietnamese).
 ---
 
 # Start Conversation — Baseline Conventions
@@ -20,14 +20,29 @@ portable and reviewable.
 - ✅ `// retry once on transient network failure`
 - ❌ `// thử lại một lần khi lỗi mạng tạm thời`
 
-### 2. No redundant comments — comment WHY, not WHAT
-Do **not** add a comment when the code already states clearly what it does. Add a
-comment only when it carries information the code cannot: a non-obvious reason, a
-constraint, a gotcha, a link to context.
+### 2. Default: no comment — comment only WHY the code cannot say
+Write code with **no comments by default**. Add one only for a constraint, gotcha,
+or reason the code cannot express: a limit of an external system, a non-obvious
+"why this way", a deliberate oddity someone might "fix", a link to the issue or spec.
+Never add a comment that describes what the code does.
 
-- ❌ `count++; // increment count`
-- ❌ `// loop over users` above an obvious `for user in users:`
+Always forbidden:
+
+- Restating the code: `count++; // increment count`, `// loop over users` above `for user in users:`
+- Section banners: `// ---- helpers ----`, `# ===== Constants =====`
+- Change history: `// changed X to Y`, `// fixed bug #12`, `// new version` — that belongs in the commit message
+- Docstrings that only repeat the name and parameters: `/** Gets the user. @param id the id */`
+- Commented-out code — delete it; git keeps the history
+
+Allowed:
+
 - ✅ `// API caps page size at 100; chunk to stay under it`
+- ✅ `// legacy MySQL stores local time (Asia/Ho_Chi_Minh), not UTC`
+- ✅ Tool directives and legal headers: `//go:build`, `// eslint-disable-next-line <rule>`, `# type: ignore[...]`, license headers
+- ✅ Public API docs where the project's language or linter requires them, written to add meaning beyond the signature
+
+When you edit a file, delete forbidden comments **in the lines you are already
+changing**; leave the rest of the file alone so the diff stays focused.
 
 If you find yourself restating the code in words, delete the comment.
 

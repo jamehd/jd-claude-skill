@@ -57,7 +57,8 @@ Write "Current step: build <n>" to `paths.status` as each step starts.
    one task at a time, models per the task's `risk` and size (`tiers.md`). Set a task
    `ai_running` while it runs and `review` when its tests pass.
    - Every implementer prompt carries the rules the reviews will apply, so findings are prevented
-     instead of found late: the project's `CLAUDE.md` rules, the error contract
+     instead of found late: the project's `CLAUDE.md` rules, the comment rule (Rule 2 of
+     `../start-conversation/SKILL.md`), the error contract
      (`error-standard.yaml` when the repository has one), and for `medium` and `high` tasks the
      checklist rows of `../../agents/security-reviewer.md` that match the task's area. Before
      reporting done, the implementer checks its own diff against them and records the result
@@ -66,7 +67,9 @@ Write "Current step: build <n>" to `paths.status` as each step starts.
      `actions.test_scenarios_only`. They never run or wait for the gate suite, load or soak.
    - Each task review uses superpowers:requesting-code-review for spec and quality; a `high` task
      also gets `jd:security-reviewer` on its commits. Critical/High findings are fixed within the
-     task (they count against its `attempts`).
+     task (they count against its `attempts`). The quality review also checks the diff against the
+     comment rule: each forbidden comment the diff adds is a Minor finding, fixed in the task
+     without counting against `attempts`.
    - On failure use superpowers:systematic-debugging and increment that task's `attempts`; check
      the limit before every new attempt.
    - When this feature creates an action named in "Delivers", run it once; if it works, set its
