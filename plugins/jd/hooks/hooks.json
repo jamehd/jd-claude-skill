@@ -1,4 +1,7 @@
 {
+  "modules": [
+    "./flow-view.tsx"
+  ],
   "hooks": {
     "SessionStart": [
       {

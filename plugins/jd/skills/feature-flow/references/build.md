@@ -27,12 +27,14 @@ superpowers:using-git-worktrees, and never merge here. Merging happens only in `
   `limits.fix_attempts`).
 - Counters are never reset. When a counter reaches its limit: write a stop report
   (`templates/stop-report.md`) into the task file or report and into `paths.status`, set
-  `stoppedFrom` to the current status, set `stopped`, tell the person named in it, and end.
+  `stoppedFrom` to the current status, set `stopped`, append a `stop` flow event, tell the person
+  named in it, and end.
 - Every stop report follows `templates/stop-report.md`, including its `## Stops` row.
 
 ## Steps
 
-Write "Current step: build <n>" to `paths.status` as each step starts.
+Write "Current step: build <n>" to `paths.status` as each step starts, and append the matching flow
+event (`events.md`: phase `build`, or `verify` for step 7).
 
 1. Set `building` in `feature.md` and the status file; on the first build (from `brief-review`) overwrite `pluginVersion` from
    `<plugin>/.claude-plugin/plugin.json` (`<plugin>` is two folders above this skill); rework keeps it. On rework, read the report's verdict table
@@ -55,7 +57,8 @@ Write "Current step: build <n>" to `paths.status` as each step starts.
    (`gate` or `nightly`); waits the product must observe use scaled, configurable values in `gate`.
 5. Implement with superpowers:subagent-driven-development and superpowers:test-driven-development,
    one task at a time, models per the task's `risk` and size (`tiers.md`). Set a task
-   `ai_running` while it runs and `review` when its tests pass.
+   `ai_running` while it runs and `review` when its tests pass, appending a flow event for each
+   (`start`, `pass`, and `fail` on every counted attempt; `--step` is the task ID).
    - Every implementer prompt carries the rules the reviews will apply, so findings are prevented
      instead of found late: the project's `CLAUDE.md` rules, the comment rule (Rule 2 of
      `../start-conversation/SKILL.md`), the error contract
@@ -110,7 +113,8 @@ Write "Current step: build <n>" to `paths.status` as each step starts.
     `node <plugin>/tools/usage-report/usage.mjs --repo <repository root> --since <first commit of the branch>`
     (`<plugin>` is two folders above this skill), and the gate suite duration against
     `quality.gate_suite_minutes`. Fill the `Plugin version` row from `pluginVersion`.
-11. Set `acceptance` in `feature.md` and the status file. Reply with results, how to start the
+11. Set `acceptance` in `feature.md` and the status file, and append the `acceptance` `wait` flow
+    event (Gate B). Reply with results, how to start the
     environment and the try-it guide; ask for `/jd:accept <ID> ok` or notes per scenario. When a
     long soak is running for this feature, say when it ends and that the merge waits for it.
     Otherwise say that the full soak runs nightly after merge and gates the release. Then, when the

@@ -36,7 +36,8 @@
    - Every decision the docs do not settle goes under Open questions with a recommendation.
    - Use superpowers:brainstorming as self Q&A only; do not run its interactive questions.
 5. Add the scenario IDs to `paths.scenarios` with state `proposed`.
-6. Set `brief-review` in `feature.md` and the status file.
+6. Set `brief-review` in `feature.md` and the status file, and append the `brief` `wait` flow
+   event (Gate A). The `brief` `start` event is appended when drafting begins (`events.md`).
 7. Reply in `language.owner`: goal, risk tier, scenarios in plain words, owner steps, open
    questions; ask for an explicit approval or corrections.
 
@@ -45,4 +46,4 @@ Every owner correction before approval adds a row to `## Brief revisions` in `fe
 
 On explicit approval (words, or the owner typing `/jd:build <ID>`): write
 `Approved by owner: <date>` in the brief and `approvedAt` in `feature.md`, set this feature's
-scenarios to `approved`, and continue with `build.md` if asked.
+scenarios to `approved`, append the `brief` `resume` flow event, and continue with `build.md` if asked.

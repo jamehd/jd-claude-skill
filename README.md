@@ -18,7 +18,7 @@ A growing library of personal engineering skills that work across projects: proj
 | `jd:auto` | Autonomous end-to-end delivery: brainstorm, spec, plan, worktree, subagent TDD, review with domain audits, then integration per `git.integration` (PR by default), stopping only for architectural, hard-to-reverse or destructive decisions. Models, audits, design system and e2e notes come from `project.yaml`; runs on defaults without it. Board mode is commit-only. |
 | `jd:plan-batch` | Morning planning pass for the project board: shapes rough intents and backlog items into agent-ready tasks (scope, `needsE2e`, requirement IDs, locked decisions), promoting to `ready` only on explicit operator OK. Requires `project.yaml`. |
 | `jd:project-board` | Sets up and runs the Project Board dashboard (LAN web board that tracks tasks as markdown and dispatches them to headless Claude Code) for a repository, on Windows or Linux. Requires `project-board/project.yaml` and creates it from a template. |
-| `jd:feature-flow` | Feature lifecycle for AI-built projects: the owner gives requirements and accepts, the AI drafts briefs with numbered acceptance scenarios (Gate A), builds with subagents test-first, verifies in proportion to risk (tiers `low` / `medium` / `high`: fast `gate` scenarios and a short fail-fast soak every build; `nightly` scenarios and the full soak gate the release, not the merge; reviews finish before long runs) with numeric quality budgets (crashes, leaks, performance) plus `jd:error-audit` / `jd:ui-design-audit`, records time and token use per build (`tools/usage-report`), records plugin version and a reason category per correction, rework and stop and reports metrics (`tools/flow-metrics`), prepares a dev environment for acceptance (Gate B) and merges only after acceptance. Hard limits (3 fix attempts, 2 rework rounds, one active feature by default; configurable in `limits.*`) with stop reports instead of loops. `git.integration` chooses pull-request or merge-after-acceptance. Project values in `project-board/project.yaml`, state in `project-board/data/`. |
+| `jd:feature-flow` | Feature lifecycle for AI-built projects: the owner gives requirements and accepts, the AI drafts briefs with numbered acceptance scenarios (Gate A), builds with subagents test-first, verifies in proportion to risk (tiers `low` / `medium` / `high`: fast `gate` scenarios and a short fail-fast soak every build; `nightly` scenarios and the full soak gate the release, not the merge; reviews finish before long runs) with numeric quality budgets (crashes, leaks, performance) plus `jd:error-audit` / `jd:ui-design-audit`, records time and token use per build (`tools/usage-report`), records plugin version and a reason category per correction, rework and stop and reports metrics (`tools/flow-metrics`), prepares a dev environment for acceptance (Gate B) and merges only after acceptance. Hard limits (3 fix attempts, 2 rework rounds, one active feature by default; configurable in `limits.*`) with stop reports instead of loops. `git.integration` chooses pull-request or merge-after-acceptance. Every step change appends a timestamped event (`tools/flow-event`) that the `/flow` pane draws as a timeline. Project values in `project-board/project.yaml`, state in `project-board/data/`. |
 
 | Command | Description |
 |---------|-------------|
@@ -35,6 +35,7 @@ A growing library of personal engineering skills that work across projects: proj
 | `/jd:feature <ID\|text>` | Feature flow: check needs and draft the brief and acceptance scenarios for owner approval (Gate A). |
 | `/jd:build <ID>` | Feature flow: build an approved feature, re-run all accepted scenarios, audit, prepare dev acceptance (stops at Gate B). |
 | `/jd:accept <ID> ok\|notes` | Feature flow: record the verdict — merge on ok, or start a rework round with notes. |
+| `/flow [repo path]` | Toggle the feature-flow pane beside the chat (stepper, timeline, waiting items, queue); a path watches another repository, `.` returns to the working directory. Registered by the `flow-view` hooks module, so it has no `jd:` prefix. |
 
 | Agent | Description |
 |-------|-------------|
@@ -42,6 +43,10 @@ A growing library of personal engineering skills that work across projects: proj
 | `jd:security-reviewer` | Independent, read-only security review (Opus) of a git range: authentication, authorization, injection, secrets, personal data, payment integrity, uploads, client storage, dependencies. Severity-graded findings with exploit steps and fixes; verdict `BLOCK` on Critical/High. Used by `jd:feature-flow` when auth, personal data, payment or uploads change. |
 
 Agents ship in `plugins/jd/agents/` as subagent types `jd:<name>` and are available to any session that has the plugin installed.
+
+## Upgrading to 0.41.0
+
+`jd:feature-flow` now records a timestamped event at every step change in `<paths.data>/flow-events.jsonl` (`tools/flow-event`), and the plugin ships a hooks module, `flow-view`: type `/flow` (or `/flow <repo path>`) in any Claude Code session to toggle a pane beside the chat with the active feature's lifecycle stepper (idea → brief → build → accept → done), current step with a live spinner and elapsed clock, fix and rework counters, a full-roadmap timeline (brief, Gate A, build steps 1-10, Gate B, done) with durations, failures and an animated bar on the running step, items waiting for people, recent events and the queue. The status line shows a one-line summary while the pane is closed. The pane needs a Claude Code build with hooks modules (`modules` in `hooks/hooks.json`); older builds ignore it and keep the classic hooks. Projects need no changes: without `flow-events.jsonl` the pane falls back to the status file's log, and the file appears with the next feature-flow step.
 
 ## Upgrading to 0.40.0
 
@@ -107,12 +112,13 @@ Every skill, hook and the board now read per-project settings from `<repo>/proje
 
 ## Hooks
 
-Registered in `plugins/jd/hooks/hooks.json`, run through `hooks/run-hook.cmd` (works on Windows and Unix).
+Registered in `plugins/jd/hooks/hooks.json`. Shell hooks run through `hooks/run-hook.cmd` (works on Windows and Unix); `flow-view.tsx` is a hooks module loaded by Claude Code itself.
 
 | Hook | Event | Behaviour |
 |------|-------|-----------|
 | `session-start` | SessionStart | Injects the `jd:start-conversation` conventions. Skipped when env `JD_CONVENTIONS=off` or `project.yaml` sets `hooks.conventions: false`. `language.*` in `project.yaml` takes precedence over the language rule. |
 | `req-check-stop` | Stop | Advisory reminder when code mapped to a component changed without a matching requirement. Active only when `project.yaml` exists and `hooks.req_check` is not `false`; never blocks. |
+| `flow-view` | hooks module | Registers `/flow`, which toggles a feature-flow pane beside the chat: lifecycle stepper, current step, counters, phase timeline from `flow-events.jsonl`, waiting items, recent events and queue. Polls the project files every 2 s and mirrors a summary in the status line. Read-only; shows an empty state outside a `project-board/project.yaml` repository. |
 
 ## Tools
 
@@ -121,6 +127,7 @@ Registered in `plugins/jd/hooks/hooks.json`, run through `hooks/run-hook.cmd` (w
 | `plugins/jd/tools/project-board` | Fastify + React board server used by `jd:project-board`; needs `project-board/project.yaml`; configured by `board.*` and `BOARD_*` env vars (`BOARD_ENV_FILE` for an env file). |
 | `plugins/jd/tools/flow-metrics` | Zero-dependency Node CLI: reads every feature folder and writes `metrics.json` and `metrics.md` (rework, stops, brief revisions by reason and plugin version) under `paths.data`. Run by `jd:accept` after each accepted feature. |
 | `plugins/jd/tools/flow-eval` | Zero-dependency Node CLI: replays a project's private eval cases (`project-board/evals/`) against two versions of the plugin through `claude plugin eval` and compares scores. See `plugins/jd/tools/flow-eval/README.md`. |
+| `plugins/jd/tools/flow-event` | Zero-dependency Node CLI: appends one timestamped event (`--feature`, `--phase`, `--event`, optional `--step`, `--note`) to `<paths.data>/flow-events.jsonl`. Called by `jd:feature-flow` at every step change; read by the `/flow` pane. |
 | `plugins/jd/tools/req-check` | Zero-dependency Node CLI behind the Stop hook; verifies the `Req:` commit trailer against the requirements map. |
 
 ## Output convention
@@ -177,10 +184,12 @@ jd-claude-skill/
 │       ├── skills/          one folder per skill, each with SKILL.md
 │       ├── commands/        one markdown file per /jd:<name> command
 │       ├── agents/          subagent definitions (qa-runner, security-reviewer)
-│       ├── hooks/           hooks.json, run-hook.cmd, session-start, req-check-stop
+│       ├── hooks/           hooks.json, run-hook.cmd, session-start, req-check-stop, flow-view.tsx
+│       ├── types/           state contract of the flow-view hooks module
 │       ├── shared/          project-config (reader + docs), requirements parser, output convention
 │       └── tools/
 │           ├── flow-eval/
+│           ├── flow-event/
 │           ├── flow-metrics/
 │           ├── project-board/
 │           └── req-check/

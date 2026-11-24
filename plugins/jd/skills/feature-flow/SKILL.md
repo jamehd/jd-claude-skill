@@ -63,6 +63,7 @@ instructions):
 | Scenario catalogue | `paths.scenarios` | `templates/scenarios.md` |
 | Owner action | `paths.owner_actions/<ID>.md` | `templates/owner-action.md` |
 | Stop report | inside the status file and the card or report | `templates/stop-report.md` |
+| Flow events | `paths.data/flow-events.jsonl` | `references/events.md` (written by `tools/flow-event`) |
 
 Files are the source of truth. Never keep state or counters only in memory.
 
@@ -123,3 +124,5 @@ anything in `acceptance.forbidden`; a missing tool, credential or service with n
 - Task files use the project-board task format but are never set to `ready`, so board
   auto-dispatch cannot pick them up.
 - End every command by updating the status file and `feature.md`.
+- Every change of status or "Current step" also appends a flow event through `tools/flow-event`
+  (`references/events.md`); the `/flow` pane and the status line read the timeline from it.

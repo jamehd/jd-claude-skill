@@ -31,7 +31,7 @@ Only when the input explicitly accepts the feature.
      fast-forward, not squash), push `git.main`, delete the remote feature branch.
 4. `paths.scenarios`: this feature's scenarios → `active` (they now run in every build).
 5. Task files of this feature → `done`.
-6. `feature.md` → `done`; the status file names the next feature in the queue. When the feature has
+6. `feature.md` → `done` with a `done` flow event (`events.md`); the status file names the next feature in the queue. When the feature has
    a `test_soak` budget and its soak gates the release, add it under "Release readiness" as
    waiting for the nightly full soak.
 7. Run `node <plugin>/tools/flow-metrics/metrics.mjs --repo <repository root>` (`<plugin>` is two folders
@@ -43,7 +43,7 @@ Only when the input explicitly accepts the feature.
 
 ## Verdict with notes
 
-1. Record each note against its scenario, with a reason slug from `references/reasons.md` (several distinct slugs, comma-separated, when the round's notes differ); increment `reworkRound` in `feature.md` and the report.
+1. Append the `rework` `start` flow event. Record each note against its scenario, with a reason slug from `references/reasons.md` (several distinct slugs, comma-separated, when the round's notes differ); increment `reworkRound` in `feature.md` and the report.
 2. Within `limits.rework_rounds`: add a rework history row (including its Reason column), set `building`, continue with
    `build.md` limited to the notes. Under `pull-request`, keep the existing PR open: push the
    rework commits to the same feature branch and note the round in the PR.

@@ -7,7 +7,7 @@ Read `project.yaml`, `paths.status` and every `feature.md`. Decide from files on
 
 | State | Action |
 |---|---|
-| A feature `stopped`, and the owner's latest message explicitly answers its stop question | Record the decision in the stop report, apply it, set the status back to `stoppedFrom`, clear `stoppedFrom`, continue from "Current step" in the status file |
+| A feature `stopped`, and the owner's latest message explicitly answers its stop question | Record the decision in the stop report, apply it, set the status back to `stoppedFrom`, clear `stoppedFrom`, append a `resume` flow event, continue from "Current step" in the status file |
 | A feature `stopped`, no explicit answer | Repeat the stop question in `language.owner`; do nothing else |
 | A feature `building` | Continue `build.md` from "Current step" and the first unfinished task |
 | A feature `acceptance` whose ok verdict waits for a long soak | Read the soak result and continue `accept.md` step 2; still running → report when it ends |
