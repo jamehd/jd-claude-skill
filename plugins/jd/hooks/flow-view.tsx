@@ -152,6 +152,19 @@ async function loadSnapshot($: EngineInterface, root: string): Promise<FlowSnaps
   }
 }
 
+// Equal or unparseable times keep the later file row first: rows are appended, so later is newer.
+const newestFirst = <T,>(rows: T[], when: (row: T) => string) => {
+  const time = (row: T) => {
+    const t = Date.parse(when(row))
+    return Number.isNaN(t) ? -Infinity : t
+  }
+  return [...rows].reverse().sort((a, b) => {
+    const ta = time(a)
+    const tb = time(b)
+    return ta === tb ? 0 : tb > ta ? 1 : -1
+  })
+}
+
 const duration = (ms: number) => {
   const m = Math.max(0, Math.round(ms / 60000))
   if (m < 60) return `${m}m`
@@ -554,13 +567,15 @@ export const register: Register = on => {
     )
 
     const recent = featureEvents.length
-      ? featureEvents.slice(-6).map(ev => ({
+      ? newestFirst(featureEvents, ev => ev.ts).slice(0, 6).map(ev => ({
           when: stamp(ev.ts),
           mark: EVENT_MARK[ev.event ?? ''] ?? ['•', 'white'],
           what: [ev.phase, ev.step].filter(Boolean).join(' · '),
           note: ev.note,
         }))
-      : s.log.slice(-6).map(row => ({ when: row.date, mark: ['•', 'white'] as [string, string], what: row.event, note: undefined }))
+      : newestFirst(s.log, row => row.date)
+          .slice(0, 6)
+          .map(row => ({ when: row.date, mark: ['•', 'white'] as [string, string], what: row.event, note: undefined }))
 
     const queue = s.features.filter(f => f.status !== 'done' && f.id !== active?.id).slice(0, 5)
     const doneCount = s.features.filter(f => f.status === 'done').length

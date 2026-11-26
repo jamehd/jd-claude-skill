@@ -44,6 +44,10 @@ A growing library of personal engineering skills that work across projects: proj
 
 Agents ship in `plugins/jd/agents/` as subagent types `jd:<name>` and are available to any session that has the plugin installed.
 
+## Upgrading to 0.41.1
+
+The `/flow` pane's Recent card lists the six newest events first, sorted by timestamp rather than file order; without `flow-events.jsonl` it sorts the status file's log by date the same way. No project changes needed.
+
 ## Upgrading to 0.41.0
 
 `jd:feature-flow` now records a timestamped event at every step change in `<paths.data>/flow-events.jsonl` (`tools/flow-event`), and the plugin ships a hooks module, `flow-view`: type `/flow` (or `/flow <repo path>`) in any Claude Code session to toggle a pane beside the chat with the active feature's lifecycle stepper (idea → brief → build → accept → done), current step with a live spinner and elapsed clock, fix and rework counters, a full-roadmap timeline (brief, Gate A, build steps 1-10, Gate B, done) with durations, failures and an animated bar on the running step, items waiting for people, recent events and the queue. The status line shows a one-line summary while the pane is closed. The pane needs a Claude Code build with hooks modules (`modules` in `hooks/hooks.json`); older builds ignore it and keep the classic hooks. Projects need no changes: without `flow-events.jsonl` the pane falls back to the status file's log, and the file appears with the next feature-flow step.

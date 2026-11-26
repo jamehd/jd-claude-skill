@@ -84,3 +84,41 @@ test('the pane draws stepper, timeline, waiting items and queue', async ($, on) 
   expect((await ui.find({ type: 'Text', text: /^Gate A/ }))?.text).toContain('approved')
   await ui.unmount()
 })
+
+const mountWith = async ($: any, on: any, files: Record<string, string>) => {
+  on('command.register', () => ({ value: { command: 'flow' } }))
+  on('session.start', (_: unknown, e: any) => ({ cwd: e.cwd }))
+  on('clock.every', () => ({ value: undefined }))
+  on('clock.now', () => ({ value: new Date('2026-11-24T10:30:00').getTime() }))
+  on('ui.status', () => ({ value: undefined }))
+  on('ui.panes', () => ({ value: [] }))
+  on('fs.exists', (_: unknown, e: any) => ({
+    value: rel(e.path) in files || ['project-board/data/features', 'project-board/data/features/F-012'].includes(rel(e.path)),
+  }))
+  on('fs.read', (_: unknown, e: any) => ({ value: files[rel(e.path)] ?? '' }))
+  on('fs.list', () => ({ value: [{ name: 'F-012', kind: 'dir', size: 0, mtimeMs: 0, isLink: false }] }))
+  await $.session.start({ cwd: '/', surface: 'terminal', isInteractive: true })
+  return $.ui.mount({ ...PANE, surface: 'terminal' })
+}
+
+test('recent events are newest first, whatever order the file holds them in', async ($, on) => {
+  const lines = (FILES['project-board/data/flow-events.jsonl'] ?? '').split('\n')
+  const shuffled = [lines[14], ...lines.slice(0, 5), lines[12], ...lines.slice(5, 12), lines[13]].join('\n')
+  const ui = await mountWith($, on, { ...FILES, 'project-board/data/flow-events.jsonl': shuffled })
+  const rows = (await ui.findAll({ type: 'Text', text: /^11-24 \d\d:\d\d\s+\S/ })).map((r: { text?: string }) => (r.text ?? '').slice(6, 11))
+  expect(rows).toEqual(['10:15', '10:03', '09:50', '09:43', '09:42', '09:30'])
+  await ui.unmount()
+})
+
+test('without events the status log is shown newest first', async ($, on) => {
+  const files = { ...FILES }
+  delete files['project-board/data/flow-events.jsonl']
+  files['project-board/data/STATUS.md'] = (files['project-board/data/STATUS.md'] ?? '').replace(
+    '| 2026-11-24 | F-012 approved |',
+    '| 2026-11-24 | F-012 approved |\n| 2026-11-20 | F-012 brief drafted |\n| 2026-11-25 | F-012 build started |',
+  )
+  const ui = await mountWith($, on, files)
+  const rows = (await ui.findAll({ type: 'Text', text: /^2026-11-\d\d\s+\S/ })).map((r: { text?: string }) => (r.text ?? '').slice(0, 10))
+  expect(rows).toEqual(['2026-11-25', '2026-11-24', '2026-11-20'])
+  await ui.unmount()
+})
